@@ -1,0 +1,6 @@
+add_subdirectory(renderer)
+add_subdirectory(scripting)
+add_subdirectory(data)
+add_subdirectory(ai)
+add_subdirectory(cloud)
+add_subdirectory(debug_ui)

@@ -1,0 +1,10 @@
+engine:
+  renderer: null
+  scripting:
+    - lua
+    - js
+  ai: true
+  data:
+    sqlite: true
+    yaml: true
+    json: true

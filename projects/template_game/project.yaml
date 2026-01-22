@@ -1,0 +1,9 @@
+project:
+  name: @PROJECT_NAME@
+  renderer: null
+  plugins:
+    - script_lua
+    - debug_ui_imgui
+  initial_level: content/levels/level.yaml
+  input_map: config/input.yaml
+  dev_mode: true

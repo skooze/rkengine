@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RKG AI Run Results",
+  "type": "object",
+  "required": [
+    "run_id",
+    "status",
+    "dry_run"
+  ],
+  "properties": {
+    "run_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["ok", "failed", "conflicts", "blocked", "unknown"] },
+    "dry_run": { "type": "boolean" },
+    "applied": { "type": "integer" },
+    "conflicts": { "type": "integer" },
+    "conflict_files": { "type": "array", "items": { "type": "string" } },
+    "staging_dir": { "type": "string" },
+    "context_drift": {
+      "type": "object",
+      "properties": {
+        "baseline_fingerprint": { "type": "object" },
+        "current_fingerprint": { "type": "object" },
+        "drift_detected": { "type": "boolean" },
+        "allow_context_drift": { "type": "boolean" },
+        "override_used": { "type": "boolean" },
+        "approved_interactive": { "type": "boolean" },
+        "message": { "type": "string" },
+        "changed_counts": {
+          "type": "object",
+          "properties": {
+            "added": { "type": "integer" },
+            "removed": { "type": "integer" },
+            "modified": { "type": "integer" }
+          }
+        },
+        "changed_paths": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

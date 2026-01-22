@@ -1,0 +1,1 @@
+Add a demo prefab named "demo_npc" and place it in the demo level.

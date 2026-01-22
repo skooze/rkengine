@@ -1,0 +1,7 @@
+if(RKG_ENABLE_IMGUI)
+  if(RKG_ENABLE_VULKAN)
+    add_subdirectory(imgui)
+  else()
+    message(WARNING "RKG_ENABLE_IMGUI requires Vulkan; debug UI will be disabled.")
+  endif()
+endif()

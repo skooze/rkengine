@@ -1,0 +1,103 @@
+{
+  "tasks": [
+    {
+      "id": "task_create_prefab",
+      "title": "Create demo NPC prefab",
+      "description": "Create a new prefab YAML for the demo entity.",
+      "type": "content_change",
+      "priority": 1,
+      "deps": [],
+      "status": "planned",
+      "inputs": {},
+      "outputs": {},
+      "artifacts": ["content/prefabs/demo_npc.yaml"],
+      "approvals_required": true,
+      "retry_policy": "none",
+      "actions": [
+        {
+          "action": "create_prefab",
+          "name": "demo_npc",
+          "components": {
+            "Transform": {
+              "position": [0.0, 0.0, 0.0],
+              "rotation": [0.0, 0.0, 0.0],
+              "scale": [1.0, 1.0, 1.0]
+            }
+          },
+          "output_path": "content/prefabs/demo_npc.yaml"
+        }
+      ]
+    },
+    {
+      "id": "task_add_to_level",
+      "title": "Add demo NPC to level",
+      "description": "Append a new entity instance to the demo level YAML.",
+      "type": "content_change",
+      "priority": 2,
+      "deps": ["task_create_prefab"],
+      "status": "planned",
+      "inputs": {},
+      "outputs": {},
+      "artifacts": ["content/levels/demo_level.yaml"],
+      "approvals_required": true,
+      "retry_policy": "none",
+      "actions": [
+        {
+          "action": "add_level_entity",
+          "level_path": "content/levels/demo_level.yaml",
+          "prefab_ref": "demo_npc",
+          "name": "demo_npc_1",
+          "transform": {
+            "position": [2.0, 0.0, 0.0],
+            "rotation": [0.0, 0.0, 0.0],
+            "scale": [1.0, 1.0, 1.0]
+          }
+        }
+      ]
+    },
+    {
+      "id": "task_update_project",
+      "title": "Update project initial level",
+      "description": "Ensure the demo project loads the updated level.",
+      "type": "doc_update",
+      "priority": 3,
+      "deps": ["task_add_to_level"],
+      "status": "planned",
+      "inputs": {},
+      "outputs": {},
+      "artifacts": ["projects/demo_game/project.yaml"],
+      "approvals_required": true,
+      "retry_policy": "none",
+      "actions": [
+        {
+          "action": "update_yaml",
+          "path": "projects/demo_game/project.yaml",
+          "keypath": "project.initial_level",
+          "value": "content/levels/demo_level.yaml"
+        }
+      ]
+    },
+    {
+      "id": "task_write_runtime_instructions",
+      "title": "Write runtime instruction file",
+      "description": "Create a runtime instruction file for the minimal app to apply on startup.",
+      "type": "content_change",
+      "priority": 4,
+      "deps": ["task_update_project"],
+      "status": "planned",
+      "inputs": {},
+      "outputs": {},
+      "artifacts": ["build/runtime_instructions.json"],
+      "approvals_required": true,
+      "retry_policy": "none",
+      "actions": [
+        {
+          "action": "write_text_file",
+          "path": "build/runtime_instructions.json",
+          "mode": "overwrite",
+          "contents": "{\n  \"instructions\": [\n    {\n      \"action\": \"spawn_entity\",\n      \"name\": \"runtime_npc\",\n      \"prefab\": \"demo_npc\",\n      \"transform\": {\n        \"position\": [1.0, 0.0, 0.0],\n        \"rotation\": [0.0, 0.0, 0.0],\n        \"scale\": [1.0, 1.0, 1.0]\n      }\n    }\n  ]\n}\n"
+        }
+      ]
+    }
+  ]
+}

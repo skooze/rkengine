@@ -1,0 +1,15 @@
+{
+  "id": "resp_example",
+  "output_text": "{\n  \"schema_version\": \"1\",\n  \"tasks\": [\n    {\n      \"id\": \"task_create_prefab\",\n      \"type\": \"content_change\",\n      \"actions\": [\n        {\n          \"action\": \"create_prefab\",\n          \"name\": \"demo_npc\",\n          \"components\": {\n            \"Transform\": {\n              \"position\": [0.0, 0.0, 0.0],\n              \"rotation\": [0.0, 0.0, 0.0],\n              \"scale\": [1.0, 1.0, 1.0]\n            }\n          },\n          \"output_path\": \"content/prefabs/demo_npc.yaml\"\n        }\n      ]\n    }\n  ]\n}",
+  "output": [
+    {
+      "type": "message",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\n  \"schema_version\": \"1\",\n  \"tasks\": [\n    {\n      \"id\": \"task_create_prefab\",\n      \"type\": \"content_change\",\n      \"actions\": [\n        {\n          \"action\": \"create_prefab\",\n          \"name\": \"demo_npc\",\n          \"components\": {\n            \"Transform\": {\n              \"position\": [0.0, 0.0, 0.0],\n              \"rotation\": [0.0, 0.0, 0.0],\n              \"scale\": [1.0, 1.0, 1.0]\n            }\n          },\n          \"output_path\": \"content/prefabs/demo_npc.yaml\"\n        }\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    }
+  ]
+}

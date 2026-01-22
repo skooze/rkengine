@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RKG AI Run Info",
+  "type": "object",
+  "required": [
+    "run_id",
+    "created_at",
+    "mode",
+    "provider",
+    "model",
+    "base_url",
+    "templates_dir",
+    "timeout_seconds",
+    "strict_enums"
+  ],
+  "properties": {
+    "run_id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "goal": { "type": "string" },
+    "mode": { "type": "string", "enum": ["plan", "apply"] },
+    "provider": { "type": "string" },
+    "provider_note": { "type": "string" },
+    "model": { "type": "string" },
+    "base_url": { "type": "string" },
+    "templates_dir": { "type": "string" },
+    "timeout_seconds": { "type": "integer" },
+    "strict_enums": { "type": "boolean" },
+    "plan_path": { "type": "string" },
+    "dry_run": { "type": "boolean" },
+    "require_approval": { "type": "boolean" },
+    "config_sources": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "base_url": { "type": "string" },
+        "templates_dir": { "type": "string" },
+        "timeout_seconds": { "type": "string" }
+      }
+    }
+  }
+}

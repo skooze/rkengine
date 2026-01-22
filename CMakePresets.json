@@ -1,0 +1,81 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "build",
+      "cacheVariables": {
+        "RKG_ENABLE_VULKAN": "ON",
+        "RKG_ENABLE_SCRIPT_LUA": "ON",
+        "RKG_ENABLE_SCRIPT_JS": "ON",
+        "RKG_ENABLE_SCRIPT_PYTHON": "ON",
+        "RKG_ENABLE_DATA_SQLITE": "ON",
+        "RKG_ENABLE_DATA_YAML": "ON",
+        "RKG_ENABLE_DATA_JSON": "ON",
+        "RKG_ENABLE_AI": "ON",
+        "RKG_ENABLE_CLOUD": "OFF",
+        "RKG_ENABLE_IMGUI": "ON"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RKG_ENABLE_D3D12": "OFF"
+      }
+    },
+    {
+      "name": "linux-release",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RKG_ENABLE_D3D12": "OFF"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RKG_ENABLE_D3D12": "ON"
+      }
+    },
+    {
+      "name": "windows-release",
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RKG_ENABLE_D3D12": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug"
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release"
+    }
+  ]
+}

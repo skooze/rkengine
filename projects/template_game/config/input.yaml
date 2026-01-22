@@ -1,0 +1,9 @@
+input:
+  actions:
+    MoveForward: W
+    MoveBack: S
+    MoveLeft: A
+    MoveRight: D
+    Quit: Escape
+    Reload: F5
+    ToggleDebugUI: F1

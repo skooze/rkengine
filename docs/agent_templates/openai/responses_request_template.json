@@ -1,0 +1,33 @@
+{
+  "model": "{{MODEL}}",
+  "input": [
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "{{SYSTEM_PROMPT}}"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "{{USER_PROMPT}}"
+        }
+      ]
+    }
+  ],
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "json_schema": {
+        "name": "rkg_plan",
+        "schema": {{PLAN_SCHEMA_JSON}},
+        "strict": true
+      }
+    }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RKG Dev Task Graph",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": ["tasks"],
+  "$defs": {
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 3
+        },
+        "rotation": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 3
+        },
+        "scale": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 3
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "write_text_file" },
+            "path": { "type": "string" },
+            "contents": { "type": "string" },
+            "mode": { "type": "string", "enum": ["create", "overwrite"] }
+          },
+          "required": ["action", "path", "contents", "mode"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "update_yaml" },
+            "path": { "type": "string" },
+            "keypath": { "type": "string" },
+            "value": {
+              "type": ["string", "number", "object", "array", "boolean", "null"]
+            }
+          },
+          "required": ["action", "path", "keypath", "value"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "create_prefab" },
+            "name": { "type": "string" },
+            "components": {
+              "type": ["object", "array"]
+            },
+            "output_path": { "type": "string" }
+          },
+          "required": ["action", "name", "components"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "add_level_entity" },
+            "level_path": { "type": "string" },
+            "prefab_ref": { "type": "string" },
+            "name": { "type": "string" },
+            "transform": { "$ref": "#/$defs/transform" }
+          },
+          "required": ["action", "level_path", "prefab_ref"]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "record_audit" },
+            "event": { "type": "string" }
+          },
+          "required": ["action", "event"]
+        }
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "content_change",
+            "asset_build",
+            "build",
+            "test",
+            "run_demo",
+            "doc_update"
+          ]
+        },
+        "priority": { "type": "integer" },
+        "deps": { "type": "array", "items": { "type": "string" } },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "in_progress", "done", "blocked"]
+        },
+        "inputs": { "type": "object", "additionalProperties": true },
+        "outputs": { "type": "object", "additionalProperties": true },
+        "artifacts": { "type": "array", "items": { "type": "string" } },
+        "approvals_required": { "type": "boolean" },
+        "retry_policy": { "type": ["string", "object", "null"] },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+      },
+      "required": ["id", "type"]
+    }
+  }
+}

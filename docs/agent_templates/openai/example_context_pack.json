@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-01-22T12:00:00",
+  "project_name": "demo_game",
+  "project_root": "/repo/projects/demo_game",
+  "engine_config": "/repo/config/engine.yaml",
+  "content_root": "/repo/projects/demo_game/content",
+  "files": [
+    { "path": "project.yaml", "hash": "abcd1234" },
+    { "path": "content/levels/demo_level.yaml", "hash": "ef567890" },
+    { "path": "content/prefabs/player.yaml", "hash": "1234abcd" }
+  ]
+}
