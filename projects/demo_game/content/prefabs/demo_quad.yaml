@@ -1,9 +1,9 @@
-name: base_cube
+name: demo_quad
 components:
   Transform:
     position: [0.0, 0.0, 0.0]
     rotation: [0.0, 0.0, 0.0]
     scale: [1.0, 1.0, 1.0]
   Renderable:
-    mesh: cube
-    color: [0.7, 0.7, 0.9, 1.0]
+    mesh: quad
+    color: [1.0, 0.7, 0.3, 1.0]

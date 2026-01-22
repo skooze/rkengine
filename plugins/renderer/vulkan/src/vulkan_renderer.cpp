@@ -12,6 +12,7 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -39,9 +40,109 @@ struct VulkanState {
   VkSemaphore image_available = VK_NULL_HANDLE;
   VkSemaphore render_finished = VK_NULL_HANDLE;
   VkFence in_flight_fence = VK_NULL_HANDLE;
+
+  VkImage offscreen_image = VK_NULL_HANDLE;
+  VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
+  VkImageView offscreen_view = VK_NULL_HANDLE;
+  VkSampler offscreen_sampler = VK_NULL_HANDLE;
+  VkRenderPass offscreen_render_pass = VK_NULL_HANDLE;
+  VkFramebuffer offscreen_framebuffer = VK_NULL_HANDLE;
+  VkExtent2D offscreen_extent{};
+  uint64_t offscreen_version = 0;
+
+  VkImage offscreen_depth_image = VK_NULL_HANDLE;
+  VkDeviceMemory offscreen_depth_memory = VK_NULL_HANDLE;
+  VkImageView offscreen_depth_view = VK_NULL_HANDLE;
+  VkFormat offscreen_depth_format = VK_FORMAT_D32_SFLOAT;
+
+  VkPipeline viewport_pipeline = VK_NULL_HANDLE;
+  VkPipelineLayout viewport_pipeline_layout = VK_NULL_HANDLE;
+  VkBuffer viewport_cube_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory viewport_cube_memory = VK_NULL_HANDLE;
+  VkBuffer viewport_quad_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory viewport_quad_memory = VK_NULL_HANDLE;
+  uint32_t viewport_cube_vertex_count = 0;
+  uint32_t viewport_quad_vertex_count = 0;
 };
 
 VulkanState g_state{};
+
+bool create_viewport_pipeline();
+bool create_viewport_vertex_buffer();
+
+static constexpr uint32_t kViewportVertexCount = 36;
+static const float kViewportCubeVertices[kViewportVertexCount * 3] = {
+    -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,
+     0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
+
+    -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f, -0.5f,  0.5f,
+
+    -0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
+    -0.5f, -0.5f, -0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f,
+
+     0.5f,  0.5f,  0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,  0.5f,
+
+    -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f,  0.5f,
+     0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f, -0.5f,
+
+    -0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f, -0.5f,  0.5f,  0.5f, -0.5f,  0.5f, -0.5f,
+};
+
+static constexpr uint32_t kViewportQuadVertexCount = 6;
+static const float kViewportQuadVertices[kViewportQuadVertexCount * 3] = {
+    -0.5f, -0.5f, 0.0f,  0.5f, -0.5f, 0.0f,  0.5f,  0.5f, 0.0f,
+     0.5f,  0.5f, 0.0f, -0.5f,  0.5f, 0.0f, -0.5f, -0.5f, 0.0f,
+};
+
+static const uint32_t rkg_viewport_vert_spv[] = {
+  0x07230203u, 0x00010300u, 0x00070000u, 0x00000019u, 0x00000000u, 0x00020011u, 0x00000001u, 0x0003000eu,
+  0x00000000u, 0x00000001u, 0x0007000fu, 0x00000000u, 0x00000001u, 0x6e69616du, 0x00000000u, 0x00000002u,
+  0x00000003u, 0x00040005u, 0x00000001u, 0x6e69616du, 0x00000000u, 0x00040005u, 0x00000002u, 0x6f506e69u,
+  0x00000073u, 0x00050005u, 0x00000003u, 0x505f6c67u, 0x7469736fu, 0x006e6f69u, 0x00060005u, 0x00000004u,
+  0x68737550u, 0x736e6f43u, 0x746e6174u, 0x00000073u, 0x00040006u, 0x00000004u, 0x00000000u, 0x0070766du,
+  0x00050006u, 0x00000004u, 0x00000001u, 0x6f6c6f63u, 0x00000072u, 0x00030005u, 0x00000005u, 0x00006370u,
+  0x00040047u, 0x00000002u, 0x0000001eu, 0x00000000u, 0x00040047u, 0x00000003u, 0x0000000bu, 0x00000000u,
+  0x00030047u, 0x00000004u, 0x00000002u, 0x00050048u, 0x00000004u, 0x00000000u, 0x00000023u, 0x00000000u,
+  0x00040048u, 0x00000004u, 0x00000000u, 0x00000005u, 0x00050048u, 0x00000004u, 0x00000000u, 0x00000007u,
+  0x00000010u, 0x00050048u, 0x00000004u, 0x00000001u, 0x00000023u, 0x00000040u, 0x00020013u, 0x00000006u,
+  0x00030016u, 0x00000007u, 0x00000020u, 0x00040015u, 0x00000008u, 0x00000020u, 0x00000001u, 0x00040017u,
+  0x00000009u, 0x00000007u, 0x00000003u, 0x00040017u, 0x0000000au, 0x00000007u, 0x00000004u, 0x00040018u,
+  0x0000000bu, 0x0000000au, 0x00000004u, 0x0004001eu, 0x00000004u, 0x0000000bu, 0x0000000au, 0x00040020u,
+  0x0000000cu, 0x00000009u, 0x00000004u, 0x00040020u, 0x0000000du, 0x00000009u, 0x0000000bu, 0x00040020u,
+  0x0000000eu, 0x00000001u, 0x00000009u, 0x00040020u, 0x0000000fu, 0x00000003u, 0x0000000au, 0x00030021u,
+  0x00000010u, 0x00000006u, 0x0004002bu, 0x00000007u, 0x00000011u, 0x3f800000u, 0x0004002bu, 0x00000008u,
+  0x00000012u, 0x00000000u, 0x0004003bu, 0x0000000eu, 0x00000002u, 0x00000001u, 0x0004003bu, 0x0000000fu,
+  0x00000003u, 0x00000003u, 0x0004003bu, 0x0000000cu, 0x00000005u, 0x00000009u, 0x00050036u, 0x00000006u,
+  0x00000001u, 0x00000000u, 0x00000010u, 0x000200f8u, 0x00000013u, 0x0004003du, 0x00000009u, 0x00000014u,
+  0x00000002u, 0x00050050u, 0x0000000au, 0x00000015u, 0x00000014u, 0x00000011u, 0x00050041u, 0x0000000du,
+  0x00000016u, 0x00000005u, 0x00000012u, 0x0004003du, 0x0000000bu, 0x00000017u, 0x00000016u, 0x00050091u,
+  0x0000000au, 0x00000018u, 0x00000017u, 0x00000015u, 0x0003003eu, 0x00000003u, 0x00000018u, 0x000100fdu,
+  0x00010038u
+};
+
+static const uint32_t rkg_viewport_frag_spv[] = {
+  0x07230203u, 0x00010300u, 0x00070000u, 0x00000012u, 0x00000000u, 0x00020011u, 0x00000001u, 0x0003000eu,
+  0x00000000u, 0x00000001u, 0x0006000fu, 0x00000004u, 0x00000001u, 0x6e69616du, 0x00000000u, 0x00000002u,
+  0x00030010u, 0x00000001u, 0x00000007u, 0x00040005u, 0x00000001u, 0x6e69616du, 0x00000000u, 0x00050005u,
+  0x00000002u, 0x4374756fu, 0x726f6c6fu, 0x00000000u, 0x00060005u, 0x00000003u, 0x68737550u, 0x736e6f43u,
+  0x746e6174u, 0x00000073u, 0x00040006u, 0x00000003u, 0x00000000u, 0x0070766du, 0x00050006u, 0x00000003u,
+  0x00000001u, 0x6f6c6f63u, 0x00000072u, 0x00030005u, 0x00000004u, 0x00006370u, 0x00040047u, 0x00000002u,
+  0x0000001eu, 0x00000000u, 0x00030047u, 0x00000003u, 0x00000002u, 0x00050048u, 0x00000003u, 0x00000000u,
+  0x00000023u, 0x00000000u, 0x00040048u, 0x00000003u, 0x00000000u, 0x00000005u, 0x00050048u, 0x00000003u,
+  0x00000000u, 0x00000007u, 0x00000010u, 0x00050048u, 0x00000003u, 0x00000001u, 0x00000023u, 0x00000040u,
+  0x00020013u, 0x00000005u, 0x00030016u, 0x00000006u, 0x00000020u, 0x00040017u, 0x00000007u, 0x00000006u,
+  0x00000004u, 0x00040018u, 0x00000008u, 0x00000007u, 0x00000004u, 0x0004001eu, 0x00000003u, 0x00000008u,
+  0x00000007u, 0x00040020u, 0x00000009u, 0x00000009u, 0x00000003u, 0x00040020u, 0x0000000au, 0x00000009u,
+  0x00000007u, 0x00040020u, 0x0000000bu, 0x00000003u, 0x00000007u, 0x00030021u, 0x0000000cu, 0x00000005u,
+  0x00040015u, 0x0000000du, 0x00000020u, 0x00000001u, 0x0004002bu, 0x0000000du, 0x0000000eu, 0x00000001u,
+  0x0004003bu, 0x0000000bu, 0x00000002u, 0x00000003u, 0x0004003bu, 0x00000009u, 0x00000004u, 0x00000009u,
+  0x00050036u, 0x00000005u, 0x00000001u, 0x00000000u, 0x0000000cu, 0x000200f8u, 0x0000000fu, 0x00050041u,
+  0x0000000au, 0x00000010u, 0x00000004u, 0x0000000eu, 0x0004003du, 0x00000007u, 0x00000011u, 0x00000010u,
+  0x0003003eu, 0x00000002u, 0x00000011u, 0x000100fdu, 0x00010038u
+};
 
 bool create_instance() {
   uint32_t ext_count = 0;
@@ -154,6 +255,493 @@ bool create_device() {
 
   vkGetDeviceQueue(g_state.device, g_state.graphics_queue_family, 0, &g_state.graphics_queue);
   vkGetDeviceQueue(g_state.device, g_state.present_queue_family, 0, &g_state.present_queue);
+  return true;
+}
+
+uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+  VkPhysicalDeviceMemoryProperties mem_properties;
+  vkGetPhysicalDeviceMemoryProperties(g_state.physical_device, &mem_properties);
+  for (uint32_t i = 0; i < mem_properties.memoryTypeCount; ++i) {
+    if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+void destroy_offscreen() {
+  if (g_state.viewport_pipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.viewport_pipeline, nullptr);
+    g_state.viewport_pipeline = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_pipeline_layout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(g_state.device, g_state.viewport_pipeline_layout, nullptr);
+    g_state.viewport_pipeline_layout = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_cube_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.viewport_cube_buffer, nullptr);
+    g_state.viewport_cube_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_cube_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.viewport_cube_memory, nullptr);
+    g_state.viewport_cube_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_quad_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.viewport_quad_buffer, nullptr);
+    g_state.viewport_quad_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_quad_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.viewport_quad_memory, nullptr);
+    g_state.viewport_quad_memory = VK_NULL_HANDLE;
+  }
+  g_state.viewport_cube_vertex_count = 0;
+  g_state.viewport_quad_vertex_count = 0;
+
+  if (g_state.offscreen_depth_view != VK_NULL_HANDLE) {
+    vkDestroyImageView(g_state.device, g_state.offscreen_depth_view, nullptr);
+    g_state.offscreen_depth_view = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_depth_image != VK_NULL_HANDLE) {
+    vkDestroyImage(g_state.device, g_state.offscreen_depth_image, nullptr);
+    g_state.offscreen_depth_image = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_depth_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.offscreen_depth_memory, nullptr);
+    g_state.offscreen_depth_memory = VK_NULL_HANDLE;
+  }
+
+  if (g_state.offscreen_framebuffer != VK_NULL_HANDLE) {
+    vkDestroyFramebuffer(g_state.device, g_state.offscreen_framebuffer, nullptr);
+    g_state.offscreen_framebuffer = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_render_pass != VK_NULL_HANDLE) {
+    vkDestroyRenderPass(g_state.device, g_state.offscreen_render_pass, nullptr);
+    g_state.offscreen_render_pass = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_view != VK_NULL_HANDLE) {
+    vkDestroyImageView(g_state.device, g_state.offscreen_view, nullptr);
+    g_state.offscreen_view = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_sampler != VK_NULL_HANDLE) {
+    vkDestroySampler(g_state.device, g_state.offscreen_sampler, nullptr);
+    g_state.offscreen_sampler = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_image != VK_NULL_HANDLE) {
+    vkDestroyImage(g_state.device, g_state.offscreen_image, nullptr);
+    g_state.offscreen_image = VK_NULL_HANDLE;
+  }
+  if (g_state.offscreen_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.offscreen_memory, nullptr);
+    g_state.offscreen_memory = VK_NULL_HANDLE;
+  }
+  g_state.offscreen_extent = {};
+  rkg::register_vulkan_viewport(nullptr);
+}
+
+bool create_offscreen(uint32_t width, uint32_t height) {
+  destroy_offscreen();
+  if (width == 0 || height == 0) {
+    return false;
+  }
+
+  VkImageCreateInfo image_info{};
+  image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType = VK_IMAGE_TYPE_2D;
+  image_info.format = g_state.swapchain_format;
+  image_info.extent = {width, height, 1};
+  image_info.mipLevels = 1;
+  image_info.arrayLayers = 1;
+  image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+  if (vkCreateImage(g_state.device, &image_info, nullptr, &g_state.offscreen_image) != VK_SUCCESS) {
+    rkg::log::error("offscreen image create failed");
+    return false;
+  }
+
+  VkMemoryRequirements mem_req{};
+  vkGetImageMemoryRequirements(g_state.device, g_state.offscreen_image, &mem_req);
+  VkMemoryAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  alloc_info.allocationSize = mem_req.size;
+  alloc_info.memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (vkAllocateMemory(g_state.device, &alloc_info, nullptr, &g_state.offscreen_memory) != VK_SUCCESS) {
+    rkg::log::error("offscreen memory allocate failed");
+    return false;
+  }
+  vkBindImageMemory(g_state.device, g_state.offscreen_image, g_state.offscreen_memory, 0);
+
+  VkImageViewCreateInfo view_info{};
+  view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  view_info.image = g_state.offscreen_image;
+  view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  view_info.format = g_state.swapchain_format;
+  view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  view_info.subresourceRange.baseMipLevel = 0;
+  view_info.subresourceRange.levelCount = 1;
+  view_info.subresourceRange.baseArrayLayer = 0;
+  view_info.subresourceRange.layerCount = 1;
+  if (vkCreateImageView(g_state.device, &view_info, nullptr, &g_state.offscreen_view) != VK_SUCCESS) {
+    rkg::log::error("offscreen image view create failed");
+    return false;
+  }
+
+  VkSamplerCreateInfo sampler_info{};
+  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.magFilter = VK_FILTER_LINEAR;
+  sampler_info.minFilter = VK_FILTER_LINEAR;
+  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  if (vkCreateSampler(g_state.device, &sampler_info, nullptr, &g_state.offscreen_sampler) != VK_SUCCESS) {
+    rkg::log::error("offscreen sampler create failed");
+    return false;
+  }
+
+  VkImageCreateInfo depth_info{};
+  depth_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  depth_info.imageType = VK_IMAGE_TYPE_2D;
+  depth_info.format = g_state.offscreen_depth_format;
+  depth_info.extent = {width, height, 1};
+  depth_info.mipLevels = 1;
+  depth_info.arrayLayers = 1;
+  depth_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  depth_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  depth_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  depth_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+  if (vkCreateImage(g_state.device, &depth_info, nullptr, &g_state.offscreen_depth_image) != VK_SUCCESS) {
+    rkg::log::error("offscreen depth image create failed");
+    return false;
+  }
+
+  VkMemoryRequirements depth_req{};
+  vkGetImageMemoryRequirements(g_state.device, g_state.offscreen_depth_image, &depth_req);
+  VkMemoryAllocateInfo depth_alloc{};
+  depth_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  depth_alloc.allocationSize = depth_req.size;
+  depth_alloc.memoryTypeIndex = find_memory_type(depth_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (vkAllocateMemory(g_state.device, &depth_alloc, nullptr, &g_state.offscreen_depth_memory) != VK_SUCCESS) {
+    rkg::log::error("offscreen depth memory allocate failed");
+    return false;
+  }
+  vkBindImageMemory(g_state.device, g_state.offscreen_depth_image, g_state.offscreen_depth_memory, 0);
+
+  VkImageViewCreateInfo depth_view{};
+  depth_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  depth_view.image = g_state.offscreen_depth_image;
+  depth_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  depth_view.format = g_state.offscreen_depth_format;
+  depth_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  depth_view.subresourceRange.baseMipLevel = 0;
+  depth_view.subresourceRange.levelCount = 1;
+  depth_view.subresourceRange.baseArrayLayer = 0;
+  depth_view.subresourceRange.layerCount = 1;
+  if (vkCreateImageView(g_state.device, &depth_view, nullptr, &g_state.offscreen_depth_view) != VK_SUCCESS) {
+    rkg::log::error("offscreen depth view create failed");
+    return false;
+  }
+
+  VkAttachmentDescription attachments[2]{};
+  attachments[0].format = g_state.swapchain_format;
+  attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+  attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  attachments[1].format = g_state.offscreen_depth_format;
+  attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+  attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference color_ref{};
+  color_ref.attachment = 0;
+  color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference depth_ref{};
+  depth_ref.attachment = 1;
+  depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkSubpassDescription subpass{};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &color_ref;
+  subpass.pDepthStencilAttachment = &depth_ref;
+
+  VkRenderPassCreateInfo render_pass_info{};
+  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  render_pass_info.attachmentCount = 2;
+  render_pass_info.pAttachments = attachments;
+  render_pass_info.subpassCount = 1;
+  render_pass_info.pSubpasses = &subpass;
+
+  if (vkCreateRenderPass(g_state.device, &render_pass_info, nullptr, &g_state.offscreen_render_pass) != VK_SUCCESS) {
+    rkg::log::error("offscreen render pass create failed");
+    return false;
+  }
+
+  VkImageView fb_attachments[] = {g_state.offscreen_view, g_state.offscreen_depth_view};
+  VkFramebufferCreateInfo fb_info{};
+  fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  fb_info.renderPass = g_state.offscreen_render_pass;
+  fb_info.attachmentCount = 2;
+  fb_info.pAttachments = fb_attachments;
+  fb_info.width = width;
+  fb_info.height = height;
+  fb_info.layers = 1;
+  if (vkCreateFramebuffer(g_state.device, &fb_info, nullptr, &g_state.offscreen_framebuffer) != VK_SUCCESS) {
+    rkg::log::error("offscreen framebuffer create failed");
+    return false;
+  }
+
+  g_state.offscreen_extent = {width, height};
+  g_state.offscreen_version += 1;
+
+  rkg::VulkanViewportHooks hooks;
+  hooks.image_view = g_state.offscreen_view;
+  hooks.sampler = g_state.offscreen_sampler;
+  hooks.width = width;
+  hooks.height = height;
+  hooks.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  hooks.version = g_state.offscreen_version;
+  rkg::register_vulkan_viewport(&hooks);
+  if (!create_viewport_pipeline()) {
+    rkg::log::error("viewport pipeline setup failed");
+    return false;
+  }
+  if (!create_viewport_vertex_buffer()) {
+    rkg::log::error("viewport vertex buffer setup failed");
+    return false;
+  }
+
+  return true;
+}
+
+void update_offscreen_target() {
+  uint32_t req_w = 0;
+  uint32_t req_h = 0;
+  rkg::get_vulkan_viewport_request(req_w, req_h);
+  if (req_w == 0 || req_h == 0) {
+    if (g_state.offscreen_image != VK_NULL_HANDLE) {
+      destroy_offscreen();
+    }
+    return;
+  }
+  if (g_state.offscreen_extent.width != req_w || g_state.offscreen_extent.height != req_h) {
+    create_offscreen(req_w, req_h);
+  }
+}
+
+VkShaderModule create_shader_module(const uint32_t* code, size_t word_count) {
+  VkShaderModuleCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  create_info.codeSize = word_count * sizeof(uint32_t);
+  create_info.pCode = code;
+  VkShaderModule module = VK_NULL_HANDLE;
+  if (vkCreateShaderModule(g_state.device, &create_info, nullptr, &module) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return module;
+}
+
+bool create_viewport_pipeline() {
+  if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
+  if (g_state.viewport_pipeline != VK_NULL_HANDLE) return true;
+
+  VkShaderModule vert = create_shader_module(rkg_viewport_vert_spv,
+                                             sizeof(rkg_viewport_vert_spv) / sizeof(uint32_t));
+  VkShaderModule frag = create_shader_module(rkg_viewport_frag_spv,
+                                             sizeof(rkg_viewport_frag_spv) / sizeof(uint32_t));
+  if (vert == VK_NULL_HANDLE || frag == VK_NULL_HANDLE) {
+    rkg::log::error("viewport shader module creation failed");
+    if (vert != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, vert, nullptr);
+    if (frag != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, frag, nullptr);
+    return false;
+  }
+
+  VkPipelineShaderStageCreateInfo stages[2]{};
+  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = vert;
+  stages[0].pName = "main";
+  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = frag;
+  stages[1].pName = "main";
+
+  VkVertexInputBindingDescription binding{};
+  binding.binding = 0;
+  binding.stride = sizeof(float) * 3;
+  binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  VkVertexInputAttributeDescription attr{};
+  attr.binding = 0;
+  attr.location = 0;
+  attr.format = VK_FORMAT_R32G32B32_SFLOAT;
+  attr.offset = 0;
+
+  VkPipelineVertexInputStateCreateInfo vertex_input{};
+  vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_input.vertexBindingDescriptionCount = 1;
+  vertex_input.pVertexBindingDescriptions = &binding;
+  vertex_input.vertexAttributeDescriptionCount = 1;
+  vertex_input.pVertexAttributeDescriptions = &attr;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+  input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly.primitiveRestartEnable = VK_FALSE;
+
+  VkPipelineViewportStateCreateInfo viewport_state{};
+  viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewport_state.viewportCount = 1;
+  viewport_state.scissorCount = 1;
+
+  VkPipelineRasterizationStateCreateInfo raster{};
+  raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  raster.depthClampEnable = VK_FALSE;
+  raster.rasterizerDiscardEnable = VK_FALSE;
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.lineWidth = 1.0f;
+  raster.cullMode = VK_CULL_MODE_BACK_BIT;
+  raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.depthBiasEnable = VK_FALSE;
+
+  VkPipelineMultisampleStateCreateInfo multisample{};
+  multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineDepthStencilStateCreateInfo depth{};
+  depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depth.depthTestEnable = VK_TRUE;
+  depth.depthWriteEnable = VK_TRUE;
+  depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth.depthBoundsTestEnable = VK_FALSE;
+  depth.stencilTestEnable = VK_FALSE;
+
+  VkPipelineColorBlendAttachmentState color_blend_attach{};
+  color_blend_attach.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  color_blend_attach.blendEnable = VK_FALSE;
+
+  VkPipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  color_blend.attachmentCount = 1;
+  color_blend.pAttachments = &color_blend_attach;
+
+  VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{};
+  dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamics;
+
+  VkPushConstantRange push_range{};
+  push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  push_range.offset = 0;
+  push_range.size = sizeof(float) * 20;
+
+  VkPipelineLayoutCreateInfo layout_info{};
+  layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  layout_info.pushConstantRangeCount = 1;
+  layout_info.pPushConstantRanges = &push_range;
+  if (vkCreatePipelineLayout(g_state.device, &layout_info, nullptr, &g_state.viewport_pipeline_layout) != VK_SUCCESS) {
+    rkg::log::error("viewport pipeline layout creation failed");
+    vkDestroyShaderModule(g_state.device, vert, nullptr);
+    vkDestroyShaderModule(g_state.device, frag, nullptr);
+    return false;
+  }
+
+  VkGraphicsPipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_info.stageCount = 2;
+  pipeline_info.pStages = stages;
+  pipeline_info.pVertexInputState = &vertex_input;
+  pipeline_info.pInputAssemblyState = &input_assembly;
+  pipeline_info.pViewportState = &viewport_state;
+  pipeline_info.pRasterizationState = &raster;
+  pipeline_info.pMultisampleState = &multisample;
+  pipeline_info.pDepthStencilState = &depth;
+  pipeline_info.pColorBlendState = &color_blend;
+  pipeline_info.pDynamicState = &dynamic;
+  pipeline_info.layout = g_state.viewport_pipeline_layout;
+  pipeline_info.renderPass = g_state.offscreen_render_pass;
+  pipeline_info.subpass = 0;
+
+  const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+                                                    &g_state.viewport_pipeline);
+  vkDestroyShaderModule(g_state.device, vert, nullptr);
+  vkDestroyShaderModule(g_state.device, frag, nullptr);
+  if (result != VK_SUCCESS) {
+    rkg::log::error("viewport pipeline creation failed");
+    return false;
+  }
+  return true;
+}
+
+bool create_viewport_vertex_buffer() {
+  if (g_state.viewport_cube_buffer != VK_NULL_HANDLE && g_state.viewport_quad_buffer != VK_NULL_HANDLE) return true;
+
+  auto create_buffer = [&](const float* data, size_t byte_size, VkBuffer& buffer, VkDeviceMemory& memory) -> bool {
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = static_cast<VkDeviceSize>(byte_size);
+    buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(g_state.device, &buffer_info, nullptr, &buffer) != VK_SUCCESS) {
+      return false;
+    }
+
+    VkMemoryRequirements mem_req{};
+    vkGetBufferMemoryRequirements(g_state.device, buffer, &mem_req);
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_req.size;
+    alloc_info.memoryTypeIndex = find_memory_type(
+        mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(g_state.device, &alloc_info, nullptr, &memory) != VK_SUCCESS) {
+      return false;
+    }
+    vkBindBufferMemory(g_state.device, buffer, memory, 0);
+
+    void* mapped = nullptr;
+    if (vkMapMemory(g_state.device, memory, 0, byte_size, 0, &mapped) != VK_SUCCESS) {
+      return false;
+    }
+    std::memcpy(mapped, data, byte_size);
+    vkUnmapMemory(g_state.device, memory);
+    return true;
+  };
+
+  if (g_state.viewport_cube_buffer == VK_NULL_HANDLE) {
+    const size_t cube_bytes = sizeof(kViewportCubeVertices);
+    if (!create_buffer(kViewportCubeVertices, cube_bytes, g_state.viewport_cube_buffer, g_state.viewport_cube_memory)) {
+      rkg::log::error("viewport cube buffer create failed");
+      return false;
+    }
+    g_state.viewport_cube_vertex_count = kViewportVertexCount;
+  }
+
+  if (g_state.viewport_quad_buffer == VK_NULL_HANDLE) {
+    const size_t quad_bytes = sizeof(kViewportQuadVertices);
+    if (!create_buffer(kViewportQuadVertices, quad_bytes, g_state.viewport_quad_buffer, g_state.viewport_quad_memory)) {
+      rkg::log::error("viewport quad buffer create failed");
+      return false;
+    }
+    g_state.viewport_quad_vertex_count = kViewportQuadVertexCount;
+  }
+
   return true;
 }
 
@@ -421,6 +1009,8 @@ void destroy_vulkan() {
     vkDeviceWaitIdle(g_state.device);
   }
 
+  destroy_offscreen();
+
   if (g_state.in_flight_fence != VK_NULL_HANDLE) {
     vkDestroyFence(g_state.device, g_state.in_flight_fence, nullptr);
   }
@@ -452,6 +1042,67 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
     return false;
+  }
+
+  if (g_state.offscreen_render_pass != VK_NULL_HANDLE && g_state.offscreen_framebuffer != VK_NULL_HANDLE) {
+    VkClearValue offscreen_clears[2]{};
+    offscreen_clears[0].color = {{0.08f, 0.08f, 0.12f, 1.0f}};
+    offscreen_clears[1].depthStencil = {1.0f, 0};
+
+    VkRenderPassBeginInfo offscreen_info{};
+    offscreen_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    offscreen_info.renderPass = g_state.offscreen_render_pass;
+    offscreen_info.framebuffer = g_state.offscreen_framebuffer;
+    offscreen_info.renderArea.offset = {0, 0};
+    offscreen_info.renderArea.extent = g_state.offscreen_extent;
+    offscreen_info.clearValueCount = 2;
+    offscreen_info.pClearValues = offscreen_clears;
+
+    vkCmdBeginRenderPass(cmd, &offscreen_info, VK_SUBPASS_CONTENTS_INLINE);
+    const auto* draw_list = rkg::get_vulkan_viewport_draw_list();
+    if (g_state.viewport_pipeline != VK_NULL_HANDLE && g_state.viewport_pipeline_layout != VK_NULL_HANDLE &&
+        g_state.viewport_cube_buffer != VK_NULL_HANDLE && g_state.viewport_cube_vertex_count > 0 &&
+        draw_list && draw_list->instance_count > 0) {
+      VkViewport viewport{};
+      viewport.x = 0.0f;
+      viewport.y = 0.0f;
+      viewport.width = static_cast<float>(g_state.offscreen_extent.width);
+      viewport.height = static_cast<float>(g_state.offscreen_extent.height);
+      viewport.minDepth = 0.0f;
+      viewport.maxDepth = 1.0f;
+      VkRect2D scissor{};
+      scissor.offset = {0, 0};
+      scissor.extent = g_state.offscreen_extent;
+      vkCmdSetViewport(cmd, 0, 1, &viewport);
+      vkCmdSetScissor(cmd, 0, 1, &scissor);
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.viewport_pipeline);
+      const uint32_t max_instances =
+          std::min(draw_list->instance_count, rkg::VulkanViewportDrawList::kMaxInstances);
+      for (uint32_t i = 0; i < max_instances; ++i) {
+        VkBuffer buffer = g_state.viewport_cube_buffer;
+        uint32_t vertex_count = g_state.viewport_cube_vertex_count;
+        if (draw_list->mesh_id[i] == 1 && g_state.viewport_quad_buffer != VK_NULL_HANDLE &&
+            g_state.viewport_quad_vertex_count > 0) {
+          buffer = g_state.viewport_quad_buffer;
+          vertex_count = g_state.viewport_quad_vertex_count;
+        }
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(cmd, 0, 1, &buffer, offsets);
+
+        struct PushData {
+          float mvp[16];
+          float color[4];
+        } push{};
+        const float* mvp = draw_list->mvp + (i * 16);
+        const float* color = draw_list->color + (i * 4);
+        std::memcpy(push.mvp, mvp, sizeof(push.mvp));
+        std::memcpy(push.color, color, sizeof(push.color));
+        vkCmdPushConstants(cmd, g_state.viewport_pipeline_layout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
+        vkCmdDraw(cmd, vertex_count, 1, 0, 0);
+      }
+    }
+    vkCmdEndRenderPass(cmd);
   }
 
   VkClearValue clear_color{};
@@ -494,6 +1145,8 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 bool draw_frame() {
   vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
   vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
+
+  update_offscreen_target();
 
   uint32_t image_index = 0;
   VkResult result = vkAcquireNextImageKHR(

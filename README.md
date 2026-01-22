@@ -19,6 +19,19 @@ working demo game, a deterministic content pipeline, and a safe dev-time AI work
 - JS/Python scripting runtimes are stubbed when VM backends are unavailable
 - Cloud/Bedrock runtime integration is not implemented
 
+## Editor (primary entrypoint)
+The Editor is the intended first-run experience. It hosts the demo scene in-process, exposes
+Play/Pause/Step/Stop, and embeds the chat-driven plan/apply workflow.
+```
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+./build/bin/rkg_editor --project projects/demo_game
+```
+What you’ll see in the Editor:
+- A real viewport panel rendering a 3D cube (Vulkan/Linux)
+- Edit-mode camera orbit/zoom with viewport focus gating
+- Play-mode movement (WASD) when the viewport is focused
+
 ## Quickstart — Linux
 ```
 cmake --preset linux-debug
@@ -55,6 +68,7 @@ With `dev_mode: true`, the demo auto-reloads on `cook_status.json` changes.
 Artifacts are saved under `build/ai_runs/<run_id>/` and summarized in `build/ai_results.json`.
 
 ## Docs
+- `docs/VISION.md` — editor-first direction and UX goals
 - `docs/TECHNICAL_OVERVIEW.md` — full system overview (runtime + tooling)
 - `docs/API_REFERENCE.md` — public headers, CLI surface, file formats
 - `docs/LLM_REFERENCE.md` — OpenAI templates, structured outputs, safe workflows

@@ -466,6 +466,16 @@ void add_error(std::vector<ValidationError>& errors,
   errors.push_back({file, keypath, message});
 }
 
+void add_warning(const fs::path& file,
+                 const std::string& keypath,
+                 const std::string& message) {
+  std::cerr << file.string() << ":" << keypath << " -> warning: " << message << "\n";
+}
+
+bool is_known_mesh_id(const std::string& mesh) {
+  return mesh == "cube" || mesh == "quad";
+}
+
 bool collect_content_files(const fs::path& root, std::vector<fs::path>& out_files) {
   if (!fs::exists(root)) {
     return false;
@@ -510,6 +520,30 @@ bool parse_prefab_json(const fs::path& path,
   if (doc.contains("tags") && !doc["tags"].is_array()) {
     add_error(errors, path, "tags", "prefab.tags must be a list");
   }
+  if (doc.contains("components") && doc["components"].is_object()) {
+    const auto& comps = doc["components"];
+    if (comps.contains("Renderable")) {
+      const auto& rend = comps["Renderable"];
+      if (!rend.is_object()) {
+        add_error(errors, path, "components.Renderable", "Renderable must be a map");
+      } else {
+        if (rend.contains("mesh")) {
+          if (!rend["mesh"].is_string()) {
+            add_error(errors, path, "components.Renderable.mesh", "mesh must be a string");
+          } else if (!is_known_mesh_id(rend["mesh"].get<std::string>())) {
+            add_warning(path, "components.Renderable.mesh", "unknown mesh id (expected cube or quad)");
+          }
+        }
+        if (rend.contains("color")) {
+          if (!rend["color"].is_array()) {
+            add_error(errors, path, "components.Renderable.color", "color must be a list");
+          } else if (rend["color"].size() < 3 || rend["color"].size() > 4) {
+            add_error(errors, path, "components.Renderable.color", "color must have 3 or 4 numbers");
+          }
+        }
+      }
+    }
+  }
   return errors.empty();
 }
 
@@ -550,6 +584,27 @@ bool parse_level_json(const fs::path& path,
     if (ent.contains("transform") && !ent["transform"].is_object()) {
       add_error(errors, path, base + ".transform", "entity.transform must be a map");
     }
+    if (ent.contains("renderable")) {
+      const auto& rend = ent["renderable"];
+      if (!rend.is_object()) {
+        add_error(errors, path, base + ".renderable", "entity.renderable must be a map");
+      } else {
+        if (rend.contains("mesh")) {
+          if (!rend["mesh"].is_string()) {
+            add_error(errors, path, base + ".renderable.mesh", "mesh must be a string");
+          } else if (!is_known_mesh_id(rend["mesh"].get<std::string>())) {
+            add_warning(path, base + ".renderable.mesh", "unknown mesh id (expected cube or quad)");
+          }
+        }
+        if (rend.contains("color")) {
+          if (!rend["color"].is_array()) {
+            add_error(errors, path, base + ".renderable.color", "color must be a list");
+          } else if (rend["color"].size() < 3 || rend["color"].size() > 4) {
+            add_error(errors, path, base + ".renderable.color", "color must have 3 or 4 numbers");
+          }
+        }
+      }
+    }
   }
   return errors.empty();
 }
@@ -577,6 +632,30 @@ bool parse_prefab_yaml(const fs::path& path,
   }
   if (doc["tags"] && !doc["tags"].IsSequence()) {
     add_error(errors, path, "tags", "prefab.tags must be a list");
+  }
+  if (doc["components"] && doc["components"].IsMap()) {
+    const auto comps = doc["components"];
+    if (comps["Renderable"]) {
+      const auto rend = comps["Renderable"];
+      if (!rend.IsMap()) {
+        add_error(errors, path, "components.Renderable", "Renderable must be a map");
+      } else {
+        if (rend["mesh"]) {
+          if (!rend["mesh"].IsScalar()) {
+            add_error(errors, path, "components.Renderable.mesh", "mesh must be a string");
+          } else if (!is_known_mesh_id(rend["mesh"].as<std::string>())) {
+            add_warning(path, "components.Renderable.mesh", "unknown mesh id (expected cube or quad)");
+          }
+        }
+        if (rend["color"]) {
+          if (!rend["color"].IsSequence()) {
+            add_error(errors, path, "components.Renderable.color", "color must be a list");
+          } else if (rend["color"].size() < 3 || rend["color"].size() > 4) {
+            add_error(errors, path, "components.Renderable.color", "color must have 3 or 4 numbers");
+          }
+        }
+      }
+    }
   }
   return errors.empty();
 }
@@ -620,6 +699,27 @@ bool parse_level_yaml(const fs::path& path,
     }
     if (ent["transform"] && !ent["transform"].IsMap()) {
       add_error(errors, path, base + ".transform", "entity.transform must be a map");
+    }
+    if (ent["renderable"]) {
+      const auto rend = ent["renderable"];
+      if (!rend.IsMap()) {
+        add_error(errors, path, base + ".renderable", "entity.renderable must be a map");
+      } else {
+        if (rend["mesh"]) {
+          if (!rend["mesh"].IsScalar()) {
+            add_error(errors, path, base + ".renderable.mesh", "mesh must be a string");
+          } else if (!is_known_mesh_id(rend["mesh"].as<std::string>())) {
+            add_warning(path, base + ".renderable.mesh", "unknown mesh id (expected cube or quad)");
+          }
+        }
+        if (rend["color"]) {
+          if (!rend["color"].IsSequence()) {
+            add_error(errors, path, base + ".renderable.color", "color must be a list");
+          } else if (rend["color"].size() < 3 || rend["color"].size() > 4) {
+            add_error(errors, path, base + ".renderable.color", "color must have 3 or 4 numbers");
+          }
+        }
+      }
     }
   }
   return errors.empty();

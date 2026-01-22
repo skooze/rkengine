@@ -6,6 +6,7 @@ rkg_add_executable(rkg_demo_game
 
 target_link_libraries(rkg_demo_game
   PUBLIC
+    rkg_runtime
     rkg_core
     rkg_platform
     rkg_renderer_rhi

@@ -15,6 +15,17 @@ struct Transform {
   float scale[3] = {1.0f, 1.0f, 1.0f};
 };
 
+enum class MeshId : uint32_t {
+  Cube = 0,
+  Quad = 1,
+  Unknown = 2
+};
+
+struct Renderable {
+  MeshId mesh = MeshId::Cube;
+  float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+};
+
 class Registry {
  public:
   Entity create_entity();
@@ -22,12 +33,17 @@ class Registry {
   void set_transform(Entity entity, const Transform& transform);
   Transform* get_transform(Entity entity);
   const Transform* get_transform(Entity entity) const;
+  void set_renderable(Entity entity, const Renderable& renderable);
+  Renderable* get_renderable(Entity entity);
+  const Renderable* get_renderable(Entity entity) const;
+  void remove_renderable(Entity entity);
   size_t entity_count() const;
   std::vector<Entity> entities() const;
 
  private:
   Entity next_id_ = 1;
   std::unordered_map<Entity, Transform> transforms_;
+  std::unordered_map<Entity, Renderable> renderables_;
 };
 
 } // namespace rkg::ecs

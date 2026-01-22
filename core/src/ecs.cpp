@@ -8,6 +8,7 @@ Entity Registry::create_entity() {
 
 void Registry::destroy_entity(Entity entity) {
   transforms_.erase(entity);
+  renderables_.erase(entity);
 }
 
 void Registry::set_transform(Entity entity, const Transform& transform) {
@@ -28,6 +29,30 @@ const Transform* Registry::get_transform(Entity entity) const {
     return nullptr;
   }
   return &it->second;
+}
+
+void Registry::set_renderable(Entity entity, const Renderable& renderable) {
+  renderables_[entity] = renderable;
+}
+
+Renderable* Registry::get_renderable(Entity entity) {
+  auto it = renderables_.find(entity);
+  if (it == renderables_.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+const Renderable* Registry::get_renderable(Entity entity) const {
+  auto it = renderables_.find(entity);
+  if (it == renderables_.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+void Registry::remove_renderable(Entity entity) {
+  renderables_.erase(entity);
 }
 
 size_t Registry::entity_count() const {

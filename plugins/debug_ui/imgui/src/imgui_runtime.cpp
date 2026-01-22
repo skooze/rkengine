@@ -28,6 +28,10 @@ struct DebugUiState {
   bool initialized = false;
   bool visible = true;
   bool force_reload = false;
+  bool show_builtin = true;
+  bool docking_enabled = false;
+  rkg::debug_ui::DrawCallback draw_callback = nullptr;
+  void* draw_user = nullptr;
   rkg::HostContext* host = nullptr;
   std::filesystem::path root;
   std::string renderer_name = "Unknown";
@@ -53,6 +57,13 @@ struct DebugUiState {
   bool ai_valid = false;
   uint64_t ai_mtime = 0;
   uint64_t ai_info_mtime = 0;
+
+  void* viewport_texture = nullptr;
+  uint32_t viewport_width = 0;
+  uint32_t viewport_height = 0;
+  uint64_t viewport_version = 0;
+  bool viewport_available = false;
+  std::string viewport_error;
 } g_state;
 
 bool create_descriptor_pool() {
@@ -185,6 +196,28 @@ void maybe_refresh_ai_status() {
 #endif
 }
 
+void maybe_refresh_viewport_texture() {
+  const auto* viewport = rkg::get_vulkan_viewport();
+  if (!viewport || !viewport->image_view || !viewport->sampler ||
+      viewport->width == 0 || viewport->height == 0) {
+    g_state.viewport_available = false;
+    g_state.viewport_error = "viewport texture unavailable";
+    return;
+  }
+
+  if (viewport->version != g_state.viewport_version || g_state.viewport_texture == nullptr) {
+    g_state.viewport_version = viewport->version;
+    g_state.viewport_width = viewport->width;
+    g_state.viewport_height = viewport->height;
+    g_state.viewport_texture = ImGui_ImplVulkan_AddTexture(
+        reinterpret_cast<VkSampler>(viewport->sampler),
+        reinterpret_cast<VkImageView>(viewport->image_view),
+        static_cast<VkImageLayout>(viewport->layout));
+  }
+  g_state.viewport_available = g_state.viewport_texture != nullptr;
+  g_state.viewport_error.clear();
+}
+
 } // namespace
 
 bool init_vulkan() {
@@ -205,6 +238,10 @@ bool init_vulkan() {
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
+  if (g_state.docking_enabled) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  }
   ImGui::StyleColorsDark();
 
   if (!ImGui_ImplSDL3_InitForVulkan(g_state.window)) {
@@ -259,94 +296,102 @@ void new_frame(float dt_seconds) {
   ImGui_ImplSDL3_NewFrame();
   ImGui::NewFrame();
 
-  if (ImGui::Begin("Stats")) {
-    ImGui::Text("FPS: %.1f", g_state.fps);
-    ImGui::Text("Frame time: %.2f ms", dt_seconds * 1000.0f);
-    ImGui::Text("Renderer: %s", g_state.renderer_name.c_str());
-  }
-  ImGui::End();
+  maybe_refresh_viewport_texture();
 
-  if (ImGui::Begin("World")) {
-    if (g_state.host && g_state.host->registry) {
-      const auto count = g_state.host->registry->entity_count();
-      ImGui::Text("Entities: %zu", count);
-      const auto entities = g_state.host->registry->entities();
-      if (!entities.empty()) {
-        const auto entity = entities.front();
-        if (auto* transform = g_state.host->registry->get_transform(entity)) {
-          ImGui::Text("Entity %u", entity);
-          ImGui::Text("Pos: %.2f %.2f %.2f",
-                      transform->position[0],
-                      transform->position[1],
-                      transform->position[2]);
-        }
-      }
-    } else {
-      ImGui::Text("Entities: N/A");
+  if (g_state.show_builtin) {
+    if (ImGui::Begin("Stats")) {
+      ImGui::Text("FPS: %.1f", g_state.fps);
+      ImGui::Text("Frame time: %.2f ms", dt_seconds * 1000.0f);
+      ImGui::Text("Renderer: %s", g_state.renderer_name.c_str());
     }
-  }
-  ImGui::End();
+    ImGui::End();
 
-  if (ImGui::Begin("Hot Reload")) {
-    ImGui::Text("Last reload: %s", g_state.last_reload_time.c_str());
-    if (!g_state.last_reload_error.empty()) {
-      ImGui::Text("Error: %s", g_state.last_reload_error.c_str());
-    }
-    if (ImGui::Button("Force Reload")) {
-      g_state.force_reload = true;
-    }
-  }
-  ImGui::End();
-
-  if (ImGui::Begin("AI Orchestration")) {
-    maybe_refresh_ai_status();
-    if (!g_state.ai_valid) {
-      ImGui::Text("Status: %s", g_state.ai_error.empty() ? "unknown" : g_state.ai_error.c_str());
-    } else {
-      ImGui::Text("Run: %s", g_state.ai_results.run_id.c_str());
-      if (!g_state.ai_goal.empty()) {
-        ImGui::TextWrapped("Goal: %s", g_state.ai_goal.c_str());
-      }
-      if (!g_state.ai_provider.empty() || !g_state.ai_model.empty()) {
-        ImGui::Text("Provider: %s  Model: %s",
-                    g_state.ai_provider.empty() ? "unknown" : g_state.ai_provider.c_str(),
-                    g_state.ai_model.empty() ? "unknown" : g_state.ai_model.c_str());
-      }
-      ImGui::Text("Status: %s", g_state.ai_results.status.c_str());
-      ImGui::Text("Mode: %s", g_state.ai_results.dry_run ? "dry-run" : "applied");
-      ImGui::Text("Conflicts: %d", g_state.ai_results.conflicts);
-      if (g_state.ai_results.has_context_drift) {
-        ImGui::Text("Drift: %s", g_state.ai_results.drift_detected ? "mismatch" : "match");
-        if (g_state.ai_results.drift_detected) {
-          ImGui::Text("Changes: +%d -%d ~%d",
-                      g_state.ai_results.drift_added,
-                      g_state.ai_results.drift_removed,
-                      g_state.ai_results.drift_modified);
-        }
-        if (!g_state.ai_results.drift_message.empty()) {
-          ImGui::TextWrapped("Note: %s", g_state.ai_results.drift_message.c_str());
+    if (ImGui::Begin("World")) {
+      if (g_state.host && g_state.host->registry) {
+        const auto count = g_state.host->registry->entity_count();
+        ImGui::Text("Entities: %zu", count);
+        const auto entities = g_state.host->registry->entities();
+        if (!entities.empty()) {
+          const auto entity = entities.front();
+          if (auto* transform = g_state.host->registry->get_transform(entity)) {
+            ImGui::Text("Entity %u", entity);
+            ImGui::Text("Pos: %.2f %.2f %.2f",
+                        transform->position[0],
+                        transform->position[1],
+                        transform->position[2]);
+          }
         }
       } else {
-        ImGui::Text("Drift: N/A");
-      }
-      if (g_state.ai_results.status != "ok") {
-        ImGui::TextWrapped("Last error: %s", g_state.ai_results.status.c_str());
-      } else if (!g_state.ai_error.empty()) {
-        ImGui::TextWrapped("Last error: %s", g_state.ai_error.c_str());
-      } else {
-        ImGui::Text("Last error: none");
+        ImGui::Text("Entities: N/A");
       }
     }
-  }
-  ImGui::End();
+    ImGui::End();
 
-  if (ImGui::Begin("Console")) {
-    const auto lines = rkg::log::recent(200);
-    for (const auto& line : lines) {
-      ImGui::TextUnformatted(line.c_str());
+    if (ImGui::Begin("Hot Reload")) {
+      ImGui::Text("Last reload: %s", g_state.last_reload_time.c_str());
+      if (!g_state.last_reload_error.empty()) {
+        ImGui::Text("Error: %s", g_state.last_reload_error.c_str());
+      }
+      if (ImGui::Button("Force Reload")) {
+        g_state.force_reload = true;
+      }
     }
+    ImGui::End();
+
+    if (ImGui::Begin("AI Orchestration")) {
+      maybe_refresh_ai_status();
+      if (!g_state.ai_valid) {
+        ImGui::Text("Status: %s", g_state.ai_error.empty() ? "unknown" : g_state.ai_error.c_str());
+      } else {
+        ImGui::Text("Run: %s", g_state.ai_results.run_id.c_str());
+        if (!g_state.ai_goal.empty()) {
+          ImGui::TextWrapped("Goal: %s", g_state.ai_goal.c_str());
+        }
+        if (!g_state.ai_provider.empty() || !g_state.ai_model.empty()) {
+          ImGui::Text("Provider: %s  Model: %s",
+                      g_state.ai_provider.empty() ? "unknown" : g_state.ai_provider.c_str(),
+                      g_state.ai_model.empty() ? "unknown" : g_state.ai_model.c_str());
+        }
+        ImGui::Text("Status: %s", g_state.ai_results.status.c_str());
+        ImGui::Text("Mode: %s", g_state.ai_results.dry_run ? "dry-run" : "applied");
+        ImGui::Text("Conflicts: %d", g_state.ai_results.conflicts);
+        if (g_state.ai_results.has_context_drift) {
+          ImGui::Text("Drift: %s", g_state.ai_results.drift_detected ? "mismatch" : "match");
+          if (g_state.ai_results.drift_detected) {
+            ImGui::Text("Changes: +%d -%d ~%d",
+                        g_state.ai_results.drift_added,
+                        g_state.ai_results.drift_removed,
+                        g_state.ai_results.drift_modified);
+          }
+          if (!g_state.ai_results.drift_message.empty()) {
+            ImGui::TextWrapped("Note: %s", g_state.ai_results.drift_message.c_str());
+          }
+        } else {
+          ImGui::Text("Drift: N/A");
+        }
+        if (g_state.ai_results.status != "ok") {
+          ImGui::TextWrapped("Last error: %s", g_state.ai_results.status.c_str());
+        } else if (!g_state.ai_error.empty()) {
+          ImGui::TextWrapped("Last error: %s", g_state.ai_error.c_str());
+        } else {
+          ImGui::Text("Last error: none");
+        }
+      }
+    }
+    ImGui::End();
+
+    if (ImGui::Begin("Console")) {
+      const auto lines = rkg::log::recent(200);
+      for (const auto& line : lines) {
+        ImGui::TextUnformatted(line.c_str());
+      }
+    }
+    ImGui::End();
   }
-  ImGui::End();
+
+  if (g_state.draw_callback) {
+    g_state.draw_callback(g_state.draw_user);
+  }
 
   ImGui::Render();
 }
@@ -395,6 +440,51 @@ bool consume_force_reload_request() {
   const bool requested = g_state.force_reload;
   g_state.force_reload = false;
   return requested;
+}
+
+void set_viewport_size(int width, int height) {
+  if (width < 0 || height < 0) {
+    return;
+  }
+  rkg::set_vulkan_viewport_request(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+}
+
+bool viewport_supported() {
+  return g_state.viewport_available;
+}
+
+void* viewport_texture() {
+  return g_state.viewport_texture;
+}
+
+void viewport_size(int* width, int* height) {
+  if (width) *width = static_cast<int>(g_state.viewport_width);
+  if (height) *height = static_cast<int>(g_state.viewport_height);
+}
+
+const char* viewport_error() {
+  return g_state.viewport_error.empty() ? nullptr : g_state.viewport_error.c_str();
+}
+
+void set_draw_callback(DrawCallback callback, void* user_data) {
+  g_state.draw_callback = callback;
+  g_state.draw_user = user_data;
+}
+
+void set_show_builtin(bool show) {
+  g_state.show_builtin = show;
+}
+
+void set_docking_enabled(bool enabled) {
+  g_state.docking_enabled = enabled;
+  if (g_state.initialized) {
+    ImGuiIO& io = ImGui::GetIO();
+    if (enabled) {
+      io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    } else {
+      io.ConfigFlags &= ~ImGuiConfigFlags_DockingEnable;
+    }
+  }
 }
 
 } // namespace rkg::debug_ui

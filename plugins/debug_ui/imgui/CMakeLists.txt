@@ -25,8 +25,8 @@ rkg_add_library(rkg_plugins_debug_ui_imgui
 target_include_directories(rkg_plugins_debug_ui_imgui
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
-  PRIVATE
     ${imgui_SOURCE_DIR}
+  PRIVATE
     ${imgui_SOURCE_DIR}/backends
 )
 
