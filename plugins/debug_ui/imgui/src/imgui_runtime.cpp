@@ -20,7 +20,6 @@
 #include <chrono>
 #include <fstream>
 #include <optional>
-#include <type_traits>
 
 namespace rkg::debug_ui {
 
@@ -69,7 +68,6 @@ struct DebugUiState {
   uint64_t viewport_version = 0;
   bool viewport_available = false;
   std::string viewport_error;
-  bool fonts_uploaded = false;
 } g_state;
 
 bool create_descriptor_pool() {
@@ -156,86 +154,35 @@ void set_pipeline_rendering_info(T& info, VkPipelineRenderingCreateInfo* renderi
   }
 }
 
-static VkCommandBuffer begin_one_time_commands() {
-  if (g_state.font_cmd_pool == VK_NULL_HANDLE) {
-    return VK_NULL_HANDLE;
+static bool texture_id_is_empty(ImTextureID tex_id) {
+  const ImTextureID empty{};
+  if constexpr (requires { tex_id == empty; }) {
+    return tex_id == empty;
+  } else if constexpr (requires { tex_id == 0; }) {
+    return tex_id == 0;
+  } else if constexpr (requires { tex_id == nullptr; }) {
+    return tex_id == nullptr;
   }
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandPool = g_state.font_cmd_pool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc_info.commandBufferCount = 1;
-  VkCommandBuffer cmd = VK_NULL_HANDLE;
-  if (vkAllocateCommandBuffers(g_state.device, &alloc_info, &cmd) != VK_SUCCESS) {
-    return VK_NULL_HANDLE;
-  }
-  VkCommandBufferBeginInfo begin_info{};
-  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
-    return VK_NULL_HANDLE;
-  }
-  return cmd;
+  return false;
 }
 
-static bool end_one_time_commands(VkCommandBuffer cmd) {
-  if (cmd == VK_NULL_HANDLE) {
-    return false;
-  }
-  if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
-    return false;
-  }
-  VkSubmitInfo submit{};
-  submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit.commandBufferCount = 1;
-  submit.pCommandBuffers = &cmd;
-  if (vkQueueSubmit(g_state.queue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS) {
-    return false;
-  }
-  vkQueueWaitIdle(g_state.queue);
-  vkFreeCommandBuffers(g_state.device, g_state.font_cmd_pool, 1, &cmd);
-  return true;
-}
-
-static bool upload_fonts() {
-  if (g_state.fonts_uploaded) {
+static bool draw_data_has_empty_texture(const ImDrawData* draw_data) {
+  if (!draw_data) {
     return true;
   }
-  ImGuiIO& io = ImGui::GetIO();
-  if (io.Fonts && io.Fonts->TexID != nullptr) {
-    g_state.fonts_uploaded = true;
-    return true;
-  }
-
-  auto fn = &ImGui_ImplVulkan_CreateFontsTexture;
-  bool ok = true;
-  if constexpr (std::is_invocable_v<decltype(fn), VkCommandBuffer>) {
-    VkCommandBuffer cmd = begin_one_time_commands();
-    if (cmd == VK_NULL_HANDLE) {
-      rkg::log::warn("debug_ui: font upload command buffer unavailable");
-      ok = false;
-    } else {
-      if constexpr (std::is_same_v<std::invoke_result_t<decltype(fn), VkCommandBuffer>, bool>) {
-        ok = fn(cmd);
-      } else {
-        fn(cmd);
+  for (int list_index = 0; list_index < draw_data->CmdListsCount; ++list_index) {
+    const ImDrawList* list = draw_data->CmdLists[list_index];
+    if (!list) {
+      continue;
+    }
+    for (int cmd_index = 0; cmd_index < list->CmdBuffer.Size; ++cmd_index) {
+      const ImDrawCmd& cmd = list->CmdBuffer[cmd_index];
+      if (texture_id_is_empty(cmd.TextureId)) {
+        return true;
       }
-      ok = ok && end_one_time_commands(cmd);
-    }
-  } else if constexpr (std::is_invocable_v<decltype(fn)>) {
-    if constexpr (std::is_same_v<std::invoke_result_t<decltype(fn)>, bool>) {
-      ok = fn();
-    } else {
-      fn();
     }
   }
-
-  if (ok && io.Fonts && io.Fonts->TexID != nullptr) {
-    g_state.fonts_uploaded = true;
-  } else if (!ok) {
-    rkg::log::warn("debug_ui: font upload failed");
-  }
-  return g_state.fonts_uploaded;
+  return false;
 }
 
 void maybe_refresh_ai_status() {
@@ -365,14 +312,6 @@ bool init_vulkan() {
     return false;
   }
 
-  VkCommandPoolCreateInfo pool_info{};
-  pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-  pool_info.queueFamilyIndex = g_state.queue_family;
-  if (vkCreateCommandPool(g_state.device, &pool_info, nullptr, &g_state.font_cmd_pool) != VK_SUCCESS) {
-    rkg::log::warn("debug_ui: font upload command pool creation failed");
-  }
-
   ImGui_ImplVulkan_InitInfo init_info{};
   init_info.Instance = g_state.instance;
   init_info.PhysicalDevice = g_state.physical;
@@ -398,10 +337,6 @@ bool init_vulkan() {
     return false;
   }
 
-  if (!upload_fonts()) {
-    rkg::log::warn("debug_ui: fonts not ready; disabling debug ui render");
-    g_state.visible = false;
-  }
   g_state.initialized = true;
   g_state.has_draw_data = false;
   return true;
@@ -413,17 +348,12 @@ void shutdown() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
-  if (g_state.font_cmd_pool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(g_state.device, g_state.font_cmd_pool, nullptr);
-    g_state.font_cmd_pool = VK_NULL_HANDLE;
-  }
   if (g_state.descriptor_pool != VK_NULL_HANDLE) {
     vkDestroyDescriptorPool(g_state.device, g_state.descriptor_pool, nullptr);
     g_state.descriptor_pool = VK_NULL_HANDLE;
   }
   g_state.initialized = false;
   g_state.has_draw_data = false;
-  g_state.fonts_uploaded = false;
 }
 
 void new_frame(float dt_seconds) {
@@ -540,11 +470,16 @@ void render(VkCommandBuffer cmd) {
   if (!g_state.initialized || !g_state.visible || !g_state.has_draw_data) {
     return;
   }
-  if (!g_state.fonts_uploaded) {
-    return;
-  }
   ImDrawData* draw_data = ImGui::GetDrawData();
   if (!draw_data || !draw_data->Valid || draw_data->CmdListsCount == 0) {
+    return;
+  }
+  if (draw_data_has_empty_texture(draw_data)) {
+    static bool warned = false;
+    if (!warned) {
+      warned = true;
+      rkg::log::warn("debug_ui: draw data references empty texture; skipping render");
+    }
     return;
   }
   ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
