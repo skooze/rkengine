@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 #include <cstdlib>
+#include <pwd.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <string>
 #include <vector>
@@ -61,6 +63,35 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 #if RKG_ENABLE_VULKAN
   window_flags |= SDL_WINDOW_VULKAN;
 #endif
+  const bool is_root = (geteuid() == 0);
+
+  if (is_root) {
+    const char* sudo_user = std::getenv("SUDO_USER");
+    if (sudo_user && *sudo_user) {
+      struct passwd* pw = getpwnam(sudo_user);
+      if (pw) {
+        if (!std::getenv("XDG_RUNTIME_DIR")) {
+          std::string runtime_dir = std::string("/run/user/") + std::to_string(pw->pw_uid);
+          if (access(runtime_dir.c_str(), R_OK | X_OK) == 0) {
+            setenv("XDG_RUNTIME_DIR", runtime_dir.c_str(), 1);
+          }
+        }
+        if (!std::getenv("XAUTHORITY") && pw->pw_dir) {
+          std::string xauth = std::string(pw->pw_dir) + "/.Xauthority";
+          if (access(xauth.c_str(), R_OK) == 0) {
+            setenv("XAUTHORITY", xauth.c_str(), 1);
+          }
+        }
+        if (!std::getenv("WAYLAND_DISPLAY")) {
+          std::string wayland_socket = std::string("/run/user/") + std::to_string(pw->pw_uid) + "/wayland-0";
+          if (access(wayland_socket.c_str(), R_OK | W_OK) == 0) {
+            setenv("WAYLAND_DISPLAY", "wayland-0", 1);
+          }
+        }
+      }
+    }
+  }
+
   const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
   const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
@@ -68,7 +99,6 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   const char* display = std::getenv("DISPLAY");
   const char* wayland_display = std::getenv("WAYLAND_DISPLAY");
   const char* session_type = std::getenv("XDG_SESSION_TYPE");
-  const bool is_root = (geteuid() == 0);
   std::string err;
   std::string last_driver;
   std::vector<std::string> attempt_errors;
