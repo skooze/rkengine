@@ -137,6 +137,14 @@ bool have_shared_lib(const char* name) {
   return true;
 }
 
+void log_missing_libs(const char* label, const std::vector<const char*>& libs) {
+  for (const char* lib : libs) {
+    if (!have_shared_lib(lib)) {
+      rkg::log::warn(std::string(label) + " missing shared library: " + lib);
+    }
+  }
+}
+
 void log_wayland_connect(const char* display_name) {
   void* lib = dlopen("libwayland-client.so.0", RTLD_LAZY | RTLD_LOCAL);
   if (!lib) {
@@ -479,6 +487,16 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!have_shared_lib("libdecor-0.so.0")) {
       rkg::log::warn("Wayland display detected but libdecor-0.so.0 is missing.");
     }
+    log_missing_libs("Wayland", {
+      "libwayland-client.so.0",
+      "libwayland-egl.so.1",
+      "libEGL.so.1",
+      "libGLESv2.so.2",
+      "libdrm.so.2",
+      "libgbm.so.1",
+      "libxkbcommon.so.0",
+      "libdecor-0.so.0"
+    });
   }
   if (have_x11) {
     if (!have_shared_lib("libX11.so.6")) {
@@ -505,6 +523,22 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!have_shared_lib("libxcb.so.1")) {
       rkg::log::warn("X11 display detected but libxcb.so.1 is missing.");
     }
+    log_missing_libs("X11", {
+      "libX11.so.6",
+      "libX11-xcb.so.1",
+      "libXcursor.so.1",
+      "libXrandr.so.2",
+      "libXi.so.6",
+      "libXext.so.6",
+      "libXfixes.so.3",
+      "libXrender.so.1",
+      "libxcb.so.1",
+      "libxcb-randr.so.0",
+      "libxcb-xfixes.so.0",
+      "libxcb-shm.so.0",
+      "libxcb-render-util.so.0",
+      "libxcb-icccm.so.4"
+    });
   }
   if (have_wayland) {
     fallback_drivers.push_back("wayland");
