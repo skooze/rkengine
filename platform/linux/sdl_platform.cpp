@@ -46,7 +46,6 @@ std::string list_video_drivers() {
 } // namespace
 
 bool platform_init(Platform* self, const WindowDesc& desc) {
-  SDL_SetMainReady();
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
     const char* err = SDL_GetError();
     if (!err || !*err) {
