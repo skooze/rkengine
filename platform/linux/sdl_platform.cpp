@@ -3,6 +3,7 @@
 #include "rkg/log.h"
 
 #include <SDL3/SDL.h>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -44,36 +45,6 @@ std::string list_video_drivers() {
   return list.empty() ? "none" : list;
 }
 
-bool try_init_with_driver(Platform* self,
-                          const WindowDesc& desc,
-                          Uint32 init_flags,
-                          Uint32 window_flags,
-                          const char* driver,
-                          std::string& out_error) {
-  if (driver && *driver) {
-    SDL_setenv("SDL_VIDEODRIVER", driver, 1);
-  } else {
-    SDL_setenv("SDL_VIDEODRIVER", "", 1);
-  }
-  if (SDL_Init(init_flags) != 0) {
-    const char* err = SDL_GetError();
-    out_error = (err && *err) ? err : "unknown error";
-    SDL_Quit();
-    return false;
-  }
-  SDL_Window* window = SDL_CreateWindow(desc.title, desc.width, desc.height, window_flags);
-  if (!window) {
-    const char* err = SDL_GetError();
-    out_error = (err && *err) ? err : "unknown error";
-    SDL_Quit();
-    return false;
-  }
-  self->window_ = window;
-  self->last_ticks_ = SDL_GetTicks();
-  self->quit_ = false;
-  return true;
-}
-
 } // namespace
 
 bool platform_init(Platform* self, const WindowDesc& desc) {
@@ -84,7 +55,32 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 #endif
   const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
   std::string err;
-  if (try_init_with_driver(self, desc, init_flags, window_flags, env_driver, err)) {
+  auto try_init_with_driver = [&](const char* driver) -> bool {
+    if (driver && *driver) {
+      setenv("SDL_VIDEODRIVER", driver, 1);
+    } else {
+      unsetenv("SDL_VIDEODRIVER");
+    }
+    if (SDL_Init(init_flags) != 0) {
+      const char* sdl_err = SDL_GetError();
+      err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      SDL_Quit();
+      return false;
+    }
+    SDL_Window* window = SDL_CreateWindow(desc.title, desc.width, desc.height, window_flags);
+    if (!window) {
+      const char* sdl_err = SDL_GetError();
+      err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      SDL_Quit();
+      return false;
+    }
+    self->window_ = window;
+    self->last_ticks_ = SDL_GetTicks();
+    self->quit_ = false;
+    return true;
+  };
+
+  if (try_init_with_driver(env_driver)) {
     return true;
   }
 
@@ -98,7 +94,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (env_driver && *env_driver && std::string(env_driver) == driver) {
       continue;
     }
-    if (try_init_with_driver(self, desc, init_flags, window_flags, driver, err)) {
+    if (try_init_with_driver(driver)) {
       rkg::log::warn(std::string("SDL_Init failed, recovered by forcing video driver: ") + driver);
       return true;
     }
