@@ -57,6 +57,71 @@ std::string list_video_drivers() {
   return list.empty() ? "none" : list;
 }
 
+const char* sdl_log_category_name(int category) {
+  switch (category) {
+    case SDL_LOG_CATEGORY_APPLICATION:
+      return "app";
+    case SDL_LOG_CATEGORY_SYSTEM:
+      return "system";
+    case SDL_LOG_CATEGORY_VIDEO:
+      return "video";
+    case SDL_LOG_CATEGORY_RENDER:
+      return "render";
+    case SDL_LOG_CATEGORY_INPUT:
+      return "input";
+    case SDL_LOG_CATEGORY_TEST:
+      return "test";
+    case SDL_LOG_CATEGORY_ERROR:
+      return "error";
+    default:
+      return "other";
+  }
+}
+
+const char* sdl_log_priority_name(SDL_LogPriority priority) {
+  switch (priority) {
+    case SDL_LOG_PRIORITY_VERBOSE:
+      return "verbose";
+    case SDL_LOG_PRIORITY_DEBUG:
+      return "debug";
+    case SDL_LOG_PRIORITY_INFO:
+      return "info";
+    case SDL_LOG_PRIORITY_WARN:
+      return "warn";
+    case SDL_LOG_PRIORITY_ERROR:
+      return "error";
+    case SDL_LOG_PRIORITY_CRITICAL:
+      return "critical";
+    default:
+      return "unknown";
+  }
+}
+
+void sdl_log_output(void*, int category, SDL_LogPriority priority, const char* message) {
+  if (!message) {
+    return;
+  }
+  std::string line = std::string("SDL ") + sdl_log_category_name(category) + "/" +
+                     sdl_log_priority_name(priority) + ": " + message;
+  if (priority >= SDL_LOG_PRIORITY_ERROR) {
+    rkg::log::error(line);
+  } else if (priority >= SDL_LOG_PRIORITY_WARN) {
+    rkg::log::warn(line);
+  } else {
+    rkg::log::info(line);
+  }
+}
+
+void install_sdl_logging() {
+  static bool installed = false;
+  if (installed) return;
+  SDL_SetLogOutputFunction(sdl_log_output, nullptr);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_DEBUG);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_DEBUG);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_SYSTEM, SDL_LOG_PRIORITY_DEBUG);
+  installed = true;
+}
+
 bool have_shared_lib(const char* name) {
   if (!name || !*name) return false;
   void* handle = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
@@ -149,6 +214,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   }
 
   log_rlimit_nofile();
+  install_sdl_logging();
 
   const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
@@ -187,8 +253,14 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     apply_evdev_setting(disable_evdev);
     if (driver && *driver) {
       setenv("SDL_VIDEODRIVER", driver, 1);
+#ifdef SDL_HINT_VIDEO_DRIVER
+      SDL_SetHint(SDL_HINT_VIDEO_DRIVER, driver);
+#endif
     } else {
       unsetenv("SDL_VIDEODRIVER");
+#ifdef SDL_HINT_VIDEO_DRIVER
+      SDL_ResetHint(SDL_HINT_VIDEO_DRIVER);
+#endif
     }
     last_driver = (driver && *driver) ? driver : "(default)";
     bool init_ok = false;
