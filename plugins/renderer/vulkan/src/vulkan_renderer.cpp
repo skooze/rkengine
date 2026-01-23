@@ -1130,6 +1130,32 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     vkCmdEndRenderPass(cmd);
+
+    // Ensure offscreen color attachment writes are visible to fragment sampling (ImGui viewport).
+    VkImageMemoryBarrier offscreen_barrier{};
+    offscreen_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    offscreen_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    offscreen_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    offscreen_barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    offscreen_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    offscreen_barrier.image = g_state.offscreen_image;
+    offscreen_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    offscreen_barrier.subresourceRange.baseMipLevel = 0;
+    offscreen_barrier.subresourceRange.levelCount = 1;
+    offscreen_barrier.subresourceRange.baseArrayLayer = 0;
+    offscreen_barrier.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &offscreen_barrier);
   }
 
   VkClearValue clear_color{};
