@@ -42,6 +42,8 @@ struct VulkanState {
   VkSemaphore render_finished = VK_NULL_HANDLE;
   VkFence in_flight_fence = VK_NULL_HANDLE;
   bool dynamic_rendering_enabled = false;
+  PFN_vkCmdBeginRenderingKHR cmd_begin_rendering = nullptr;
+  PFN_vkCmdEndRenderingKHR cmd_end_rendering = nullptr;
 
   VkImage offscreen_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
@@ -261,9 +263,9 @@ bool create_device() {
     extensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
   }
 
-  VkPhysicalDeviceDynamicRenderingFeatures dynamic_features{};
+  VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_features{};
   if (g_state.dynamic_rendering_enabled) {
-    dynamic_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamic_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
     dynamic_features.dynamicRendering = VK_TRUE;
   }
   VkDeviceCreateInfo create_info{};
@@ -283,6 +285,18 @@ bool create_device() {
 
   vkGetDeviceQueue(g_state.device, g_state.graphics_queue_family, 0, &g_state.graphics_queue);
   vkGetDeviceQueue(g_state.device, g_state.present_queue_family, 0, &g_state.present_queue);
+  if (g_state.dynamic_rendering_enabled) {
+    g_state.cmd_begin_rendering = reinterpret_cast<PFN_vkCmdBeginRenderingKHR>(
+        vkGetDeviceProcAddr(g_state.device, "vkCmdBeginRenderingKHR"));
+    g_state.cmd_end_rendering = reinterpret_cast<PFN_vkCmdEndRenderingKHR>(
+        vkGetDeviceProcAddr(g_state.device, "vkCmdEndRenderingKHR"));
+    if (!g_state.cmd_begin_rendering || !g_state.cmd_end_rendering) {
+      rkg::log::warn("renderer:vulkan dynamic rendering entrypoints missing; disabling");
+      g_state.dynamic_rendering_enabled = false;
+      g_state.cmd_begin_rendering = nullptr;
+      g_state.cmd_end_rendering = nullptr;
+    }
+  }
   return true;
 }
 
@@ -1246,7 +1260,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          &to_color);
 
     VkRenderingAttachmentInfo color_attach{};
-    color_attach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    color_attach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
     color_attach.imageView = g_state.swapchain_image_views[image_index];
     color_attach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1254,16 +1268,20 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     color_attach.clearValue = clear_color;
 
     VkRenderingInfo rendering_info{};
-    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
     rendering_info.renderArea.offset = {0, 0};
     rendering_info.renderArea.extent = g_state.swapchain_extent;
     rendering_info.layerCount = 1;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attach;
 
-    vkCmdBeginRendering(cmd, &rendering_info);
+    if (!g_state.cmd_begin_rendering || !g_state.cmd_end_rendering) {
+      rkg::log::warn("debug_ui render skipped: dynamic rendering entrypoints missing");
+      return vkEndCommandBuffer(cmd) == VK_SUCCESS;
+    }
+    g_state.cmd_begin_rendering(cmd, &rendering_info);
     rkg::debug_ui::render(cmd);
-    vkCmdEndRendering(cmd);
+    g_state.cmd_end_rendering(cmd);
 
     VkImageMemoryBarrier to_present{};
     to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
