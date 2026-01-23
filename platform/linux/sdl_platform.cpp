@@ -76,6 +76,17 @@ std::string x11_socket_path(const char* display) {
   return std::string("/tmp/.X11-unix/X") + std::to_string(num);
 }
 
+std::string format_mode(mode_t mode) {
+  std::string out;
+  out.reserve(10);
+  out.push_back(S_ISDIR(mode) ? 'd' : S_ISLNK(mode) ? 'l' : S_ISSOCK(mode) ? 's' : '-');
+  const char* rwx = "rwx";
+  for (int i = 0; i < 9; ++i) {
+    out.push_back((mode & (1 << (8 - i))) ? rwx[i % 3] : '-');
+  }
+  return out;
+}
+
 #ifndef SDL_HINT_INPUT_LINUXEV
 #define SDL_HINT_INPUT_LINUXEV "SDL_INPUT_LINUXEV"
 #endif
@@ -214,7 +225,17 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   bool have_wayland = (wayland_display && *wayland_display && env_xdg_runtime && *env_xdg_runtime);
   if (have_wayland) {
     std::string wl_socket = std::string(env_xdg_runtime) + "/" + wayland_display;
-    if (access(wl_socket.c_str(), R_OK | W_OK) != 0) {
+    struct stat st = {};
+    if (stat(wl_socket.c_str(), &st) == 0) {
+      rkg::log::info(std::string("Wayland socket: ") + wl_socket +
+                     " mode=" + format_mode(st.st_mode) +
+                     " uid=" + std::to_string(st.st_uid) +
+                     " gid=" + std::to_string(st.st_gid));
+    } else {
+      rkg::log::warn(std::string("Wayland socket stat failed: ") + wl_socket + format_errno());
+      have_wayland = false;
+    }
+    if (have_wayland && access(wl_socket.c_str(), R_OK | W_OK) != 0) {
       have_wayland = false;
       rkg::log::warn(std::string("Wayland socket not accessible: ") + wl_socket + format_errno());
     }
@@ -223,6 +244,15 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   if (have_x11) {
     const std::string x_sock = x11_socket_path(display);
     if (!x_sock.empty()) {
+      struct stat st = {};
+      if (stat(x_sock.c_str(), &st) == 0) {
+        rkg::log::info(std::string("X11 socket: ") + x_sock +
+                       " mode=" + format_mode(st.st_mode) +
+                       " uid=" + std::to_string(st.st_uid) +
+                       " gid=" + std::to_string(st.st_gid));
+      } else {
+        rkg::log::warn(std::string("X11 socket stat failed: ") + x_sock + format_errno());
+      }
       if (access(x_sock.c_str(), R_OK | W_OK) != 0) {
         rkg::log::warn(std::string("X11 socket not accessible: ") + x_sock + format_errno());
       }
