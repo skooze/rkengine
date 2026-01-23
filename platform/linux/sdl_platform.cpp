@@ -9,8 +9,10 @@
 #include <cstring>
 #include <pwd.h>
 #include <dlfcn.h>
+#include <chrono>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <thread>
 #include <sys/resource.h>
 #include <string>
 #include <vector>
@@ -183,9 +185,21 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       unsetenv("SDL_VIDEODRIVER");
     }
     last_driver = (driver && *driver) ? driver : "(default)";
-    SDL_ClearError();
-    errno = 0;
-    if (SDL_Init(init_flags) != 0) {
+    bool init_ok = false;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      SDL_ClearError();
+      errno = 0;
+      if (SDL_Init(init_flags) == 0) {
+        init_ok = true;
+        break;
+      }
+      if (errno == EAGAIN) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50 * (attempt + 1)));
+        continue;
+      }
+      break;
+    }
+    if (!init_ok) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
       if (err == "unknown error") {
@@ -195,7 +209,18 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       SDL_Quit();
       return false;
     }
-    SDL_Window* window = SDL_CreateWindow(desc.title, desc.width, desc.height, window_flags);
+    SDL_Window* window = nullptr;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+      SDL_ClearError();
+      errno = 0;
+      window = SDL_CreateWindow(desc.title, desc.width, desc.height, window_flags);
+      if (window) break;
+      if (errno == EAGAIN) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        continue;
+      }
+      break;
+    }
     if (!window) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
