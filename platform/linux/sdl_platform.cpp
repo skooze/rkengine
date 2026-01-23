@@ -48,6 +48,22 @@ std::string format_errno();
 
 namespace {
 
+bool sdl_init_ok(Uint32 flags) {
+#if SDL_MAJOR_VERSION >= 3
+  return SDL_Init(flags);
+#else
+  return SDL_Init(flags) == 0;
+#endif
+}
+
+bool sdl_init_subsystem_ok(Uint32 flags) {
+#if SDL_MAJOR_VERSION >= 3
+  return SDL_InitSubSystem(flags);
+#else
+  return SDL_InitSubSystem(flags) == 0;
+#endif
+}
+
 std::string list_video_drivers() {
   const int count = SDL_GetNumVideoDrivers();
   if (count <= 0) return "none";
@@ -362,7 +378,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     for (int attempt = 0; attempt < 3; ++attempt) {
       SDL_ClearError();
       errno = 0;
-      if (SDL_Init(init_flags) == 0) {
+      if (sdl_init_ok(init_flags)) {
         init_ok = true;
         break;
       }
@@ -383,6 +399,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       SDL_Quit();
       return false;
     }
+    const char* current_driver = SDL_GetCurrentVideoDriver();
+    rkg::log::info(std::string("SDL current video driver: ") +
+                   (current_driver && *current_driver ? current_driver : "unknown"));
     SDL_Window* window = nullptr;
     for (int attempt = 0; attempt < 2; ++attempt) {
       SDL_ClearError();
@@ -422,7 +441,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       unsetenv("SDL_INPUT_LINUXEV");
       unsetenv("SDL_INPUT_EVDEV");
     }
-    if (SDL_InitSubSystem(SDL_INIT_EVENTS) != 0) {
+    if (!sdl_init_subsystem_ok(SDL_INIT_EVENTS)) {
       const char* sdl_err = SDL_GetError();
       rkg::log::warn(std::string("SDL_InitSubSystem(SDL_INIT_EVENTS) failed: ") +
                      ((sdl_err && *sdl_err) ? sdl_err : "unknown error"));
