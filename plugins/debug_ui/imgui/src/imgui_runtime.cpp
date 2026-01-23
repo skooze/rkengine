@@ -230,6 +230,26 @@ static void process_texture_requests(ImDrawData* draw_data) {
     }
   }
 }
+
+static bool draw_data_has_pending_textures(const ImDrawData* draw_data) {
+  auto* textures = draw_data_textures(const_cast<ImDrawData*>(draw_data));
+  if (!textures) {
+    return false;
+  }
+  for (int i = 0; i < textures->Size; ++i) {
+    auto& entry = (*textures)[i];
+    ImTextureData* tex = texture_ptr_from_entry(entry);
+    if (!tex) {
+      continue;
+    }
+    if (tex->Status == ImTextureStatus_WantCreate ||
+        tex->Status == ImTextureStatus_WantUpdates ||
+        tex->Status == ImTextureStatus_WantDestroy) {
+      return true;
+    }
+  }
+  return false;
+}
 #endif
 
 void maybe_refresh_ai_status() {
@@ -527,6 +547,17 @@ void render(VkCommandBuffer cmd) {
   if (!draw_data || !draw_data->Valid || draw_data->CmdListsCount == 0) {
     return;
   }
+#if IMGUI_VERSION_NUM >= 19000
+  process_texture_requests(draw_data);
+  if (draw_data_has_pending_textures(draw_data)) {
+    static bool warned_textures = false;
+    if (!warned_textures) {
+      warned_textures = true;
+      rkg::log::warn("debug_ui: textures pending upload; skipping render this frame");
+    }
+    return;
+  }
+#endif
   if (draw_data_has_empty_texture(draw_data)) {
     static bool warned = false;
     if (!warned) {
