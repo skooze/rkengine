@@ -66,8 +66,12 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
   const char* env_xdg_runtime = std::getenv("XDG_RUNTIME_DIR");
   const char* display = std::getenv("DISPLAY");
+  const char* wayland_display = std::getenv("WAYLAND_DISPLAY");
+  const char* session_type = std::getenv("XDG_SESSION_TYPE");
+  const bool is_root = (geteuid() == 0);
   std::string err;
   std::string last_driver;
+  std::vector<std::string> attempt_errors;
   auto apply_evdev_setting = [&](bool disable_evdev) {
     if (!disable_evdev) return;
     if (!env_linuxev || !*env_linuxev) {
@@ -91,6 +95,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (SDL_Init(init_flags) != 0) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
       return false;
     }
@@ -98,6 +103,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!window) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
       return false;
     }
@@ -128,19 +134,21 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   };
 
   std::vector<const char*> fallback_drivers;
-  // Prefer x11 if XDG_RUNTIME_DIR is missing but DISPLAY is present (e.g., sudo/root shells).
-  if ((!env_xdg_runtime || !*env_xdg_runtime) && display && *display) {
-    fallback_drivers.push_back("x11");
+  const bool have_wayland = (wayland_display && *wayland_display && env_xdg_runtime && *env_xdg_runtime);
+  const bool have_x11 = (display && *display);
+  if (have_wayland) {
     fallback_drivers.push_back("wayland");
-  } else {
-    fallback_drivers.push_back("wayland");
+  }
+  if (have_x11) {
     fallback_drivers.push_back("x11");
   }
-  fallback_drivers.push_back("kmsdrm");
+  if (!have_wayland && !have_x11) {
+    fallback_drivers.push_back("kmsdrm");
 #if !RKG_ENABLE_VULKAN
-  fallback_drivers.push_back("offscreen");
-  fallback_drivers.push_back("dummy");
+    fallback_drivers.push_back("offscreen");
+    fallback_drivers.push_back("dummy");
 #endif
+  }
   auto attempt_with_evdev = [&](bool disable_evdev) -> bool {
     if (try_init_with_driver(env_driver, disable_evdev)) {
       if (!init_events(disable_evdev)) {
@@ -176,15 +184,20 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 
   rkg::log::error(std::string("SDL_Init failed: ") + err +
                   (last_driver.empty() ? "" : std::string(" (driver=") + last_driver + ")"));
+  if (!attempt_errors.empty()) {
+    rkg::log::error("SDL init attempts:");
+    for (const auto& entry : attempt_errors) {
+      rkg::log::error("  " + entry);
+    }
+  }
   rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
-  const char* wayland = std::getenv("WAYLAND_DISPLAY");
-  const char* session = std::getenv("XDG_SESSION_TYPE");
   const char* forced = std::getenv("SDL_VIDEODRIVER");
   rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
-                  " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
-                  " XDG_SESSION_TYPE=" + (session ? session : "") +
+                  " WAYLAND_DISPLAY=" + (wayland_display ? wayland_display : "") +
+                  " XDG_SESSION_TYPE=" + (session_type ? session_type : "") +
                   " XDG_RUNTIME_DIR=" + (env_xdg_runtime ? env_xdg_runtime : "") +
-                  " SDL_VIDEODRIVER=" + (forced ? forced : ""));
+                  " SDL_VIDEODRIVER=" + (forced ? forced : "") +
+                  " EUID=" + (is_root ? "0" : "user"));
   return false;
 }
 
