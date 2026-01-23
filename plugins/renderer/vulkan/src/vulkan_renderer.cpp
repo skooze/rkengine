@@ -40,6 +40,7 @@ struct VulkanState {
   VkSemaphore image_available = VK_NULL_HANDLE;
   VkSemaphore render_finished = VK_NULL_HANDLE;
   VkFence in_flight_fence = VK_NULL_HANDLE;
+  bool dynamic_rendering_enabled = false;
 
   VkImage offscreen_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
@@ -237,13 +238,42 @@ bool create_device() {
     queue_infos.push_back(present_queue);
   }
 
-  const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+  std::vector<const char*> extensions;
+  extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+  g_state.dynamic_rendering_enabled = false;
+  uint32_t ext_count = 0;
+  if (vkEnumerateDeviceExtensionProperties(g_state.physical_device, nullptr, &ext_count, nullptr) == VK_SUCCESS &&
+      ext_count > 0) {
+    std::vector<VkExtensionProperties> ext_props(ext_count);
+    if (vkEnumerateDeviceExtensionProperties(g_state.physical_device, nullptr, &ext_count, ext_props.data()) ==
+        VK_SUCCESS) {
+      for (const auto& ext : ext_props) {
+        if (std::strcmp(ext.extensionName, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0) {
+          g_state.dynamic_rendering_enabled = true;
+          break;
+        }
+      }
+    }
+  }
+  if (g_state.dynamic_rendering_enabled) {
+    extensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  }
+
+  VkPhysicalDeviceDynamicRenderingFeatures dynamic_features{};
+  if (g_state.dynamic_rendering_enabled) {
+    dynamic_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    dynamic_features.dynamicRendering = VK_TRUE;
+  }
   VkDeviceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_infos.size());
   create_info.pQueueCreateInfos = queue_infos.data();
-  create_info.enabledExtensionCount = 1;
-  create_info.ppEnabledExtensionNames = extensions;
+  create_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+  create_info.ppEnabledExtensionNames = extensions.data();
+  if (g_state.dynamic_rendering_enabled) {
+    create_info.pNext = &dynamic_features;
+  }
 
   if (vkCreateDevice(g_state.physical_device, &create_info, nullptr, &g_state.device) != VK_SUCCESS) {
     rkg::log::error("vkCreateDevice failed");
@@ -1233,6 +1263,8 @@ bool vulkan_init(void* host) {
   rkg::register_vulkan_hooks(&hooks);
 
   rkg::log::info("renderer:vulkan init");
+  rkg::log::info(std::string("renderer:vulkan dynamic rendering: ") +
+                 (g_state.dynamic_rendering_enabled ? "enabled" : "disabled"));
   return true;
 }
 
