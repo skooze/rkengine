@@ -652,7 +652,7 @@ void apply_editor_overrides(rkg::ecs::Registry& registry,
 #endif
 }
 
-fs::path executable_dir(const char* argv0) {
+fs::path detect_executable_dir(const char* argv0) {
 #if defined(_WIN32)
   if (argv0) {
     return fs::absolute(argv0).parent_path();
@@ -670,7 +670,7 @@ fs::path executable_dir(const char* argv0) {
 
 bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   paths_ = rkg::resolve_paths(init.argv0, init.project_override, init.default_project);
-  executable_dir_ = executable_dir(init.argv0);
+  executable_dir_ = detect_executable_dir(init.argv0);
 
   rkg::log::init(init.app_name, paths_.root);
   rkg::log::install_crash_handlers();

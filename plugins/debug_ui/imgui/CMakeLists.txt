@@ -37,5 +37,3 @@ target_link_libraries(rkg_plugins_debug_ui_imgui
     Vulkan::Vulkan
     SDL3::SDL3
 )
-
-target_compile_definitions(rkg_plugins_debug_ui_imgui PRIVATE IMGUI_DISABLE_OBSOLETE_FUNCTIONS=1)
