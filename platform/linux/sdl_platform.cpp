@@ -64,6 +64,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
   const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
   const char* env_xdg_runtime = std::getenv("XDG_RUNTIME_DIR");
+  const char* display = SDL_getenv("DISPLAY");
   std::string err;
   auto apply_evdev_setting = [&](bool disable_evdev) {
     if (!disable_evdev) return;
@@ -130,12 +131,20 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     return true;
   }
 
-  const std::vector<const char*> fallback_drivers = {
-      "wayland",
-      "x11",
-      "kmsdrm",
-      "offscreen",
-      "dummy"};
+  std::vector<const char*> fallback_drivers;
+  // Prefer x11 if XDG_RUNTIME_DIR is missing but DISPLAY is present (e.g., sudo/root shells).
+  if ((!env_xdg_runtime || !*env_xdg_runtime) && display && *display) {
+    fallback_drivers.push_back("x11");
+    fallback_drivers.push_back("wayland");
+  } else {
+    fallback_drivers.push_back("wayland");
+    fallback_drivers.push_back("x11");
+  }
+  fallback_drivers.push_back("kmsdrm");
+#if !RKG_ENABLE_VULKAN
+  fallback_drivers.push_back("offscreen");
+  fallback_drivers.push_back("dummy");
+#endif
   for (const char* driver : fallback_drivers) {
     if (env_driver && *env_driver && std::string(env_driver) == driver) {
       continue;
@@ -168,7 +177,6 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 
   rkg::log::error(std::string("SDL_Init failed: ") + err);
   rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
-  const char* display = SDL_getenv("DISPLAY");
   const char* wayland = SDL_getenv("WAYLAND_DISPLAY");
   const char* session = SDL_getenv("XDG_SESSION_TYPE");
   const char* forced = SDL_getenv("SDL_VIDEODRIVER");
