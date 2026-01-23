@@ -33,6 +33,7 @@ struct VulkanState {
   VkExtent2D swapchain_extent{};
   std::vector<VkImage> swapchain_images;
   std::vector<VkImageView> swapchain_image_views;
+  std::vector<VkImageLayout> swapchain_image_layouts;
   VkRenderPass render_pass = VK_NULL_HANDLE;
   std::vector<VkFramebuffer> framebuffers;
   VkCommandPool command_pool = VK_NULL_HANDLE;
@@ -889,6 +890,7 @@ bool create_swapchain() {
       return false;
     }
   }
+  g_state.swapchain_image_layouts.assign(g_state.swapchain_images.size(), VK_IMAGE_LAYOUT_UNDEFINED);
 
   return true;
 }
@@ -1024,6 +1026,7 @@ void destroy_swapchain() {
     vkDestroyImageView(g_state.device, view, nullptr);
   }
   g_state.swapchain_image_views.clear();
+  g_state.swapchain_image_layouts.clear();
 
   if (g_state.swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(g_state.device, g_state.swapchain, nullptr);
@@ -1158,54 +1161,70 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          &offscreen_barrier);
   }
 
-  VkClearValue clear_color{};
-  clear_color.color = {{0.02f, 0.02f, 0.05f, 1.0f}};
-
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = g_state.render_pass;
-  render_pass_info.framebuffer = g_state.framebuffers[image_index];
-  render_pass_info.renderArea.offset = {0, 0};
-  render_pass_info.renderArea.extent = g_state.swapchain_extent;
-  render_pass_info.clearValueCount = 1;
-  render_pass_info.pClearValues = &clear_color;
-
-  vkCmdBeginRenderPass(cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-
-  VkClearAttachment clear_attachment{};
-  clear_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  clear_attachment.colorAttachment = 0;
-  clear_attachment.clearValue.color = {{0.15f, 0.65f, 0.95f, 1.0f}};
-
-  VkClearRect rect{};
-  rect.baseArrayLayer = 0;
-  rect.layerCount = 1;
-  rect.rect.offset = {static_cast<int32_t>(g_state.swapchain_extent.width / 4),
-                      static_cast<int32_t>(g_state.swapchain_extent.height / 4)};
-  rect.rect.extent = {g_state.swapchain_extent.width / 2, g_state.swapchain_extent.height / 2};
-
-  vkCmdClearAttachments(cmd, 1, &clear_attachment, 1, &rect);
-
 #if RKG_ENABLE_IMGUI
-  if (rkg::debug_ui::render_inside_pass()) {
-    rkg::debug_ui::render(cmd);
-  }
+  const bool render_inside = rkg::debug_ui::render_inside_pass();
+#else
+  const bool render_inside = true;
 #endif
 
-  vkCmdEndRenderPass(cmd);
+  if (render_inside) {
+    VkClearValue clear_color{};
+    clear_color.color = {{0.02f, 0.02f, 0.05f, 1.0f}};
+
+    VkRenderPassBeginInfo render_pass_info{};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_info.renderPass = g_state.render_pass;
+    render_pass_info.framebuffer = g_state.framebuffers[image_index];
+    render_pass_info.renderArea.offset = {0, 0};
+    render_pass_info.renderArea.extent = g_state.swapchain_extent;
+    render_pass_info.clearValueCount = 1;
+    render_pass_info.pClearValues = &clear_color;
+
+    vkCmdBeginRenderPass(cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkClearAttachment clear_attachment{};
+    clear_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    clear_attachment.colorAttachment = 0;
+    clear_attachment.clearValue.color = {{0.15f, 0.65f, 0.95f, 1.0f}};
+
+    VkClearRect rect{};
+    rect.baseArrayLayer = 0;
+    rect.layerCount = 1;
+    rect.rect.offset = {static_cast<int32_t>(g_state.swapchain_extent.width / 4),
+                        static_cast<int32_t>(g_state.swapchain_extent.height / 4)};
+    rect.rect.extent = {g_state.swapchain_extent.width / 2, g_state.swapchain_extent.height / 2};
+
+    vkCmdClearAttachments(cmd, 1, &clear_attachment, 1, &rect);
 
 #if RKG_ENABLE_IMGUI
-  if (!rkg::debug_ui::render_inside_pass()) {
+    rkg::debug_ui::render(cmd);
+#endif
+    vkCmdEndRenderPass(cmd);
+    if (image_index < g_state.swapchain_image_layouts.size()) {
+      g_state.swapchain_image_layouts[image_index] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    }
+  }
+
+#if RKG_ENABLE_IMGUI
+  if (!render_inside) {
     if (!g_state.dynamic_rendering_enabled) {
       rkg::log::warn("debug_ui render skipped: dynamic rendering not enabled");
       return vkEndCommandBuffer(cmd) == VK_SUCCESS;
+    }
+
+    VkClearValue clear_color{};
+    clear_color.color = {{0.02f, 0.02f, 0.05f, 1.0f}};
+
+    VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (image_index < g_state.swapchain_image_layouts.size()) {
+      old_layout = g_state.swapchain_image_layouts[image_index];
     }
 
     VkImageMemoryBarrier to_color{};
     to_color.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     to_color.srcAccessMask = 0;
     to_color.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    to_color.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    to_color.oldLayout = old_layout;
     to_color.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     to_color.image = g_state.swapchain_images[image_index];
     to_color.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1216,7 +1235,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     to_color.subresourceRange.baseArrayLayer = 0;
     to_color.subresourceRange.layerCount = 1;
     vkCmdPipelineBarrier(cmd,
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          0,
                          0,
@@ -1230,8 +1249,9 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     color_attach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     color_attach.imageView = g_state.swapchain_image_views[image_index];
     color_attach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attach.clearValue = clear_color;
 
     VkRenderingInfo rendering_info{};
     rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -1269,6 +1289,10 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          nullptr,
                          1,
                          &to_present);
+
+    if (image_index < g_state.swapchain_image_layouts.size()) {
+      g_state.swapchain_image_layouts[image_index] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    }
   }
 #endif
 
