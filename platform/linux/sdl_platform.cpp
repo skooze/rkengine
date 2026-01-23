@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <string>
+#include <vector>
 
 namespace rkg::platform::detail {
 
@@ -43,40 +44,77 @@ std::string list_video_drivers() {
   return list.empty() ? "none" : list;
 }
 
-} // namespace
-
-bool platform_init(Platform* self, const WindowDesc& desc) {
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
-    const char* err = SDL_GetError();
-    if (!err || !*err) {
-      err = "unknown error";
-    }
-    rkg::log::error(std::string("SDL_Init failed: ") + err);
-    rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
-    const char* display = SDL_getenv("DISPLAY");
-    const char* wayland = SDL_getenv("WAYLAND_DISPLAY");
-    const char* session = SDL_getenv("XDG_SESSION_TYPE");
-    rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
-                    " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
-                    " XDG_SESSION_TYPE=" + (session ? session : ""));
-    return false;
+bool try_init_with_driver(Platform* self,
+                          const WindowDesc& desc,
+                          Uint32 init_flags,
+                          Uint32 window_flags,
+                          const char* driver,
+                          std::string& out_error) {
+  if (driver && *driver) {
+    SDL_setenv("SDL_VIDEODRIVER", driver, 1);
+  } else {
+    SDL_setenv("SDL_VIDEODRIVER", "", 1);
   }
-
-  Uint32 flags = SDL_WINDOW_RESIZABLE;
-#if RKG_ENABLE_VULKAN
-  flags |= SDL_WINDOW_VULKAN;
-#endif
-  SDL_Window* window = SDL_CreateWindow(desc.title, desc.width, desc.height, flags);
-  if (!window) {
-    rkg::log::error(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
+  if (SDL_Init(init_flags) != 0) {
+    const char* err = SDL_GetError();
+    out_error = (err && *err) ? err : "unknown error";
     SDL_Quit();
     return false;
   }
-
+  SDL_Window* window = SDL_CreateWindow(desc.title, desc.width, desc.height, window_flags);
+  if (!window) {
+    const char* err = SDL_GetError();
+    out_error = (err && *err) ? err : "unknown error";
+    SDL_Quit();
+    return false;
+  }
   self->window_ = window;
   self->last_ticks_ = SDL_GetTicks();
   self->quit_ = false;
   return true;
+}
+
+} // namespace
+
+bool platform_init(Platform* self, const WindowDesc& desc) {
+  const Uint32 init_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+  Uint32 window_flags = SDL_WINDOW_RESIZABLE;
+#if RKG_ENABLE_VULKAN
+  window_flags |= SDL_WINDOW_VULKAN;
+#endif
+  const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
+  std::string err;
+  if (try_init_with_driver(self, desc, init_flags, window_flags, env_driver, err)) {
+    return true;
+  }
+
+  const std::vector<const char*> fallback_drivers = {
+      "wayland",
+      "x11",
+      "kmsdrm",
+      "offscreen",
+      "dummy"};
+  for (const char* driver : fallback_drivers) {
+    if (env_driver && *env_driver && std::string(env_driver) == driver) {
+      continue;
+    }
+    if (try_init_with_driver(self, desc, init_flags, window_flags, driver, err)) {
+      rkg::log::warn(std::string("SDL_Init failed, recovered by forcing video driver: ") + driver);
+      return true;
+    }
+  }
+
+  rkg::log::error(std::string("SDL_Init failed: ") + err);
+  rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
+  const char* display = SDL_getenv("DISPLAY");
+  const char* wayland = SDL_getenv("WAYLAND_DISPLAY");
+  const char* session = SDL_getenv("XDG_SESSION_TYPE");
+  const char* forced = SDL_getenv("SDL_VIDEODRIVER");
+  rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
+                  " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
+                  " XDG_SESSION_TYPE=" + (session ? session : "") +
+                  " SDL_VIDEODRIVER=" + (forced ? forced : ""));
+  return false;
 }
 
 void platform_shutdown(Platform* self) {
