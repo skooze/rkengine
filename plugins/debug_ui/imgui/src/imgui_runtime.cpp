@@ -20,7 +20,6 @@
 #include <chrono>
 #include <fstream>
 #include <optional>
-#include <type_traits>
 
 namespace rkg::debug_ui {
 
@@ -229,12 +228,7 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  using InitFn = decltype(&ImGui_ImplVulkan_Init);
-  constexpr bool kInitWithRenderPass =
-      std::is_invocable_v<InitFn, ImGui_ImplVulkan_InitInfo*, VkRenderPass>;
-  const bool init_ok = kInitWithRenderPass ? ImGui_ImplVulkan_Init(&init_info, g_state.render_pass)
-                                           : ImGui_ImplVulkan_Init(&init_info);
-  if (!init_ok) {
+  if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
   }
