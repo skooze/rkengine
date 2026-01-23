@@ -118,6 +118,41 @@ constexpr bool has_pipeline_rendering_member() {
   return requires(T value) { value.PipelineRenderingCreateInfo; };
 }
 
+template <typename T>
+void set_render_pass(T& info, VkRenderPass pass) {
+  if constexpr (has_render_pass_member<T>()) {
+    info.RenderPass = pass;
+  }
+}
+
+template <typename T>
+void set_dynamic_rendering(T& info, bool enable) {
+  if constexpr (has_dynamic_rendering_member<T>()) {
+    info.UseDynamicRendering = enable;
+  }
+}
+
+template <typename T>
+void set_color_format(T& info, VkFormat format) {
+  if constexpr (has_color_format_member<T>()) {
+    info.ColorAttachmentFormat = format;
+  }
+}
+
+template <typename T>
+void set_msaa_samples(T& info, VkSampleCountFlagBits samples) {
+  if constexpr (has_msaa_member<T>()) {
+    info.MSAASamples = samples;
+  }
+}
+
+template <typename T>
+void set_pipeline_rendering_info(T& info, VkPipelineRenderingCreateInfo* rendering_info) {
+  if constexpr (has_pipeline_rendering_member<T>()) {
+    info.PipelineRenderingCreateInfo = rendering_info;
+  }
+}
+
 bool upload_fonts() {
   // Newer ImGui Vulkan backends handle font upload internally.
   // Keep this as a no-op for compatibility across backend versions.
@@ -260,27 +295,17 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  if constexpr (has_render_pass_member<ImGui_ImplVulkan_InitInfo>()) {
-    init_info.RenderPass = g_state.render_pass;
+  set_render_pass(init_info, g_state.render_pass);
+  set_dynamic_rendering(init_info, !g_state.render_inside_pass);
+  if (g_state.swapchain_format != VK_FORMAT_UNDEFINED) {
+    set_color_format(init_info, g_state.swapchain_format);
   }
-  if constexpr (has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>()) {
-    init_info.UseDynamicRendering = !g_state.render_inside_pass;
-  }
-  if constexpr (has_color_format_member<ImGui_ImplVulkan_InitInfo>()) {
-    if (g_state.swapchain_format != VK_FORMAT_UNDEFINED) {
-      init_info.ColorAttachmentFormat = g_state.swapchain_format;
-    }
-  }
-  if constexpr (has_msaa_member<ImGui_ImplVulkan_InitInfo>()) {
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-  }
-  if constexpr (has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>()) {
-    static VkPipelineRenderingCreateInfo rendering_info{};
-    rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
-    init_info.PipelineRenderingCreateInfo = &rendering_info;
-  }
+  set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
+  static VkPipelineRenderingCreateInfo rendering_info{};
+  rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+  rendering_info.colorAttachmentCount = 1;
+  rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
+  set_pipeline_rendering_info(init_info, &rendering_info);
   if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
