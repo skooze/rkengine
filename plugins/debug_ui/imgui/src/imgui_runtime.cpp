@@ -155,15 +155,20 @@ void set_pipeline_rendering_info(T& info, VkPipelineRenderingCreateInfo* renderi
 }
 
 static bool texture_id_is_empty(ImTextureID tex_id) {
-  const ImTextureID empty{};
-  if constexpr (requires { tex_id == empty; }) {
-    return tex_id == empty;
-  } else if constexpr (requires { tex_id == 0; }) {
-    return tex_id == 0;
-  } else if constexpr (requires { tex_id == nullptr; }) {
-    return tex_id == nullptr;
+  return tex_id == static_cast<ImTextureID>(0);
+}
+
+template <typename T>
+static ImTextureID draw_cmd_texture_id(const T& cmd) {
+  if constexpr (requires { cmd.GetTexID(); }) {
+    return cmd.GetTexID();
+  } else if constexpr (requires { cmd.TextureId; }) {
+    return cmd.TextureId;
+  } else if constexpr (requires { cmd.TexID; }) {
+    return cmd.TexID;
+  } else {
+    return static_cast<ImTextureID>(0);
   }
-  return false;
 }
 
 static bool draw_data_has_empty_texture(const ImDrawData* draw_data) {
@@ -177,7 +182,7 @@ static bool draw_data_has_empty_texture(const ImDrawData* draw_data) {
     }
     for (int cmd_index = 0; cmd_index < list->CmdBuffer.Size; ++cmd_index) {
       const ImDrawCmd& cmd = list->CmdBuffer[cmd_index];
-      if (texture_id_is_empty(cmd.TextureId)) {
+      if (texture_id_is_empty(draw_cmd_texture_id(cmd))) {
         return true;
       }
     }
