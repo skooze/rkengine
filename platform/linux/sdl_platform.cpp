@@ -54,8 +54,21 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   window_flags |= SDL_WINDOW_VULKAN;
 #endif
   const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
+  const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
+  const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
   std::string err;
-  auto try_init_with_driver = [&](const char* driver) -> bool {
+  auto apply_evdev_setting = [&](bool disable_evdev) {
+    if (!disable_evdev) return;
+    if (!env_linuxev || !*env_linuxev) {
+      setenv("SDL_INPUT_LINUXEV", "0", 1);
+    }
+    if (!env_evdev || !*env_evdev) {
+      setenv("SDL_INPUT_EVDEV", "0", 1);
+    }
+  };
+
+  auto try_init_with_driver = [&](const char* driver, bool disable_evdev) -> bool {
+    apply_evdev_setting(disable_evdev);
     if (driver && *driver) {
       setenv("SDL_VIDEODRIVER", driver, 1);
     } else {
@@ -96,7 +109,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     return true;
   };
 
-  if (try_init_with_driver(env_driver)) {
+  if (try_init_with_driver(env_driver, false)) {
     if (!init_events(false)) {
       init_events(true);
     }
@@ -113,11 +126,28 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (env_driver && *env_driver && std::string(env_driver) == driver) {
       continue;
     }
-    if (try_init_with_driver(driver)) {
+    if (try_init_with_driver(driver, false)) {
       rkg::log::warn(std::string("SDL_Init failed, recovered by forcing video driver: ") + driver);
       if (!init_events(false)) {
         init_events(true);
       }
+      return true;
+    }
+  }
+
+  if (try_init_with_driver(env_driver, true)) {
+    rkg::log::warn("SDL_Init recovered by disabling evdev input");
+    init_events(true);
+    return true;
+  }
+
+  for (const char* driver : fallback_drivers) {
+    if (env_driver && *env_driver && std::string(env_driver) == driver) {
+      continue;
+    }
+    if (try_init_with_driver(driver, true)) {
+      rkg::log::warn(std::string("SDL_Init recovered by disabling evdev input and forcing video driver: ") + driver);
+      init_events(true);
       return true;
     }
   }
