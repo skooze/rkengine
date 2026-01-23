@@ -2,7 +2,9 @@
 
 #include "rkg/log.h"
 
+#define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <cerrno>
 #include <cctype>
 #include <cstdlib>
@@ -216,6 +218,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 
   log_rlimit_nofile();
   install_sdl_logging();
+  SDL_SetMainReady();
 
   const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
