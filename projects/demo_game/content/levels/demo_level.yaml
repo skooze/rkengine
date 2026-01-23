@@ -1,12 +1,14 @@
 name: demo_level
 entities:
   - name: demo_cube_1
+    id: demo_cube_1
     prefab: demo_cube
     transform:
       position: [0.0, 0.0, 0.0]
       rotation: [0.0, 0.0, 0.0]
       scale: [1.0, 1.0, 1.0]
   - name: demo_quad_1
+    id: demo_quad_1
     prefab: demo_quad
     transform:
       position: [2.0, 0.0, 0.0]

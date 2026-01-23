@@ -93,6 +93,9 @@ End-to-end dev loop:
 6) **Audit**: `build/ai_audit.log`, `build/ai_results.json`, `build/ai_runs/<run_id>/`
 7) **Rollback**: `rkgctl rollback --last`
 
+Run artifacts live under `build/ai_runs/<run_id>/` (run_info/results, staged_patches diffs, and optional snapshots),
+and power the Editor Runs Browser for diff review, conflict visibility, cleanup, and snapshot restore workflows.
+
 ## Safety Model
 - **Allowlist-only actions** (no arbitrary shell execution)
 - **Conflict detection** via base-file hash checks

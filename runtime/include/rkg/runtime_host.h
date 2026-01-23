@@ -62,6 +62,7 @@ class RuntimeHost {
   const std::filesystem::path& cooked_root() const { return cooked_root_; }
   const std::filesystem::path& pack_path() const { return pack_path_; }
   const std::filesystem::path& cook_status_path() const { return cook_status_path_; }
+  const std::string& current_level_path() const { return current_level_path_; }
 
   const std::string& renderer_plugin() const { return renderer_plugin_; }
   uint32_t renderer_caps() const { return renderer_caps_; }
@@ -81,6 +82,10 @@ class RuntimeHost {
   const rkg::ecs::Registry& registry() const { return registry_; }
   rkg::ecs::Entity player_entity() const { return player_; }
   const std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_name() const { return entities_by_name_; }
+  const std::unordered_map<rkg::ecs::Entity, std::string>& entity_override_keys() const {
+    return entity_override_keys_;
+  }
+  std::string override_key_for_entity(rkg::ecs::Entity entity) const;
   const rkg::input::InputSystem& input() const { return input_; }
   rkg::input::InputSystem& input() { return input_; }
 
@@ -104,6 +109,8 @@ class RuntimeHost {
 
   rkg::ecs::Registry registry_{};
   std::unordered_map<std::string, rkg::ecs::Entity> entities_by_name_{};
+  std::unordered_map<rkg::ecs::Entity, std::string> entity_override_keys_{};
+  std::unordered_map<std::string, rkg::ecs::Entity> entities_by_override_key_{};
   rkg::ecs::Entity player_ = rkg::ecs::kInvalidEntity;
 
   std::filesystem::path raw_content_root_;
@@ -123,6 +130,7 @@ class RuntimeHost {
   std::chrono::steady_clock::time_point last_cook_check_{};
   std::string last_reload_time_ = "N/A";
   std::string last_reload_error_;
+  std::string current_level_path_;
 
   bool manual_reload_requested_ = false;
   std::string manual_reload_reason_;

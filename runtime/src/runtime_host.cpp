@@ -253,6 +253,8 @@ bool apply_prefab_components_json(const nlohmann::json& prefab,
 
 bool load_level_from_json(rkg::ecs::Registry& registry,
                           std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_name,
+                          std::unordered_map<rkg::ecs::Entity, std::string>& entity_override_keys,
+                          std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_override_key,
                           rkg::ecs::Entity& player,
                           const nlohmann::json& level,
                           rkg::content::PackReader* pack_reader) {
@@ -261,6 +263,10 @@ bool load_level_from_json(rkg::ecs::Registry& registry,
   }
   for (const auto& entity : level["entities"]) {
     const auto name = entity.value("name", "entity");
+    std::string override_key = name;
+    if (entity.contains("id") && entity["id"].is_string()) {
+      override_key = entity["id"].get<std::string>();
+    }
     rkg::ecs::Transform transform;
     rkg::ecs::Renderable renderable;
     bool has_renderable = false;
@@ -320,6 +326,12 @@ bool load_level_from_json(rkg::ecs::Registry& registry,
       registry.set_renderable(entity_id, renderable);
     }
     entities_by_name[name] = entity_id;
+    entity_override_keys[entity_id] = override_key;
+    const auto inserted = entities_by_override_key.emplace(override_key, entity_id);
+    if (!inserted.second) {
+      rkg::log::warn(std::string("duplicate override id: ") + override_key);
+      entities_by_override_key[override_key] = entity_id;
+    }
     if (player == rkg::ecs::kInvalidEntity) {
       player = entity_id;
     }
@@ -331,6 +343,8 @@ bool load_level_from_json(rkg::ecs::Registry& registry,
 
 bool load_level_from_pack(rkg::ecs::Registry& registry,
                           std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_name,
+                          std::unordered_map<rkg::ecs::Entity, std::string>& entity_override_keys,
+                          std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_override_key,
                           rkg::ecs::Entity& player,
                           rkg::content::PackReader& pack_reader,
                           const std::string& level_path) {
@@ -351,7 +365,8 @@ bool load_level_from_pack(rkg::ecs::Registry& registry,
     rkg::log::warn("pack JSON parse failed");
     return false;
   }
-  return load_level_from_json(registry, entities_by_name, player, level, &pack_reader);
+  return load_level_from_json(registry, entities_by_name, entity_override_keys, entities_by_override_key,
+                              player, level, &pack_reader);
 #else
   (void)registry;
   (void)entities_by_name;
@@ -431,6 +446,8 @@ bool apply_prefab_components_yaml(const YAML::Node& prefab,
 
 void load_level_from_yaml(rkg::ecs::Registry& registry,
                           std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_name,
+                          std::unordered_map<rkg::ecs::Entity, std::string>& entity_override_keys,
+                          std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_override_key,
                           rkg::ecs::Entity& player,
                           const fs::path& content_root,
                           const std::string& level_path) {
@@ -443,6 +460,10 @@ void load_level_from_yaml(rkg::ecs::Registry& registry,
   if (!level["entities"]) return;
   for (const auto& entity : level["entities"]) {
     const auto name = entity["name"] ? entity["name"].as<std::string>() : "entity";
+    std::string override_key = name;
+    if (entity["id"] && entity["id"].IsScalar()) {
+      override_key = entity["id"].as<std::string>();
+    }
     rkg::ecs::Transform transform;
     rkg::ecs::Renderable renderable;
     bool has_renderable = false;
@@ -516,6 +537,12 @@ void load_level_from_yaml(rkg::ecs::Registry& registry,
       registry.set_renderable(entity_id, renderable);
     }
     entities_by_name[name] = entity_id;
+    entity_override_keys[entity_id] = override_key;
+    const auto inserted = entities_by_override_key.emplace(override_key, entity_id);
+    if (!inserted.second) {
+      rkg::log::warn(std::string("duplicate override id: ") + override_key);
+      entities_by_override_key[override_key] = entity_id;
+    }
     if (player == rkg::ecs::kInvalidEntity) {
       player = entity_id;
     }
@@ -526,23 +553,102 @@ void load_level_from_yaml(rkg::ecs::Registry& registry,
 
 void load_level(rkg::ecs::Registry& registry,
                 std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_name,
+                std::unordered_map<rkg::ecs::Entity, std::string>& entity_override_keys,
+                std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_override_key,
                 rkg::ecs::Entity& player,
                 const fs::path& content_root,
                 const std::string& level_path,
                 rkg::content::PackReader* pack_reader) {
   if (pack_reader) {
-    if (load_level_from_pack(registry, entities_by_name, player, *pack_reader, level_path)) {
+    if (load_level_from_pack(registry, entities_by_name, entity_override_keys, entities_by_override_key,
+                             player, *pack_reader, level_path)) {
       return;
     }
   }
 #if RKG_ENABLE_DATA_YAML
-  load_level_from_yaml(registry, entities_by_name, player, content_root, level_path);
+  load_level_from_yaml(registry, entities_by_name, entity_override_keys, entities_by_override_key,
+                       player, content_root, level_path);
 #else
   (void)registry;
   (void)entities_by_name;
+  (void)entity_override_keys;
+  (void)entities_by_override_key;
   (void)player;
   (void)content_root;
   (void)level_path;
+#endif
+}
+
+void apply_editor_overrides(rkg::ecs::Registry& registry,
+                            const std::unordered_map<std::string, rkg::ecs::Entity>& entities_by_override_key,
+                            const fs::path& overrides_path) {
+#if RKG_ENABLE_DATA_YAML
+  if (!fs::exists(overrides_path)) {
+    return;
+  }
+  YAML::Node doc;
+  try {
+    doc = YAML::LoadFile(overrides_path.string());
+  } catch (const std::exception& e) {
+    rkg::log::warn(std::string("editor_overrides load failed: ") + e.what());
+    return;
+  }
+  if (!doc["overrides"] || !doc["overrides"].IsMap()) {
+    return;
+  }
+  const auto overrides = doc["overrides"];
+  for (const auto& item : overrides) {
+    const auto key = item.first.as<std::string>();
+    const auto it = entities_by_override_key.find(key);
+    if (it == entities_by_override_key.end()) {
+      rkg::log::warn(std::string("override target missing: ") + key);
+      continue;
+    }
+    const auto entity = it->second;
+    const auto node = item.second;
+    if (node["transform"] && node["transform"].IsMap()) {
+      auto* transform = registry.get_transform(entity);
+      if (transform) {
+        const auto t = node["transform"];
+        if (t["position"]) {
+          auto p = t["position"];
+          transform->position[0] = p[0].as<float>();
+          transform->position[1] = p[1].as<float>();
+          transform->position[2] = p[2].as<float>();
+        }
+        if (t["rotation"]) {
+          auto r = t["rotation"];
+          transform->rotation[0] = r[0].as<float>();
+          transform->rotation[1] = r[1].as<float>();
+          transform->rotation[2] = r[2].as<float>();
+        }
+        if (t["scale"]) {
+          auto s = t["scale"];
+          transform->scale[0] = s[0].as<float>();
+          transform->scale[1] = s[1].as<float>();
+          transform->scale[2] = s[2].as<float>();
+        }
+      }
+    }
+    if (node["renderable"] && node["renderable"].IsMap()) {
+      const auto rnode = node["renderable"];
+      rkg::ecs::Renderable renderable{};
+      bool had = false;
+      if (auto* existing = registry.get_renderable(entity)) {
+        renderable = *existing;
+        had = true;
+      }
+      if (apply_renderable_from_yaml(rnode, renderable)) {
+        registry.set_renderable(entity, renderable);
+      } else if (had) {
+        registry.set_renderable(entity, renderable);
+      }
+    }
+  }
+#else
+  (void)registry;
+  (void)entities_by_override_key;
+  (void)overrides_path;
 #endif
 }
 
@@ -649,11 +755,7 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   }
 #endif
 
-  if (!project_.initial_level.empty()) {
-    rkg::content::PackReader* pack_ptr = (using_cooked_ && pack_loaded_) ? &pack_reader_ : nullptr;
-    load_level(registry_, entities_by_name_, player_, using_cooked_ ? cooked_root_ : raw_content_root_,
-               project_.initial_level, pack_ptr);
-  }
+  load_initial_level();
 
   watcher_.start(raw_content_root_);
   rkg::log::info(std::string("content watcher: ") + watcher_.backend_name());
@@ -951,20 +1053,34 @@ bool RuntimeHost::reload_content(bool raw_changed, const std::string& reason) {
 void RuntimeHost::reset_runtime() {
   registry_ = rkg::ecs::Registry{};
   entities_by_name_.clear();
+  entity_override_keys_.clear();
+  entities_by_override_key_.clear();
   player_ = rkg::ecs::kInvalidEntity;
+  current_level_path_.clear();
 }
 
 void RuntimeHost::load_initial_level() {
   if (project_.initial_level.empty()) {
     return;
   }
+  current_level_path_ = project_.initial_level;
   rkg::content::PackReader* pack_ptr = (using_cooked_ && pack_loaded_) ? &pack_reader_ : nullptr;
   const fs::path content_root = using_cooked_ ? cooked_root_ : raw_content_root_;
-  load_level(registry_, entities_by_name_, player_, content_root, project_.initial_level, pack_ptr);
+  load_level(registry_, entities_by_name_, entity_override_keys_, entities_by_override_key_,
+             player_, content_root, project_.initial_level, pack_ptr);
+  apply_editor_overrides(registry_, entities_by_override_key_, project_root_ / "editor_overrides.yaml");
 }
 
 std::string RuntimeHost::renderer_display_name() const {
   return rkg::renderer_display_name(renderer_plugin_);
+}
+
+std::string RuntimeHost::override_key_for_entity(rkg::ecs::Entity entity) const {
+  const auto it = entity_override_keys_.find(entity);
+  if (it == entity_override_keys_.end()) {
+    return {};
+  }
+  return it->second;
 }
 
 } // namespace rkg::runtime

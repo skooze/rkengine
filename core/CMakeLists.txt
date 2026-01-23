@@ -13,6 +13,9 @@ rkg_add_library(rkg_core
   src/replay.cpp
   src/content_pack.cpp
   src/ai_results.cpp
+  src/staged_runs.cpp
+  src/run_cleanup.cpp
+  src/snapshot_restore.cpp
 )
 
 target_include_directories(rkg_core

@@ -2,6 +2,9 @@
 #include "rkg/ai_results.h"
 #include "rkg/log.h"
 #include "rkg/paths.h"
+#include "rkg/run_cleanup.h"
+#include "rkg/snapshot_restore.h"
+#include "rkg/staged_runs.h"
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
 #include "rkgctl/cli_api.h"
@@ -12,10 +15,13 @@
 #include <yaml-cpp/yaml.h>
 #endif
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <chrono>
+#include <optional>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -510,6 +516,424 @@ int main(int argc, char** argv) {
       }
     }
   }
+
+#if RKG_ENABLE_DATA_YAML
+  // Test: commit overrides dry-run staging.
+  {
+    const fs::path tmp_project = paths.root / "build" / "test_tmp_commit";
+    fs::remove_all(tmp_project);
+    fs::create_directories(tmp_project / "content" / "prefabs");
+    fs::create_directories(tmp_project / "content" / "levels");
+    write_text(tmp_project / "project.yaml",
+               "project:\n  name: commit_test\n  initial_level: content/levels/level.yaml\n");
+    write_text(tmp_project / "content/prefabs/prefab.yaml",
+               "name: prefab\ncomponents: {}\n");
+    write_text(tmp_project / "content/levels/level.yaml",
+               "name: level\nentities:\n  - name: e1\n    id: e1\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n"
+               "    renderable:\n      mesh: cube\n      color: [1, 1, 1, 1]\n");
+    write_text(tmp_project / "editor_overrides.yaml",
+               "overrides:\n  e1:\n    transform:\n      position: [1, 2, 3]\n"
+               "    renderable:\n      mesh: quad\n      color: [0.2, 0.3, 0.4, 1.0]\n");
+
+    const std::string run_id = "test_commit_stage";
+    const fs::path run_dir = tmp_project / "run";
+    const fs::path staging_dir = run_dir / "staged_patches";
+    std::string error_code;
+    std::string error_message;
+    const StageResult stage =
+        stage_commit_overrides(paths.root, tmp_project, tmp_project / "editor_overrides.yaml",
+                               std::nullopt, std::nullopt, std::nullopt, staging_dir,
+                               run_id, error_code, error_message);
+    if (!error_message.empty() || !stage.errors.empty() || stage.files.empty()) {
+      std::cerr << "commit overrides staging failed\n";
+      ++failures;
+    } else {
+      const auto diff_text = read_text(stage.files.front().diff_path);
+      if (diff_text.find("renderable") == std::string::npos ||
+          diff_text.find("quad") == std::string::npos ||
+          diff_text.find("position") == std::string::npos) {
+        std::cerr << "commit overrides diff missing expected edits\n";
+        ++failures;
+      }
+    }
+  }
+
+  // Test: commit overrides stage selected entity only.
+  {
+    const fs::path tmp_project = paths.root / "build" / "test_tmp_commit_selected";
+    fs::remove_all(tmp_project);
+    fs::create_directories(tmp_project / "content" / "prefabs");
+    fs::create_directories(tmp_project / "content" / "levels");
+    write_text(tmp_project / "project.yaml",
+               "project:\n  name: commit_selected\n  initial_level: content/levels/level.yaml\n");
+    write_text(tmp_project / "content/prefabs/prefab.yaml",
+               "name: prefab\ncomponents: {}\n");
+    write_text(tmp_project / "content/levels/level.yaml",
+               "name: level\nentities:\n"
+               "  - name: e1\n    id: e1\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n"
+               "  - name: e2\n    id: e2\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n");
+    write_text(tmp_project / "editor_overrides.yaml",
+               "overrides:\n"
+               "  e1:\n    transform:\n      position: [1, 2, 3]\n"
+               "  e2:\n    transform:\n      position: [9, 9, 9]\n");
+
+    const std::string run_id = "test_commit_selected";
+    const fs::path run_dir = tmp_project / "run";
+    const fs::path staging_dir = run_dir / "staged_patches";
+    std::string error_code;
+    std::string error_message;
+    const StageResult stage =
+        stage_commit_overrides(paths.root, tmp_project, tmp_project / "editor_overrides.yaml",
+                               std::nullopt, std::optional<std::string>("e1"), std::nullopt, staging_dir,
+                               run_id, error_code, error_message);
+    if (!error_message.empty() || !stage.errors.empty() || stage.files.empty()) {
+      std::cerr << "commit overrides selected staging failed\n";
+      ++failures;
+    } else {
+      const auto diff_text = read_text(stage.files.front().diff_path);
+      if (diff_text.find("position: [1, 2, 3]") == std::string::npos ||
+          diff_text.find("position: [9, 9, 9]") != std::string::npos) {
+        std::cerr << "commit overrides selected diff unexpected\n";
+        ++failures;
+      }
+      if (stage.summary.value("entity_id", "") != "e1") {
+        std::cerr << "commit overrides selected summary missing entity_id\n";
+        ++failures;
+      }
+    }
+  }
+
+  // Test: commit overrides stage selected by name.
+  {
+    const fs::path tmp_project = paths.root / "build" / "test_tmp_commit_selected_name";
+    fs::remove_all(tmp_project);
+    fs::create_directories(tmp_project / "content" / "prefabs");
+    fs::create_directories(tmp_project / "content" / "levels");
+    write_text(tmp_project / "project.yaml",
+               "project:\n  name: commit_selected_name\n  initial_level: content/levels/level.yaml\n");
+    write_text(tmp_project / "content/prefabs/prefab.yaml",
+               "name: prefab\ncomponents: {}\n");
+    write_text(tmp_project / "content/levels/level.yaml",
+               "name: level\nentities:\n"
+               "  - name: e1\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n"
+               "  - name: e2\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n");
+    write_text(tmp_project / "editor_overrides.yaml",
+               "overrides:\n"
+               "  e1:\n    transform:\n      position: [1, 2, 3]\n"
+               "  e2:\n    transform:\n      position: [9, 9, 9]\n");
+
+    const std::string run_id = "test_commit_selected_name";
+    const fs::path run_dir = tmp_project / "run";
+    const fs::path staging_dir = run_dir / "staged_patches";
+    std::string error_code;
+    std::string error_message;
+    const StageResult stage =
+        stage_commit_overrides(paths.root, tmp_project, tmp_project / "editor_overrides.yaml",
+                               std::nullopt, std::nullopt, std::optional<std::string>("e2"),
+                               staging_dir, run_id, error_code, error_message);
+    if (!error_message.empty() || !stage.errors.empty() || stage.files.empty()) {
+      std::cerr << "commit overrides selected-name staging failed\n";
+      ++failures;
+    } else {
+      const auto diff_text = read_text(stage.files.front().diff_path);
+      if (diff_text.find("position: [9, 9, 9]") == std::string::npos ||
+          diff_text.find("position: [1, 2, 3]") != std::string::npos) {
+        std::cerr << "commit overrides selected-name diff unexpected\n";
+        ++failures;
+      }
+      const auto warning = stage.summary.value("selector_warning", "");
+      if (warning.empty()) {
+        std::cerr << "commit overrides selected-name warning missing\n";
+        ++failures;
+      }
+      if (stage.summary.value("selector_type", "") != "name") {
+        std::cerr << "commit overrides selected-name selector_type missing\n";
+        ++failures;
+      }
+    }
+  }
+
+  // Test: commit overrides conflict detection.
+  {
+    const fs::path tmp_project = paths.root / "build" / "test_tmp_commit_conflict";
+    fs::remove_all(tmp_project);
+    fs::create_directories(tmp_project / "content" / "prefabs");
+    fs::create_directories(tmp_project / "content" / "levels");
+    write_text(tmp_project / "project.yaml",
+               "project:\n  name: commit_conflict\n  initial_level: content/levels/level.yaml\n");
+    write_text(tmp_project / "content/prefabs/prefab.yaml",
+               "name: prefab\ncomponents: {}\n");
+    write_text(tmp_project / "content/levels/level.yaml",
+               "name: level\nentities:\n  - name: e1\n    id: e1\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n");
+    write_text(tmp_project / "editor_overrides.yaml",
+               "overrides:\n  e1:\n    transform:\n      position: [4, 5, 6]\n");
+
+    const fs::path run_dir = paths.root / "build" / "ai_runs" / "test_commit_conflict";
+    fs::remove_all(run_dir);
+    CommitOverridesOptions stage_opts;
+    stage_opts.apply.dry_run = true;
+    stage_opts.apply.require_approval = false;
+    stage_opts.stage_only = true;
+    stage_opts.run_dir = run_dir;
+    if (content_commit_overrides(argv[0], tmp_project, tmp_project / "editor_overrides.yaml", stage_opts) != 0) {
+      std::cerr << "commit overrides staging failed for conflict test\n";
+      ++failures;
+    } else {
+      write_text(tmp_project / "content/levels/level.yaml",
+                 "name: level\nentities:\n  - name: e1\n    id: e1\n    prefab: prefab\n    transform:\n"
+                 "      position: [9, 9, 9]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n");
+      CommitOverridesOptions apply_opts;
+      apply_opts.apply.dry_run = true;
+      apply_opts.apply.require_approval = false;
+      apply_opts.stage_only = false;
+      apply_opts.apply_staged_dir = run_dir;
+      const int rc = content_commit_overrides(argv[0], tmp_project, tmp_project / "editor_overrides.yaml", apply_opts);
+      if (rc == 0) {
+        std::cerr << "commit overrides conflict was not detected\n";
+        ++failures;
+      } else {
+        json results;
+        const auto text = read_text(run_dir / "results.json");
+        results = json::parse(text, nullptr, false);
+        if (results.is_discarded()) {
+          std::cerr << "commit overrides results missing\n";
+          ++failures;
+        } else if (results.value("error_code", "") != "conflict" ||
+                   results.value("stage", "") != "apply" ||
+                   !results.value("conflict_detected", false) ||
+                   results.value("forced_apply", false)) {
+          std::cerr << "commit overrides results missing conflict fields\n";
+          ++failures;
+        } else {
+          const auto conflict_files = results.value("conflict_files", json::array());
+          const auto expected = fs::relative(tmp_project / "content/levels/level.yaml", paths.root).generic_string();
+          bool found = false;
+          for (const auto& item : conflict_files) {
+            if (item.is_string() && item.get<std::string>() == expected) {
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            std::cerr << "commit overrides conflict_files missing expected path\n";
+            ++failures;
+          }
+        }
+      }
+
+      CommitOverridesOptions force_opts;
+      force_opts.apply.dry_run = true;
+      force_opts.apply.require_approval = false;
+      force_opts.apply.force = true;
+      force_opts.stage_only = false;
+      force_opts.apply_staged_dir = run_dir;
+      const int force_rc = content_commit_overrides(argv[0], tmp_project, tmp_project / "editor_overrides.yaml", force_opts);
+      if (force_rc != 0) {
+        std::cerr << "commit overrides force apply failed\n";
+        ++failures;
+      } else {
+        json results;
+        const auto text = read_text(run_dir / "results.json");
+        results = json::parse(text, nullptr, false);
+        if (results.is_discarded()) {
+          std::cerr << "commit overrides force results missing\n";
+          ++failures;
+        } else if (!results.value("forced_apply", false) ||
+                   !results.value("conflict_detected", false) ||
+                   !results.value("success", false)) {
+          std::cerr << "commit overrides force results invalid\n";
+          ++failures;
+        } else {
+          const std::string manifest_path = results.value("snapshot_manifest_path", "");
+          if (manifest_path.empty() || !fs::exists(manifest_path)) {
+            std::cerr << "commit overrides snapshot manifest missing\n";
+            ++failures;
+          }
+          if (!results.value("snapshots_taken", false)) {
+            std::cerr << "commit overrides snapshots_taken not set\n";
+            ++failures;
+          }
+        }
+      }
+    }
+  }
+
+  // Test: commit overrides stage-only results + apply-staged results.
+  {
+    const fs::path tmp_project = paths.root / "build" / "test_tmp_commit_stage_apply";
+    fs::remove_all(tmp_project);
+    fs::create_directories(tmp_project / "content" / "prefabs");
+    fs::create_directories(tmp_project / "content" / "levels");
+    write_text(tmp_project / "project.yaml",
+               "project:\n  name: commit_stage_apply\n  initial_level: content/levels/level.yaml\n");
+    write_text(tmp_project / "content/prefabs/prefab.yaml",
+               "name: prefab\ncomponents: {}\n");
+    write_text(tmp_project / "content/levels/level.yaml",
+               "name: level\nentities:\n  - name: e1\n    id: e1\n    prefab: prefab\n    transform:\n"
+               "      position: [0, 0, 0]\n      rotation: [0, 0, 0]\n      scale: [1, 1, 1]\n");
+    write_text(tmp_project / "editor_overrides.yaml",
+               "overrides:\n  e1:\n    transform:\n      position: [7, 8, 9]\n");
+
+    const fs::path run_dir = paths.root / "build" / "ai_runs" / "test_stage_apply";
+    fs::remove_all(run_dir);
+    CommitOverridesOptions opts;
+    opts.apply.dry_run = true;
+    opts.apply.require_approval = false;
+    opts.stage_only = true;
+    opts.run_dir = run_dir;
+    if (content_commit_overrides(argv[0], tmp_project, tmp_project / "editor_overrides.yaml", opts) != 0) {
+      std::cerr << "commit overrides stage-only failed\n";
+      ++failures;
+    } else {
+      const auto results_text = read_text(run_dir / "results.json");
+      auto results = json::parse(results_text, nullptr, false);
+      if (results.is_discarded() || results.value("stage", "") != "stage" ||
+          !results.value("success", false) ||
+          results.value("forced_apply", true) ||
+          results.value("conflict_detected", true)) {
+        std::cerr << "commit overrides stage-only results invalid\n";
+        ++failures;
+      }
+    }
+
+    CommitOverridesOptions apply_opts;
+    apply_opts.apply.dry_run = true;
+    apply_opts.apply.require_approval = false;
+    apply_opts.stage_only = false;
+    apply_opts.apply_staged_dir = run_dir;
+    if (content_commit_overrides(argv[0], tmp_project, tmp_project / "editor_overrides.yaml", apply_opts) != 0) {
+      std::cerr << "commit overrides apply-staged failed\n";
+      ++failures;
+    } else {
+      const auto results_text = read_text(run_dir / "results.json");
+      auto results = json::parse(results_text, nullptr, false);
+      if (results.is_discarded() || results.value("stage", "") != "apply" ||
+          results.value("forced_apply", true) || results.value("conflict_detected", true)) {
+        std::cerr << "commit overrides apply-staged results invalid\n";
+        ++failures;
+      }
+    }
+  }
+#endif
+
+  // Test: latest staged run selection.
+  {
+    const fs::path tmp_root = paths.root / "build" / "test_tmp_staged_runs";
+    fs::remove_all(tmp_root);
+    const fs::path run_root = tmp_root / "build" / "ai_runs";
+    fs::create_directories(run_root);
+
+    const auto make_run = [&](const std::string& name, const std::string& stage) {
+      const fs::path run_dir = run_root / name;
+      fs::create_directories(run_dir / "staged_patches");
+      write_text(run_dir / "staged_patches" / "summary.json", "{\"run_id\":\"" + name + "\"}\n");
+      write_text(run_dir / "results.json", "{\"stage\":\"" + stage + "\"}\n");
+      return run_dir;
+    };
+
+    const fs::path run_old = make_run("run_old", "stage");
+    const fs::path run_new = make_run("run_new", "stage");
+    const fs::path run_apply = make_run("run_apply", "apply");
+
+    const auto now = fs::file_time_type::clock::now();
+    fs::last_write_time(run_old / "results.json", now - std::chrono::hours(2));
+    fs::last_write_time(run_new / "results.json", now - std::chrono::hours(1));
+    fs::last_write_time(run_apply / "results.json", now);
+
+    std::string err;
+    const auto latest = rkg::find_latest_staged_run_dir(tmp_root, &err);
+    if (!latest.has_value() || latest->filename().string() != "run_new") {
+      std::cerr << "latest staged run selection failed\n";
+      ++failures;
+    }
+  }
+
+  // Test: cleanup candidates preserve snapshot runs.
+  {
+    const fs::path tmp_root = paths.root / "build" / "test_tmp_cleanup_runs";
+    fs::remove_all(tmp_root);
+    const fs::path run_root = tmp_root / "build" / "ai_runs";
+    fs::create_directories(run_root);
+
+    const auto make_run = [&](const std::string& name, bool snapshot) {
+      const fs::path run_dir = run_root / name;
+      fs::create_directories(run_dir);
+      write_text(run_dir / "results.json", "{\"stage\":\"apply\"}\n");
+      if (snapshot) {
+        fs::create_directories(run_dir / "snapshots");
+        write_text(run_dir / "snapshots/manifest.json", "{\"files\":[]}\n");
+      }
+      return run_dir;
+    };
+
+    const fs::path run_new = make_run("run_new", false);
+    const fs::path run_old = make_run("run_old", false);
+    const fs::path run_snap = make_run("run_snap", true);
+
+    const auto now = fs::file_time_type::clock::now();
+    fs::last_write_time(run_new / "results.json", now);
+    fs::last_write_time(run_old / "results.json", now - std::chrono::hours(48));
+    fs::last_write_time(run_snap / "results.json", now - std::chrono::hours(72));
+
+    rkg::RunCleanupOptions opts;
+    opts.keep_last = 1;
+    opts.older_than_days = 0;
+    const auto cleanup = rkg::collect_run_cleanup_candidates(tmp_root, opts, {});
+    const auto has_old = std::find(cleanup.candidates.begin(), cleanup.candidates.end(), run_old) !=
+                         cleanup.candidates.end();
+    const auto has_snap = std::find(cleanup.candidates.begin(), cleanup.candidates.end(), run_snap) !=
+                          cleanup.candidates.end();
+    if (!has_old || has_snap) {
+      std::cerr << "cleanup candidates did not preserve snapshot runs\n";
+      ++failures;
+    }
+  }
+
+#if RKG_ENABLE_DATA_JSON
+  // Test: snapshot restore staging produces diff + results.
+  {
+    const fs::path tmp_root = paths.root / "build" / "test_tmp_snapshot_restore";
+    fs::remove_all(tmp_root);
+    fs::create_directories(tmp_root / "content/levels");
+    const fs::path target = tmp_root / "content/levels/level.yaml";
+    const fs::path snapshot = tmp_root / "snapshot.before";
+    write_text(target, "name: level\nvalue: 1\n");
+    write_text(snapshot, "name: level\nvalue: 2\n");
+
+    const auto stage = rkg::stage_snapshot_restore(tmp_root, target, snapshot, "snap_run");
+    if (!stage.success) {
+      std::cerr << "snapshot restore stage failed\n";
+      ++failures;
+    } else {
+      const fs::path results_path = stage.run_dir / "results.json";
+      const auto results_text = read_text(results_path);
+      auto results = json::parse(results_text, nullptr, false);
+      if (results.is_discarded() || results.value("stage", "") != "stage" ||
+          !results.value("success", false)) {
+        std::cerr << "snapshot stage results invalid\n";
+        ++failures;
+      }
+      const fs::path diff_dir = stage.run_dir / "staged_patches" / "patches";
+      std::string diff_text;
+      for (const auto& entry : fs::directory_iterator(diff_dir)) {
+        if (entry.path().extension() == ".diff") {
+          diff_text = read_text(entry.path());
+          break;
+        }
+      }
+      if (diff_text.empty()) {
+        std::cerr << "snapshot stage diff missing\n";
+        ++failures;
+      }
+    }
+  }
+#endif
 
   rkg::log::shutdown();
   return failures == 0 ? 0 : 1;

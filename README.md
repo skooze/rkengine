@@ -28,9 +28,21 @@ cmake --build --preset linux-debug
 ./build/bin/rkg_editor --project projects/demo_game
 ```
 What you’ll see in the Editor:
-- A real viewport panel rendering a 3D cube (Vulkan/Linux)
+- A real viewport panel rendering content-driven meshes (Vulkan/Linux)
+- Click-to-select with a highlighted entity + Scene/Inspector sync
+- Inspector edits with undo/redo and per-project overrides (Save/Revert)
+- Manual edits can be staged to a diff, reviewed, then applied back to content
+- Runs Browser unifies AI + commit-overrides history with diffs, conflicts, and snapshots
 - Edit-mode camera orbit/zoom with viewport focus gating
 - Play-mode movement (WASD) when the viewport is focused
+
+Manual edits workflow (in-editor):
+- Save overrides -> Stage diff -> Review in Diff Preview -> Apply staged patch
+- Cook/reload if raw content changed
+Notes:
+- Diff Preview auto-loads the last staged run on startup
+- Stage Selected Only targets a single entity override
+- Apply Staged (Force) is available with explicit confirmation and snapshots current files for audit
 
 ## Quickstart — Linux
 ```

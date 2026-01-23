@@ -52,6 +52,39 @@ void write_ai_results_with_drift(const std::filesystem::path& run_dir,
                                  const nlohmann::json& drift_info,
                                  const std::optional<std::string>& status_override = std::nullopt);
 
+StageResult stage_commit_overrides(const std::filesystem::path& root,
+                                   const std::filesystem::path& project_root,
+                                   const std::filesystem::path& overrides_path,
+                                   const std::optional<std::filesystem::path>& level_override,
+                                   const std::optional<std::string>& entity_id,
+                                   const std::optional<std::string>& entity_name,
+                                   const std::filesystem::path& staging_dir,
+                                   const std::string& run_id,
+                                   std::string& error_code,
+                                   std::string& error_message);
+int apply_commit_overrides(const StageResult& stage,
+                           const ApplyOptions& opts,
+                           const std::filesystem::path& run_dir,
+                           const std::string& run_id,
+                           std::string& error_code,
+                           std::string& error_message,
+                           std::string& stage_name);
+
+struct CommitOverridesOptions {
+  ApplyOptions apply;
+  bool stage_only = true;
+  std::optional<std::filesystem::path> run_dir;
+  std::optional<std::filesystem::path> apply_staged_dir;
+  std::optional<std::filesystem::path> level_override;
+  std::optional<std::string> entity_id;
+  std::optional<std::string> entity_name;
+};
+
+int content_commit_overrides(const char* argv0,
+                             const std::optional<std::filesystem::path>& project_override,
+                             const std::filesystem::path& overrides_path,
+                             const CommitOverridesOptions& opts);
+
 int content_validate(const char* argv0, const std::optional<std::filesystem::path>& project_override);
 int content_cook(const char* argv0,
                  const std::optional<std::filesystem::path>& project_override,

@@ -1323,6 +1323,615 @@ StageResult stage_plan(const json& plan, const fs::path& plan_path) {
   return result;
 }
 
+#if RKG_ENABLE_DATA_YAML
+bool validate_override_vec(const YAML::Node& node, size_t min_size, size_t max_size) {
+  if (!node || !node.IsSequence()) return false;
+  const size_t size = node.size();
+  return size >= min_size && size <= max_size;
+}
+
+bool apply_override_to_entity(YAML::Node& entity,
+                              const YAML::Node& override_node,
+                              std::vector<std::string>& errors,
+                              std::vector<std::string>& warnings) {
+  if (override_node["transform"]) {
+    const auto t = override_node["transform"];
+    if (!t.IsMap()) {
+      errors.push_back("override transform must be a map");
+      return false;
+    }
+    YAML::Node out = entity["transform"];
+    if (!out || !out.IsMap()) out = YAML::Node(YAML::NodeType::Map);
+    if (t["position"]) {
+      if (!validate_override_vec(t["position"], 3, 3)) {
+        errors.push_back("override transform.position must have 3 values");
+        return false;
+      }
+      out["position"] = t["position"];
+    }
+    if (t["rotation"]) {
+      if (!validate_override_vec(t["rotation"], 3, 3)) {
+        errors.push_back("override transform.rotation must have 3 values");
+        return false;
+      }
+      out["rotation"] = t["rotation"];
+    }
+    if (t["scale"]) {
+      if (!validate_override_vec(t["scale"], 3, 3)) {
+        errors.push_back("override transform.scale must have 3 values");
+        return false;
+      }
+      out["scale"] = t["scale"];
+    }
+    entity["transform"] = out;
+  }
+
+  if (override_node["renderable"]) {
+    const auto r = override_node["renderable"];
+    if (!r.IsMap()) {
+      errors.push_back("override renderable must be a map");
+      return false;
+    }
+    YAML::Node out = entity["renderable"];
+    if (!out || !out.IsMap()) out = YAML::Node(YAML::NodeType::Map);
+    if (r["mesh"]) {
+      if (!r["mesh"].IsScalar()) {
+        errors.push_back("override renderable.mesh must be a string");
+        return false;
+      }
+      const std::string mesh = r["mesh"].as<std::string>();
+      if (!is_known_mesh_id(mesh)) {
+        warnings.push_back("unknown mesh id: " + mesh);
+      }
+      out["mesh"] = mesh;
+    }
+    if (r["color"]) {
+      if (!validate_override_vec(r["color"], 3, 4)) {
+        errors.push_back("override renderable.color must have 3 or 4 values");
+        return false;
+      }
+      out["color"] = r["color"];
+    }
+    entity["renderable"] = out;
+  }
+
+  return true;
+}
+#endif
+
+StageResult stage_commit_overrides(const fs::path& root,
+                                   const fs::path& project_root,
+                                   const fs::path& overrides_path,
+                                   const std::optional<fs::path>& level_override,
+                                   const std::optional<std::string>& entity_id,
+                                   const std::optional<std::string>& entity_name,
+                                   const fs::path& staging_dir,
+                                   const std::string& run_id,
+                                   std::string& error_code,
+                                   std::string& error_message) {
+  StageResult result;
+  result.run_dir = staging_dir;
+  error_code.clear();
+  error_message.clear();
+
+#if !RKG_ENABLE_DATA_YAML
+  error_code = "yaml_disabled";
+  error_message = "YAML support is disabled";
+  result.errors.push_back(error_message);
+  return result;
+#else
+  if (!fs::exists(overrides_path)) {
+    error_code = "overrides_missing";
+    error_message = "overrides file not found: " + overrides_path.string();
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  const fs::path project_config_path = project_root / "project.yaml";
+  const rkg::ProjectConfig cfg = rkg::load_project_config(project_config_path);
+  fs::path level_rel;
+  if (level_override.has_value() && !level_override->empty()) {
+    level_rel = level_override.value();
+  } else {
+    level_rel = fs::path(cfg.initial_level);
+  }
+  if (level_rel.empty()) {
+    error_code = "level_missing";
+    error_message = "project initial_level missing";
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  if (level_rel.is_absolute()) {
+    error_code = "level_path_invalid";
+    error_message = "initial_level must be relative";
+    result.errors.push_back(error_message);
+    return result;
+  }
+  const fs::path level_abs = project_root / level_rel;
+  if (!fs::exists(level_abs)) {
+    error_code = "level_missing";
+    error_message = "level not found: " + level_abs.string();
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  std::error_code rel_ec;
+  const fs::path level_rel_to_root = fs::relative(level_abs, root, rel_ec);
+  if (rel_ec || !is_safe_rel_path(level_rel_to_root)) {
+    error_code = "level_path_invalid";
+    error_message = "level path is not under repo root";
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  const std::string base = read_file_string(level_abs);
+  YAML::Node level;
+  try {
+    level = YAML::Load(base);
+  } catch (const std::exception& e) {
+    error_code = "level_invalid";
+    error_message = std::string("level parse failed: ") + e.what();
+    result.errors.push_back(error_message);
+    return result;
+  }
+  if (!level || !level.IsMap()) {
+    level = YAML::Node(YAML::NodeType::Map);
+  }
+  if (!level["entities"] || !level["entities"].IsSequence()) {
+    error_code = "entities_missing";
+    error_message = "level.entities missing or invalid";
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  YAML::Node overrides_doc;
+  try {
+    overrides_doc = YAML::LoadFile(overrides_path.string());
+  } catch (const std::exception& e) {
+    error_code = "overrides_invalid";
+    error_message = std::string("overrides parse failed: ") + e.what();
+    result.errors.push_back(error_message);
+    return result;
+  }
+  if (!overrides_doc["overrides"] || !overrides_doc["overrides"].IsMap()) {
+    error_code = "overrides_invalid";
+    error_message = "overrides map missing";
+    result.errors.push_back(error_message);
+    return result;
+  }
+
+  std::string selector_type = "all";
+  std::string selector_value;
+  std::string selector_warning;
+  bool use_name_selector = false;
+  if (entity_id.has_value() && !entity_id->empty()) {
+    selector_type = "id";
+    selector_value = entity_id.value();
+  } else if (entity_name.has_value() && !entity_name->empty()) {
+    selector_type = "name";
+    selector_value = entity_name.value();
+    selector_warning = "Staging by name is less reliable; add id to level YAML for stability.";
+    use_name_selector = true;
+  }
+
+  std::vector<std::pair<std::string, YAML::Node>> override_entries;
+  if (selector_type != "all") {
+    const auto node = overrides_doc["overrides"][selector_value];
+    if (!node) {
+      error_code = "override_missing";
+      error_message = "override entry missing: " + selector_value;
+      result.errors.push_back(error_message);
+      return result;
+    }
+    override_entries.emplace_back(selector_value, node);
+  } else {
+    for (const auto& item : overrides_doc["overrides"]) {
+      override_entries.emplace_back(item.first.as<std::string>(), item.second);
+    }
+  }
+
+  std::vector<std::string> errors;
+  std::vector<std::string> warnings;
+  YAML::Node entities = level["entities"];
+  std::string matched_name;
+  for (const auto& item : override_entries) {
+    const std::string key = item.first;
+    const YAML::Node override_node = item.second;
+    bool matched = false;
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+      YAML::Node entity = entities[i];
+      if (!entity.IsMap()) {
+        continue;
+      }
+      std::string id;
+      if (entity["id"] && entity["id"].IsScalar()) {
+        id = entity["id"].as<std::string>();
+      }
+      std::string name;
+      if (entity["name"] && entity["name"].IsScalar()) {
+        name = entity["name"].as<std::string>();
+      }
+      bool match = false;
+      if (selector_type == "id") {
+        match = (!id.empty() && id == key);
+      } else if (selector_type == "name") {
+        match = (!name.empty() && name == key);
+      } else {
+        match = (!id.empty() && id == key) || (id.empty() && !name.empty() && name == key);
+      }
+      if (match) {
+        matched = true;
+        if (matched_name.empty()) {
+          matched_name = name;
+        }
+        if (!apply_override_to_entity(entity, override_node, errors, warnings)) {
+          break;
+        }
+        entities[i] = entity;
+        break;
+      }
+    }
+    if (!matched) {
+      errors.push_back("override target missing: " + key);
+    }
+  }
+
+  for (const auto& warn : warnings) {
+    std::cerr << "warning: " << warn << "\n";
+  }
+  if (!errors.empty()) {
+    error_code = "override_apply_failed";
+    error_message = errors.front();
+    result.errors = errors;
+    return result;
+  }
+
+  level["entities"] = entities;
+  const std::string proposed = emit_yaml(level);
+  if (base == proposed) {
+    result.summary["run_id"] = run_id;
+    result.summary["created_at"] = now_iso();
+    result.summary["overrides_path"] = overrides_path.generic_string();
+    result.summary["level_path"] = level_rel_to_root.generic_string();
+    result.summary["entity_id"] = entity_id.value_or("");
+    result.summary["entity_name"] = matched_name;
+    result.summary["selector_type"] = selector_type;
+    result.summary["selector_value"] = selector_value;
+    result.summary["selector_warning"] = selector_warning;
+    result.summary["files"] = json::array();
+    fs::create_directories(staging_dir);
+    rkg::data::write_text_file(staging_dir / "summary.json", result.summary.dump(2));
+    return result;
+  }
+
+  const fs::path patches_dir = staging_dir / "patches";
+  const fs::path base_dir = staging_dir / "base_files";
+  const fs::path proposed_dir = staging_dir / "proposed_files";
+
+  fs::create_directories(patches_dir);
+  fs::create_directories(base_dir);
+  fs::create_directories(proposed_dir);
+
+  StagedFile staged;
+  staged.path = level_rel_to_root;
+  staged.base_hash = to_hex(fnv1a_64(base));
+  staged.new_hash = to_hex(fnv1a_64(proposed));
+  const std::string sanitized = sanitize_filename(level_rel_to_root);
+  staged.diff_path = patches_dir / ("0_" + sanitized + ".diff");
+  staged.base_path = base_dir / level_rel_to_root;
+  staged.proposed_path = proposed_dir / level_rel_to_root;
+  fs::create_directories(staged.base_path.parent_path());
+  fs::create_directories(staged.proposed_path.parent_path());
+  rkg::data::write_text_file(staged.base_path, base);
+  rkg::data::write_text_file(staged.proposed_path, proposed);
+  const auto diff_text = unified_diff(base, proposed, level_rel_to_root.generic_string());
+  rkg::data::write_text_file(staged.diff_path, diff_text);
+  result.files.push_back(staged);
+
+  result.summary["run_id"] = run_id;
+  result.summary["created_at"] = now_iso();
+  result.summary["overrides_path"] = overrides_path.generic_string();
+  result.summary["level_path"] = level_rel_to_root.generic_string();
+  result.summary["entity_id"] = entity_id.value_or("");
+  result.summary["entity_name"] = matched_name;
+  result.summary["selector_type"] = selector_type;
+  result.summary["selector_value"] = selector_value;
+  result.summary["selector_warning"] = selector_warning;
+  result.summary["files"] = json::array();
+  for (const auto& file : result.files) {
+    json entry;
+    entry["path"] = file.path.generic_string();
+    entry["base_hash"] = file.base_hash;
+    entry["new_hash"] = file.new_hash;
+    entry["diff_path"] = file.diff_path.generic_string();
+    entry["base_path"] = file.base_path.generic_string();
+    entry["proposed_path"] = file.proposed_path.generic_string();
+    result.summary["files"].push_back(entry);
+  }
+  rkg::data::write_text_file(staging_dir / "summary.json", result.summary.dump(2));
+  return result;
+#endif
+}
+
+bool is_safe_run_dir(const fs::path& root, const fs::path& run_dir) {
+  std::error_code ec;
+  const auto rel = fs::relative(run_dir, root, ec);
+  if (ec || rel.empty()) return false;
+  auto it = rel.begin();
+  if (it == rel.end() || (*it).string() != "build") return false;
+  ++it;
+  if (it == rel.end() || (*it).string() != "ai_runs") return false;
+  return true;
+}
+
+bool load_commit_stage_summary(const fs::path& run_dir, StageResult& out, std::string& error) {
+  const fs::path summary_path = run_dir / "staged_patches" / "summary.json";
+  json summary;
+  if (!load_json_file(summary_path, summary)) {
+    error = "staged summary missing";
+    return false;
+  }
+  out = StageResult{};
+  out.run_dir = run_dir / "staged_patches";
+  out.summary = summary;
+  if (summary.contains("files") && summary["files"].is_array()) {
+    for (const auto& file : summary["files"]) {
+      StagedFile staged;
+      staged.path = fs::path(file.value("path", ""));
+      staged.base_hash = file.value("base_hash", "");
+      staged.new_hash = file.value("new_hash", "");
+      staged.diff_path = fs::path(file.value("diff_path", ""));
+      staged.base_path = fs::path(file.value("base_path", ""));
+      staged.proposed_path = fs::path(file.value("proposed_path", ""));
+      out.files.push_back(staged);
+    }
+  }
+  return true;
+}
+
+struct SelectorInfo {
+  std::string entity_id;
+  std::string selector_type;
+  std::string selector_value;
+  std::string selector_warning;
+};
+
+SelectorInfo selector_from_summary(const json& summary) {
+  SelectorInfo info;
+  info.entity_id = summary.value("entity_id", "");
+  info.selector_type = summary.value("selector_type", "");
+  info.selector_value = summary.value("selector_value", "");
+  info.selector_warning = summary.value("selector_warning", "");
+  return info;
+}
+
+SelectorInfo selector_from_opts(const CommitOverridesOptions& opts) {
+  SelectorInfo info;
+  if (opts.entity_id.has_value() && !opts.entity_id->empty()) {
+    info.entity_id = opts.entity_id.value();
+    info.selector_type = "id";
+    info.selector_value = opts.entity_id.value();
+  } else if (opts.entity_name.has_value() && !opts.entity_name->empty()) {
+    info.selector_type = "name";
+    info.selector_value = opts.entity_name.value();
+    info.selector_warning = "Staging by name is less reliable; add id to level YAML for stability.";
+  } else {
+    info.selector_type = "all";
+  }
+  return info;
+}
+
+void write_commit_results(const fs::path& run_dir,
+                          const std::string& run_id,
+                          const ApplyOptions& opts,
+                          int rc,
+                          size_t applied,
+                          size_t conflicts,
+                          const std::vector<std::string>& conflict_files,
+                          const std::string& stage_name,
+                          const std::string& error_code,
+                          const std::string& error_message,
+                          const fs::path& staging_dir,
+                          bool forced_apply,
+                          bool conflict_detected,
+                          const std::string& entity_id,
+                          const std::string& selector_type,
+                          const std::string& selector_value,
+                          const std::string& selector_warning,
+                          bool snapshots_taken,
+                          const std::string& snapshot_manifest_path) {
+  json results;
+  results["run_id"] = run_id;
+  results["status"] = result_status_from_rc(rc);
+  results["dry_run"] = opts.dry_run;
+  results["applied"] = applied;
+  results["conflicts"] = conflicts;
+  results["conflict_files"] = conflict_files;
+  results["staging_dir"] = staging_dir.generic_string();
+  results["success"] = (rc == 0);
+  results["stage"] = stage_name;
+  results["forced_apply"] = forced_apply;
+  results["conflict_detected"] = conflict_detected;
+  results["entity_id"] = entity_id;
+  results["selector_type"] = selector_type;
+  results["selector_value"] = selector_value;
+  results["selector_warning"] = selector_warning;
+  results["snapshots_taken"] = snapshots_taken;
+  results["snapshot_manifest_path"] = snapshot_manifest_path;
+  results["error_code"] = error_code;
+  results["error_message"] = error_message;
+  write_json_file(run_dir / "results.json", results);
+}
+
+int apply_commit_overrides(const StageResult& stage,
+                           const ApplyOptions& opts,
+                           const fs::path& run_dir,
+                           const std::string& run_id,
+                           std::string& error_code,
+                           std::string& error_message,
+                           std::string& stage_name) {
+  stage_name = "apply";
+  error_code.clear();
+  error_message.clear();
+  const SelectorInfo selector = selector_from_summary(stage.summary);
+  bool snapshots_taken = false;
+  fs::path snapshot_manifest;
+
+  if (stage.files.empty()) {
+    write_commit_results(run_dir, run_id, opts, 0, 0, 0, {}, stage_name, "", "", stage.run_dir,
+                         opts.force, false, selector.entity_id, selector.selector_type,
+                         selector.selector_value, selector.selector_warning, false, "");
+    return 0;
+  }
+
+  std::cout << "Staged " << stage.files.size() << " file(s) in " << stage.run_dir.string() << "\n";
+  for (const auto& file : stage.files) {
+    const auto diff = read_file_string(file.diff_path);
+    std::cout << diff << "\n";
+  }
+
+  if (opts.require_approval && !opts.dry_run) {
+    if (!confirm_actions()) {
+      error_code = "approval_denied";
+      error_message = "approval denied";
+      write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                           stage.run_dir, opts.force, false, selector.entity_id,
+                           selector.selector_type, selector.selector_value, selector.selector_warning,
+                           false, "");
+      return 1;
+    }
+  }
+
+  size_t applied = 0;
+  size_t conflicts = 0;
+  std::vector<std::string> conflict_files;
+  bool conflict_detected = false;
+
+  if (opts.force) {
+    const fs::path snapshots_dir = run_dir / "snapshots";
+    std::error_code snap_ec;
+    fs::create_directories(snapshots_dir, snap_ec);
+    if (snap_ec) {
+      error_code = "snapshot_failed";
+      error_message = "snapshot dir create failed";
+      write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                           stage.run_dir, opts.force, false, selector.entity_id,
+                           selector.selector_type, selector.selector_value, selector.selector_warning,
+                           false, "");
+      return 1;
+    }
+    json manifest;
+    manifest["created_at"] = now_iso();
+    manifest["files"] = json::array();
+    for (const auto& file : stage.files) {
+      const fs::path target = file.path;
+      std::error_code exists_ec;
+      const bool exists = fs::exists(target, exists_ec);
+      if (exists_ec) {
+        error_code = "snapshot_failed";
+        error_message = "snapshot stat failed: " + target.generic_string();
+        write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                             stage.run_dir, opts.force, false, selector.entity_id,
+                             selector.selector_type, selector.selector_value, selector.selector_warning,
+                             false, "");
+        return 1;
+      }
+      const std::string contents = exists ? read_file_string(target) : std::string{};
+      fs::path snapshot_path = snapshots_dir / target;
+      snapshot_path += ".before";
+      fs::create_directories(snapshot_path.parent_path(), snap_ec);
+      if (snap_ec) {
+        error_code = "snapshot_failed";
+        error_message = "snapshot dir create failed: " + snapshot_path.parent_path().generic_string();
+        write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                             stage.run_dir, opts.force, false, selector.entity_id,
+                             selector.selector_type, selector.selector_value, selector.selector_warning,
+                             false, "");
+        return 1;
+      }
+      if (!rkg::data::write_text_file(snapshot_path, contents)) {
+        error_code = "snapshot_failed";
+        error_message = "snapshot write failed: " + snapshot_path.generic_string();
+        write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                             stage.run_dir, opts.force, false, selector.entity_id,
+                             selector.selector_type, selector.selector_value, selector.selector_warning,
+                             false, "");
+        return 1;
+      }
+      json entry;
+      entry["path"] = target.generic_string();
+      entry["size"] = static_cast<uint64_t>(contents.size());
+      entry["hash"] = to_hex(fnv1a_64(contents));
+      entry["timestamp"] = now_iso();
+      entry["missing"] = !exists;
+      entry["snapshot_path"] = snapshot_path.generic_string();
+      manifest["files"].push_back(entry);
+    }
+    snapshot_manifest = snapshots_dir / "manifest.json";
+    if (!write_json_file(snapshot_manifest, manifest)) {
+      error_code = "snapshot_failed";
+      error_message = "snapshot manifest write failed";
+      write_commit_results(run_dir, run_id, opts, 1, 0, 0, {}, stage_name, error_code, error_message,
+                           stage.run_dir, opts.force, false, selector.entity_id,
+                           selector.selector_type, selector.selector_value, selector.selector_warning,
+                           false, "");
+      return 1;
+    }
+    snapshots_taken = true;
+  }
+
+  for (const auto& file : stage.files) {
+    const auto current_contents = read_file_string(file.path);
+    const auto current_hash = to_hex(fnv1a_64(current_contents));
+    const bool hash_match = (current_hash == file.base_hash);
+    if (!hash_match) {
+      conflict_detected = true;
+      if (!opts.force) {
+        ++conflicts;
+        conflict_files.push_back(file.path.string());
+        continue;
+      }
+    }
+
+    if (!opts.dry_run) {
+      fs::create_directories(file.path.parent_path());
+      rkg::data::write_text_file(file.path, read_file_string(file.proposed_path));
+    }
+    ++applied;
+
+    json audit;
+    audit["time"] = now_iso();
+    audit["action_type"] = "commit_overrides";
+    audit["params_hash"] = file.new_hash;
+    audit["result"] = hash_match ? "ok" : "forced";
+    audit["message"] = file.path.string();
+    audit["files_touched"] = {file.path.string()};
+    append_audit_line("build/ai_audit.log", audit);
+  }
+
+  int rc = 0;
+  if (conflicts > 0) {
+    rc = 2;
+    error_code = "conflict";
+    error_message = "content changed since overrides were staged";
+    stage_name = "apply";
+  }
+
+  write_commit_results(run_dir, run_id, opts, rc, applied, conflicts, conflict_files,
+                       stage_name, error_code, error_message, stage.run_dir,
+                       opts.force, conflict_detected, selector.entity_id,
+                       selector.selector_type, selector.selector_value, selector.selector_warning,
+                       snapshots_taken, snapshot_manifest.generic_string());
+
+  if (conflicts > 0) {
+    std::cerr << "Conflicts detected; apply aborted for those files.\n";
+    return rc;
+  }
+
+  return rc;
+}
+
 int apply_staged(const StageResult& stage, const ApplyOptions& opts) {
   if (stage.files.empty()) {
     std::cout << "No file changes proposed.\n";
@@ -3963,6 +4572,117 @@ int content_cook(const char* argv0,
   return 0;
 }
 
+int content_commit_overrides(const char* argv0,
+                             const std::optional<fs::path>& project_override,
+                             const fs::path& overrides_path,
+                             const CommitOverridesOptions& opts) {
+  const auto paths = rkg::resolve_paths(argv0, project_override, "demo_game");
+  const fs::path project_root = paths.project;
+  const fs::path run_root = paths.root / "build" / "ai_runs";
+
+  auto write_marker = [&](const std::string& run_id, const fs::path& run_dir) {
+    json marker;
+    marker["run_id"] = run_id;
+    marker["run_dir"] = run_dir.generic_string();
+    marker["staging_dir"] = (run_dir / "staged_patches").generic_string();
+    marker["results_path"] = (run_dir / "results.json").generic_string();
+    write_json_file(run_root / "last_commit_overrides.json", marker);
+  };
+
+  if (opts.apply_staged_dir.has_value()) {
+    const fs::path run_dir = opts.apply_staged_dir.value();
+    if (!is_safe_run_dir(paths.root, run_dir)) {
+      const std::string run_id = run_dir.filename().string();
+      write_commit_results(run_dir, run_id, opts.apply, 1, 0, 0, {}, "apply",
+                           "run_dir_invalid", "apply-staged dir must be under build/ai_runs",
+                           run_dir / "staged_patches", opts.apply.force, false, "",
+                           "", "", "", false, "");
+      return 1;
+    }
+
+    StageResult stage;
+    std::string error;
+    if (!load_commit_stage_summary(run_dir, stage, error)) {
+      const std::string run_id = run_dir.filename().string();
+      write_commit_results(run_dir, run_id, opts.apply, 1, 0, 0, {}, "apply",
+                           "staged_missing", error, run_dir / "staged_patches",
+                           opts.apply.force, false, "", "", "", "", false, "");
+      return 1;
+    }
+
+    std::string error_code;
+    std::string error_message;
+    std::string stage_name;
+    const std::string run_id = stage.summary.value("run_id", run_dir.filename().string());
+    write_marker(run_id, run_dir);
+    std::cout << "run_dir: " << run_dir.generic_string() << "\n";
+    std::cout << "staging_dir: " << stage.run_dir.generic_string() << "\n";
+    const int rc = apply_commit_overrides(stage, opts.apply, run_dir, run_id, error_code, error_message, stage_name);
+    return rc;
+  }
+
+  fs::path run_dir = opts.run_dir.value_or(run_root / make_run_id());
+  if (!is_safe_run_dir(paths.root, run_dir)) {
+    std::cerr << "run_dir must be under build/ai_runs\n";
+    return 1;
+  }
+
+  const std::string run_id = run_dir.filename().string();
+  const fs::path staging_dir = run_dir / "staged_patches";
+
+  json run_info;
+  run_info["run_id"] = run_id;
+  run_info["created_at"] = now_iso();
+  run_info["mode"] = "commit_overrides";
+  run_info["overrides_path"] = overrides_path.generic_string();
+  std::string level_path;
+  if (opts.level_override.has_value()) {
+    level_path = opts.level_override->generic_string();
+  } else {
+    const auto cfg = rkg::load_project_config(project_root / "project.yaml");
+    level_path = cfg.initial_level;
+  }
+  run_info["level_path"] = level_path;
+  run_info["entity_id"] = opts.entity_id.value_or("");
+  run_info["entity_name"] = opts.entity_name.value_or("");
+  run_info["dry_run"] = opts.apply.dry_run;
+  run_info["require_approval"] = opts.apply.require_approval;
+  write_json_file(run_dir / "run_info.json", run_info);
+
+  std::string error_code;
+  std::string error_message;
+  const StageResult stage =
+      stage_commit_overrides(paths.root, project_root, overrides_path, opts.level_override,
+                             opts.entity_id, opts.entity_name, staging_dir, run_id, error_code, error_message);
+  const SelectorInfo summary_selector = selector_from_summary(stage.summary);
+  const SelectorInfo selector =
+      summary_selector.selector_type.empty() ? selector_from_opts(opts) : summary_selector;
+
+  write_marker(run_id, run_dir);
+
+  std::cout << "run_dir: " << run_dir.generic_string() << "\n";
+  std::cout << "staging_dir: " << staging_dir.generic_string() << "\n";
+
+  if (!error_message.empty()) {
+    write_commit_results(run_dir, run_id, opts.apply, 1, 0, 0, {}, "stage",
+                         error_code, error_message, staging_dir, false, false, selector.entity_id,
+                         selector.selector_type, selector.selector_value, selector.selector_warning,
+                         false, "");
+    return 1;
+  }
+
+  write_commit_results(run_dir, run_id, opts.apply, 0, 0, 0, {}, "stage", "", "", staging_dir,
+                       false, false, selector.entity_id, selector.selector_type, selector.selector_value,
+                       selector.selector_warning, false, "");
+  if (opts.stage_only) {
+    return 0;
+  }
+
+  std::string stage_name;
+  const int rc = apply_commit_overrides(stage, opts.apply, run_dir, run_id, error_code, error_message, stage_name);
+  return rc;
+}
+
 int content_list(const fs::path& cooked_path) {
   fs::path index_path = cooked_path;
   if (fs::is_directory(cooked_path)) {
@@ -4088,6 +4808,9 @@ void print_usage() {
             << "  rkgctl content list --cooked <dir>\n"
             << "  rkgctl content watch --project <path> [--out <dir>] [--debounce-ms <n>]\n"
             << "  rkgctl content dump-pack --pack <path> [--list|--extract <id_or_path>]\n"
+            << "  rkgctl content commit-overrides --project <path> [--overrides <file>] [--level <path>] [--entity-id <id>] [--entity-name <name>] [--stage] [--run-dir <dir>]\n"
+            << "  rkgctl content commit-overrides --project <path> [--overrides <file>] [--level <path>] [--entity-id <id>] [--entity-name <name>] --apply [--yes] [--dry-run] [--force] [--run-dir <dir>]\n"
+            << "  rkgctl content commit-overrides --apply-staged <run_dir> [--yes] [--dry-run] [--force]\n"
             << "  rkgctl plan validate --plan <path>\n"
             << "  rkgctl plan summarize --plan <path>\n"
             << "  rkgctl plan schema --out <file>\n"
@@ -4165,16 +4888,31 @@ int main(int argc, char** argv) {
     std::string sub = argv[2];
     std::optional<fs::path> project_override;
     std::optional<fs::path> out_override;
+    fs::path overrides_path;
     fs::path cooked_path;
     fs::path pack_path;
     std::optional<std::string> extract_target;
     int debounce_ms = 300;
+    CommitOverridesOptions commit_opts;
     for (int i = 3; i < argc; ++i) {
       std::string arg = argv[i];
       if (arg == "--project" && i + 1 < argc) {
         project_override = fs::path(argv[++i]);
       } else if (arg == "--out" && i + 1 < argc) {
         out_override = fs::path(argv[++i]);
+      } else if (arg == "--overrides" && i + 1 < argc) {
+        overrides_path = fs::path(argv[++i]);
+      } else if (arg == "--level" && i + 1 < argc) {
+        commit_opts.level_override = fs::path(argv[++i]);
+      } else if (arg == "--entity-id" && i + 1 < argc) {
+        commit_opts.entity_id = std::string(argv[++i]);
+      } else if (arg == "--entity-name" && i + 1 < argc) {
+        commit_opts.entity_name = std::string(argv[++i]);
+      } else if (arg == "--run-dir" && i + 1 < argc) {
+        commit_opts.run_dir = fs::path(argv[++i]);
+      } else if (arg == "--apply-staged" && i + 1 < argc) {
+        commit_opts.apply_staged_dir = fs::path(argv[++i]);
+        commit_opts.apply.dry_run = false;
       } else if (arg == "--cooked" && i + 1 < argc) {
         cooked_path = fs::path(argv[++i]);
       } else if (arg == "--pack" && i + 1 < argc) {
@@ -4183,6 +4921,21 @@ int main(int argc, char** argv) {
         extract_target = std::string(argv[++i]);
       } else if (arg == "--debounce-ms" && i + 1 < argc) {
         debounce_ms = std::max(0, std::stoi(argv[++i]));
+      } else if (arg == "--dry-run") {
+        commit_opts.apply.dry_run = true;
+      } else if (arg == "--yes") {
+        commit_opts.apply.dry_run = false;
+        commit_opts.apply.require_approval = false;
+      } else if (arg == "--no-approval") {
+        commit_opts.apply.require_approval = false;
+      } else if (arg == "--force") {
+        commit_opts.apply.force = true;
+      } else if (arg == "--stage") {
+        commit_opts.stage_only = true;
+        commit_opts.apply.dry_run = true;
+      } else if (arg == "--apply") {
+        commit_opts.stage_only = false;
+        commit_opts.apply.dry_run = false;
       }
     }
     if (sub == "validate") {
@@ -4207,6 +4960,16 @@ int main(int argc, char** argv) {
         return 1;
       }
       return content_dump_pack(pack_path, extract_target);
+    }
+    if (sub == "commit-overrides") {
+      if (overrides_path.empty()) {
+        const auto paths = rkg::resolve_paths(argc > 0 ? argv[0] : nullptr, project_override, "demo_game");
+        overrides_path = paths.project / "editor_overrides.yaml";
+      }
+      if (commit_opts.apply_staged_dir.has_value()) {
+        commit_opts.stage_only = false;
+      }
+      return content_commit_overrides(argc > 0 ? argv[0] : nullptr, project_override, overrides_path, commit_opts);
     }
     print_usage();
     return 1;

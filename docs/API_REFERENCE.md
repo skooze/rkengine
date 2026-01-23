@@ -45,7 +45,7 @@ Defined in `core/include/rkg/plugin_api.h`:
 
 ## rkgctl CLI Surface
 Core commands:
-- `rkgctl content validate|cook|watch|list|dump-pack`
+- `rkgctl content validate|cook|watch|list|dump-pack|commit-overrides`
 - `rkgctl plan validate|summarize|schema`
 - `rkgctl apply --plan <file>`
 - `rkgctl agent status|plan|apply`
@@ -60,6 +60,27 @@ Artifacts:
 - `build/ai_runs/<run_id>/` — run artifacts (context, plan, results)
 - `build/ai_results.json` — latest summary
 - `build/ai_audit.log` — JSON-lines audit
+
+### content commit-overrides
+```
+rkgctl content commit-overrides --project <path> [--overrides <file>] [--level <path>] [--entity-id <id>] [--entity-name <name>] [--stage] [--run-dir <dir>]
+rkgctl content commit-overrides --apply-staged <run_dir> [--yes] [--dry-run] [--force]
+```
+Stages patch files under `build/ai_runs/<run_id>/staged_patches/` (default is stage-only).
+Review the diff, then apply explicitly with `--apply-staged <run_dir>` (re-checks base hashes and reports conflicts).
+`--run-dir` allows deterministic staging directories for later apply. `--level` targets a specific level file
+(relative to the project root). `--entity-id` stages only a single override entry (by id/key);
+`--entity-name` is a fallback selector (less reliable; prefer ids).
+`--force` applies staged patches even if base hashes changed, and records `forced_apply` + `conflict_detected`
+in `results.json`. Forced apply writes snapshots under `build/ai_runs/<run_id>/snapshots/` and records
+`snapshots_taken` + `snapshot_manifest_path` in results.
+Uses per-level entity `id` values to update instance `transform` and `renderable` fields.
+If `--overrides` is omitted, defaults to `<project>/editor_overrides.yaml`.
+
+Results fields include:
+- `conflict_files` (relative paths)
+- `selector_type`/`selector_value`/`selector_warning`
+- `snapshots_taken` + `snapshot_manifest_path` (forced apply only)
 
 ## File Formats
 ### project.yaml
@@ -110,12 +131,14 @@ components:
 name: demo_level
 entities:
   - name: demo_cube_1
+    id: demo_cube_1
     prefab: demo_cube
     transform:
       position: [0, 0, 0]
       rotation: [0, 0, 0]
       scale: [1, 1, 1]
 ```
+`id` is optional but recommended for editor overrides; if omitted, the entity name is used as the override key.
 
 ### Plan Schema
 Canonical JSON schema: `docs/schemas/rkg_plan.schema.json`
