@@ -53,11 +53,13 @@ struct VulkanState {
   VkFramebuffer offscreen_framebuffer = VK_NULL_HANDLE;
   VkExtent2D offscreen_extent{};
   uint64_t offscreen_version = 0;
+  VkImageLayout offscreen_color_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkImage offscreen_depth_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_depth_memory = VK_NULL_HANDLE;
   VkImageView offscreen_depth_view = VK_NULL_HANDLE;
   VkFormat offscreen_depth_format = VK_FORMAT_D32_SFLOAT;
+  VkImageLayout offscreen_depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkPipeline viewport_pipeline = VK_NULL_HANDLE;
   VkPipelineLayout viewport_pipeline_layout = VK_NULL_HANDLE;
@@ -377,6 +379,8 @@ void destroy_offscreen() {
     g_state.offscreen_memory = VK_NULL_HANDLE;
   }
   g_state.offscreen_extent = {};
+  g_state.offscreen_color_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  g_state.offscreen_depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
   rkg::register_vulkan_viewport(nullptr);
 }
 
@@ -494,7 +498,7 @@ bool create_offscreen(uint32_t width, uint32_t height) {
   attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   attachments[1].format = g_state.offscreen_depth_format;
@@ -503,7 +507,7 @@ bool create_offscreen(uint32_t width, uint32_t height) {
   attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
   attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference color_ref{};
@@ -548,6 +552,8 @@ bool create_offscreen(uint32_t width, uint32_t height) {
 
   g_state.offscreen_extent = {width, height};
   g_state.offscreen_version += 1;
+  g_state.offscreen_color_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  g_state.offscreen_depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   rkg::VulkanViewportHooks hooks;
   hooks.image_view = g_state.offscreen_view;
@@ -917,7 +923,7 @@ bool create_render_pass() {
   color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
   VkAttachmentReference color_attachment_ref{};
@@ -1089,6 +1095,54 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
   }
 
   if (g_state.offscreen_render_pass != VK_NULL_HANDLE && g_state.offscreen_framebuffer != VK_NULL_HANDLE) {
+    VkImageMemoryBarrier offscreen_color_to_attachment{};
+    offscreen_color_to_attachment.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    offscreen_color_to_attachment.srcAccessMask = 0;
+    offscreen_color_to_attachment.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    offscreen_color_to_attachment.oldLayout = g_state.offscreen_color_layout;
+    offscreen_color_to_attachment.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    offscreen_color_to_attachment.image = g_state.offscreen_image;
+    offscreen_color_to_attachment.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_color_to_attachment.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_color_to_attachment.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    offscreen_color_to_attachment.subresourceRange.baseMipLevel = 0;
+    offscreen_color_to_attachment.subresourceRange.levelCount = 1;
+    offscreen_color_to_attachment.subresourceRange.baseArrayLayer = 0;
+    offscreen_color_to_attachment.subresourceRange.layerCount = 1;
+
+    VkImageMemoryBarrier offscreen_depth_to_attachment{};
+    offscreen_depth_to_attachment.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    offscreen_depth_to_attachment.srcAccessMask = 0;
+    offscreen_depth_to_attachment.dstAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    offscreen_depth_to_attachment.oldLayout = g_state.offscreen_depth_layout;
+    offscreen_depth_to_attachment.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    offscreen_depth_to_attachment.image = g_state.offscreen_depth_image;
+    offscreen_depth_to_attachment.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_depth_to_attachment.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    offscreen_depth_to_attachment.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    offscreen_depth_to_attachment.subresourceRange.baseMipLevel = 0;
+    offscreen_depth_to_attachment.subresourceRange.levelCount = 1;
+    offscreen_depth_to_attachment.subresourceRange.baseArrayLayer = 0;
+    offscreen_depth_to_attachment.subresourceRange.layerCount = 1;
+
+    VkImageMemoryBarrier offscreen_barriers[] = {offscreen_color_to_attachment, offscreen_depth_to_attachment};
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         2,
+                         offscreen_barriers);
+
+    g_state.offscreen_color_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    g_state.offscreen_depth_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkClearValue offscreen_clears[2]{};
     offscreen_clears[0].color = {{0.08f, 0.08f, 0.12f, 1.0f}};
     offscreen_clears[1].depthStencil = {1.0f, 0};
@@ -1153,7 +1207,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     offscreen_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     offscreen_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     offscreen_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    offscreen_barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    offscreen_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     offscreen_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     offscreen_barrier.image = g_state.offscreen_image;
     offscreen_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1173,6 +1227,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          nullptr,
                          1,
                          &offscreen_barrier);
+    g_state.offscreen_color_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   }
 
 #if RKG_ENABLE_IMGUI
@@ -1182,6 +1237,39 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 #endif
 
   if (render_inside) {
+    VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (image_index < g_state.swapchain_image_layouts.size()) {
+      old_layout = g_state.swapchain_image_layouts[image_index];
+    }
+
+    VkImageMemoryBarrier to_color{};
+    to_color.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    to_color.srcAccessMask = 0;
+    to_color.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    to_color.oldLayout = old_layout;
+    to_color.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    to_color.image = g_state.swapchain_images[image_index];
+    to_color.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_color.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_color.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    to_color.subresourceRange.baseMipLevel = 0;
+    to_color.subresourceRange.levelCount = 1;
+    to_color.subresourceRange.baseArrayLayer = 0;
+    to_color.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &to_color);
+    if (image_index < g_state.swapchain_image_layouts.size()) {
+      g_state.swapchain_image_layouts[image_index] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
     VkClearValue clear_color{};
     clear_color.color = {{0.02f, 0.02f, 0.05f, 1.0f}};
 
