@@ -137,6 +137,62 @@ bool have_shared_lib(const char* name) {
   return true;
 }
 
+void log_wayland_connect(const char* display_name) {
+  void* lib = dlopen("libwayland-client.so.0", RTLD_LAZY | RTLD_LOCAL);
+  if (!lib) {
+    rkg::log::warn("Wayland connect check skipped: libwayland-client.so.0 not loaded.");
+    return;
+  }
+  using DisplayConnectFn = void* (*)(const char*);
+  using DisplayDisconnectFn = void (*)(void*);
+  auto connect_fn = reinterpret_cast<DisplayConnectFn>(dlsym(lib, "wl_display_connect"));
+  auto disconnect_fn = reinterpret_cast<DisplayDisconnectFn>(dlsym(lib, "wl_display_disconnect"));
+  if (!connect_fn || !disconnect_fn) {
+    rkg::log::warn("Wayland connect check skipped: wl_display_connect not found.");
+    dlclose(lib);
+    return;
+  }
+  errno = 0;
+  void* display = connect_fn(display_name && *display_name ? display_name : nullptr);
+  if (display) {
+    rkg::log::info(std::string("Wayland wl_display_connect ok: ") +
+                   (display_name && *display_name ? display_name : "(default)"));
+    disconnect_fn(display);
+  } else {
+    rkg::log::warn(std::string("Wayland wl_display_connect failed: ") +
+                   (display_name && *display_name ? display_name : "(default)") + format_errno());
+  }
+  dlclose(lib);
+}
+
+void log_x11_connect(const char* display_name) {
+  void* lib = dlopen("libX11.so.6", RTLD_LAZY | RTLD_LOCAL);
+  if (!lib) {
+    rkg::log::warn("X11 connect check skipped: libX11.so.6 not loaded.");
+    return;
+  }
+  using OpenDisplayFn = void* (*)(const char*);
+  using CloseDisplayFn = int (*)(void*);
+  auto open_fn = reinterpret_cast<OpenDisplayFn>(dlsym(lib, "XOpenDisplay"));
+  auto close_fn = reinterpret_cast<CloseDisplayFn>(dlsym(lib, "XCloseDisplay"));
+  if (!open_fn || !close_fn) {
+    rkg::log::warn("X11 connect check skipped: XOpenDisplay not found.");
+    dlclose(lib);
+    return;
+  }
+  errno = 0;
+  void* display = open_fn(display_name && *display_name ? display_name : nullptr);
+  if (display) {
+    rkg::log::info(std::string("X11 XOpenDisplay ok: ") +
+                   (display_name && *display_name ? display_name : "(default)"));
+    close_fn(display);
+  } else {
+    rkg::log::warn(std::string("X11 XOpenDisplay failed: ") +
+                   (display_name && *display_name ? display_name : "(default)") + format_errno());
+  }
+  dlclose(lib);
+}
+
 std::string x11_socket_path(const char* display) {
   if (!display || *display != ':') return "";
   const char* p = display + 1;
@@ -388,6 +444,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     }
     if (have_wayland) {
       log_unix_socket_connect(wl_socket, "Wayland");
+      log_wayland_connect(wayland_display);
     }
   }
   const bool have_x11 = (display && *display);
@@ -407,6 +464,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
         rkg::log::warn(std::string("X11 socket not accessible: ") + x_sock + format_errno());
       }
       log_unix_socket_connect(x_sock, "X11");
+      log_x11_connect(display);
     } else {
       rkg::log::warn(std::string("Unrecognized DISPLAY format: ") + display);
     }
