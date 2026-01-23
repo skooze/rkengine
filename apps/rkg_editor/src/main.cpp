@@ -3767,12 +3767,13 @@ int main(int argc, char** argv) {
   }
 
 #if RKG_EDITOR_IMGUI
-  if (!disable_ui) {
+  const bool use_ui = !disable_ui;
+  EditorState state;
+  state.runtime = &runtime;
+  if (use_ui) {
     rkg::debug_ui::set_show_builtin(false);
     rkg::debug_ui::set_docking_enabled(true);
 
-    EditorState state;
-    state.runtime = &runtime;
     state.agent.openai_available = openai_available(state.agent.openai_error);
     state.overrides.path = runtime.project_root() / "editor_overrides.yaml";
     sync_overrides_state(state);
@@ -3793,19 +3794,21 @@ int main(int argc, char** argv) {
 
 #if RKG_EDITOR_IMGUI
     runtime.update_input();
-    update_agent_state(state);
-    update_content_state(state);
-    update_runs_browser_state(state);
-    sync_overrides_state(state);
-    update_camera_and_draw_list(state);
+    if (use_ui) {
+      update_agent_state(state);
+      update_content_state(state);
+      update_runs_browser_state(state);
+      sync_overrides_state(state);
+      update_camera_and_draw_list(state);
 
-    if (state.stop_requested) {
-      runtime.force_reload("stop");
-      state.stop_requested = false;
-      state.selected_entity = rkg::ecs::kInvalidEntity;
-      state.selected_name.clear();
-      state.auto_select = true;
-      state.fallback_entity = rkg::ecs::kInvalidEntity;
+      if (state.stop_requested) {
+        runtime.force_reload("stop");
+        state.stop_requested = false;
+        state.selected_entity = rkg::ecs::kInvalidEntity;
+        state.selected_name.clear();
+        state.auto_select = true;
+        state.fallback_entity = rkg::ecs::kInvalidEntity;
+      }
     }
 
     float sim_dt = 0.0f;

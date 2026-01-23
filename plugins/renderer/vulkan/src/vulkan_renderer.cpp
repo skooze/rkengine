@@ -1556,7 +1556,7 @@ bool vulkan_init(void* host) {
   hooks.physical_device = g_state.physical_device;
   hooks.device = g_state.device;
   hooks.queue = g_state.graphics_queue;
-  hooks.render_pass = g_state.render_pass;
+  hooks.render_pass = g_state.dynamic_rendering_enabled ? nullptr : g_state.render_pass;
   hooks.window = g_state.window;
   hooks.queue_family = g_state.graphics_queue_family;
   hooks.image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
@@ -1578,6 +1578,8 @@ void vulkan_shutdown() {
 void vulkan_update(float) {
   static bool logged = false;
   if (!logged) {
+    g_log_steps = true;
+    g_log_step_index = 0;
     rkg::log::info("renderer:vulkan update begin");
   }
   if (!draw_frame()) {

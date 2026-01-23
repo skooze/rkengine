@@ -223,7 +223,12 @@ static void process_texture_requests(ImDrawData* draw_data) {
     if (!tex) {
       continue;
     }
-    if (tex->Status == ImTextureStatus_WantCreate ||
+    bool tex_empty = false;
+    if constexpr (requires { tex->TexID; }) {
+      tex_empty = texture_id_is_empty(tex->TexID);
+    }
+    if (tex_empty ||
+        tex->Status == ImTextureStatus_WantCreate ||
         tex->Status == ImTextureStatus_WantUpdates ||
         tex->Status == ImTextureStatus_WantDestroy) {
       ImGui_ImplVulkan_UpdateTexture(tex);
@@ -246,6 +251,11 @@ static bool draw_data_has_pending_textures(const ImDrawData* draw_data) {
         tex->Status == ImTextureStatus_WantUpdates ||
         tex->Status == ImTextureStatus_WantDestroy) {
       return true;
+    }
+    if constexpr (requires { tex->TexID; }) {
+      if (texture_id_is_empty(tex->TexID)) {
+        return true;
+      }
     }
   }
   return false;
@@ -359,7 +369,10 @@ bool init_vulkan() {
   g_state.swapchain_format = hooks->swapchain_format != 0
                                  ? static_cast<VkFormat>(hooks->swapchain_format)
                                  : VK_FORMAT_UNDEFINED;
-  g_state.render_inside_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_render_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
+  g_state.render_inside_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
+  const bool use_dynamic_rendering =
+      !g_state.render_inside_pass && has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -388,17 +401,24 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  set_render_pass(init_info, g_state.render_pass);
-  set_dynamic_rendering(init_info, !g_state.render_inside_pass);
-  if (g_state.swapchain_format != VK_FORMAT_UNDEFINED) {
-    set_color_format(init_info, g_state.swapchain_format);
+  if (g_state.render_inside_pass) {
+    set_render_pass(init_info, g_state.render_pass);
+  } else {
+    set_render_pass(init_info, VK_NULL_HANDLE);
   }
-  set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
-  static VkPipelineRenderingCreateInfo rendering_info{};
-  rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-  rendering_info.colorAttachmentCount = 1;
-  rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
-  set_pipeline_rendering_info(init_info, &rendering_info);
+  set_dynamic_rendering(init_info, use_dynamic_rendering);
+  if (use_dynamic_rendering) {
+    if (g_state.swapchain_format != VK_FORMAT_UNDEFINED) {
+      set_color_format(init_info, g_state.swapchain_format);
+    }
+    set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
+    static VkPipelineRenderingCreateInfo rendering_info{};
+    rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    rendering_info.pNext = nullptr;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
+    set_pipeline_rendering_info(init_info, &rendering_info);
+  }
   if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
@@ -406,6 +426,8 @@ bool init_vulkan() {
 #if IMGUI_VERSION_NUM >= 19000
   ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
 #endif
+  rkg::log::info(std::string("debug_ui: render path ") +
+                 (g_state.render_inside_pass ? "render_pass" : "dynamic_rendering"));
 
   g_state.initialized = true;
   g_state.has_draw_data = false;
@@ -557,6 +579,32 @@ void render(VkCommandBuffer cmd) {
     }
     return;
   }
+  {
+    static bool logged_textures = false;
+    if (!logged_textures) {
+      auto* textures = draw_data_textures(draw_data);
+      if (textures) {
+        rkg::log::info("debug_ui: draw_data textures=" + std::to_string(textures->Size));
+        const int count = textures->Size < 4 ? textures->Size : 4;
+        for (int i = 0; i < count; ++i) {
+          auto& entry = (*textures)[i];
+          ImTextureData* tex = texture_ptr_from_entry(entry);
+          if (!tex) {
+            rkg::log::warn("debug_ui: texture entry " + std::to_string(i) + " null");
+            continue;
+          }
+          bool tex_empty = false;
+          if constexpr (requires { tex->TexID; }) {
+            tex_empty = texture_id_is_empty(tex->TexID);
+          }
+          rkg::log::info("debug_ui: texture " + std::to_string(i) +
+                         " status=" + std::to_string(static_cast<int>(tex->Status)) +
+                         " tex_empty=" + std::string(tex_empty ? "true" : "false"));
+        }
+      }
+      logged_textures = true;
+    }
+  }
 #endif
   if (draw_data_has_empty_texture(draw_data)) {
     static bool warned = false;
@@ -565,6 +613,18 @@ void render(VkCommandBuffer cmd) {
       rkg::log::warn("debug_ui: draw data references empty texture; skipping render");
     }
     return;
+  }
+  {
+    static bool logged = false;
+    if (!logged) {
+      const int cmd_lists = draw_data->CmdListsCount;
+      const int total_vtx = draw_data->TotalVtxCount;
+      const int total_idx = draw_data->TotalIdxCount;
+      rkg::log::info("debug_ui: render draw_data lists=" + std::to_string(cmd_lists) +
+                     " vtx=" + std::to_string(total_vtx) +
+                     " idx=" + std::to_string(total_idx));
+      logged = true;
+    }
   }
   ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
 }
