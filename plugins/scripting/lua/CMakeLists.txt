@@ -17,10 +17,10 @@ target_link_libraries(rkg_plugins_script_lua
 
 if(Lua_FOUND)
   if(TARGET Lua::Lua)
-    target_link_libraries(rkg_plugins_script_lua PRIVATE Lua::Lua)
+    target_link_libraries(rkg_plugins_script_lua PUBLIC Lua::Lua)
   else()
-    target_include_directories(rkg_plugins_script_lua PRIVATE ${LUA_INCLUDE_DIR})
-    target_link_libraries(rkg_plugins_script_lua PRIVATE ${LUA_LIBRARIES})
+    target_include_directories(rkg_plugins_script_lua PUBLIC ${LUA_INCLUDE_DIR})
+    target_link_libraries(rkg_plugins_script_lua PUBLIC ${LUA_LIBRARIES})
   endif()
   target_compile_definitions(rkg_plugins_script_lua PRIVATE RKG_HAVE_LUA=1)
 else()
