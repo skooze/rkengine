@@ -21,6 +21,7 @@
 #include <fstream>
 #include <optional>
 #include <type_traits>
+#include <utility>
 
 namespace rkg::debug_ui {
 
@@ -97,27 +98,27 @@ bool create_descriptor_pool() {
 
 template <typename T>
 constexpr bool has_render_pass_member() {
-  return requires(T value) { value.RenderPass; };
+  return requires { std::declval<T&>().RenderPass; };
 }
 
 template <typename T>
 constexpr bool has_dynamic_rendering_member() {
-  return requires(T value) { value.UseDynamicRendering; };
+  return requires { std::declval<T&>().UseDynamicRendering; };
 }
 
 template <typename T>
 constexpr bool has_color_format_member() {
-  return requires(T value) { value.ColorAttachmentFormat; };
+  return requires { std::declval<T&>().ColorAttachmentFormat; };
 }
 
 template <typename T>
 constexpr bool has_msaa_member() {
-  return requires(T value) { value.MSAASamples; };
+  return requires { std::declval<T&>().MSAASamples; };
 }
 
 template <typename T>
 constexpr bool has_pipeline_rendering_member() {
-  return requires(T value) { value.PipelineRenderingCreateInfo; };
+  return requires { std::declval<T&>().PipelineRenderingCreateInfo; };
 }
 
 template <typename T>
@@ -371,18 +372,25 @@ bool init_vulkan() {
                                  : VK_FORMAT_UNDEFINED;
   rkg::log::info("debug_ui: swapchain_format=" + std::to_string(static_cast<int>(g_state.swapchain_format)));
   const bool has_render_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
-  const bool has_dynamic_rendering = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_dynamic = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
   const bool has_color_format = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
-  const bool has_pipeline_rendering = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_pipeline_info = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
   const bool can_render_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
-  const bool can_dynamic_rendering = has_dynamic_rendering && has_color_format && has_pipeline_rendering;
-  g_state.render_inside_pass = can_render_pass;
-  const bool use_dynamic_rendering = !g_state.render_inside_pass && can_dynamic_rendering;
-  rkg::log::info(std::string("debug_ui: backend caps render_pass=") + (has_render_pass ? "yes" : "no") +
-                 " dynamic=" + (has_dynamic_rendering ? "yes" : "no") +
+  const bool can_dynamic_rendering = has_dynamic && has_color_format && has_pipeline_info;
+
+  rkg::log::info(std::string("debug_ui: backend caps render_pass=") +
+                 (has_render_pass ? "yes" : "no") +
+                 " dynamic=" + (has_dynamic ? "yes" : "no") +
                  " color_format=" + (has_color_format ? "yes" : "no") +
-                 " pipeline_rendering=" + (has_pipeline_rendering ? "yes" : "no"));
-  if (!can_render_pass && !can_dynamic_rendering) {
+                 " pipeline_rendering=" + (has_pipeline_info ? "yes" : "no"));
+
+  bool use_dynamic_rendering = false;
+  if (!can_render_pass && can_dynamic_rendering) {
+    use_dynamic_rendering = g_state.dynamic_rendering_enabled;
+  }
+  g_state.render_inside_pass = !use_dynamic_rendering;
+
+  if (!can_render_pass && !use_dynamic_rendering) {
     rkg::log::warn("debug_ui: ImGui Vulkan backend lacks render pass and dynamic rendering support");
     return false;
   }
@@ -420,6 +428,7 @@ bool init_vulkan() {
     set_render_pass(init_info, VK_NULL_HANDLE);
   }
   set_dynamic_rendering(init_info, use_dynamic_rendering);
+#if defined(IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING)
   if (use_dynamic_rendering) {
     if (g_state.swapchain_format == VK_FORMAT_UNDEFINED) {
       rkg::log::warn("debug_ui: dynamic rendering requires a valid swapchain format");
@@ -434,6 +443,7 @@ bool init_vulkan() {
     rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
     set_pipeline_rendering_info(init_info, &rendering_info);
   }
+#endif
   if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
