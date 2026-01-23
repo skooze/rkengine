@@ -99,6 +99,17 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   const char* display = std::getenv("DISPLAY");
   const char* wayland_display = std::getenv("WAYLAND_DISPLAY");
   const char* session_type = std::getenv("XDG_SESSION_TYPE");
+  const char* env_xauthority = std::getenv("XAUTHORITY");
+  const char* env_home = std::getenv("HOME");
+  if (!env_xauthority || !*env_xauthority) {
+    if (env_home && *env_home) {
+      std::string xauth = std::string(env_home) + "/.Xauthority";
+      if (access(xauth.c_str(), R_OK) == 0) {
+        setenv("XAUTHORITY", xauth.c_str(), 1);
+        env_xauthority = std::getenv("XAUTHORITY");
+      }
+    }
+  }
   std::string err;
   std::string last_driver;
   std::vector<std::string> attempt_errors;
@@ -122,6 +133,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       unsetenv("SDL_VIDEODRIVER");
     }
     last_driver = (driver && *driver) ? driver : "(default)";
+    SDL_ClearError();
     if (SDL_Init(init_flags) != 0) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
@@ -164,7 +176,13 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   };
 
   std::vector<const char*> fallback_drivers;
-  const bool have_wayland = (wayland_display && *wayland_display && env_xdg_runtime && *env_xdg_runtime);
+  bool have_wayland = (wayland_display && *wayland_display && env_xdg_runtime && *env_xdg_runtime);
+  if (have_wayland) {
+    std::string wl_socket = std::string(env_xdg_runtime) + "/" + wayland_display;
+    if (access(wl_socket.c_str(), R_OK | W_OK) != 0) {
+      have_wayland = false;
+    }
+  }
   const bool have_x11 = (display && *display);
   if (have_wayland) {
     fallback_drivers.push_back("wayland");
@@ -226,6 +244,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
                   " WAYLAND_DISPLAY=" + (wayland_display ? wayland_display : "") +
                   " XDG_SESSION_TYPE=" + (session_type ? session_type : "") +
                   " XDG_RUNTIME_DIR=" + (env_xdg_runtime ? env_xdg_runtime : "") +
+                  " XAUTHORITY=" + (env_xauthority ? env_xauthority : "") +
                   " SDL_VIDEODRIVER=" + (forced ? forced : "") +
                   " EUID=" + (is_root ? "0" : "user"));
   return false;
