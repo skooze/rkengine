@@ -3,7 +3,9 @@
 #include "rkg/log.h"
 
 #include <SDL3/SDL.h>
+#include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <pwd.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -145,9 +147,13 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     }
     last_driver = (driver && *driver) ? driver : "(default)";
     SDL_ClearError();
+    errno = 0;
     if (SDL_Init(init_flags) != 0) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      if (err == "unknown error") {
+        err += format_errno();
+      }
       attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
       return false;
@@ -156,6 +162,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!window) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
+      if (err == "unknown error") {
+        err += format_errno();
+      }
       attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
       return false;
@@ -192,6 +201,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     std::string wl_socket = std::string(env_xdg_runtime) + "/" + wayland_display;
     if (access(wl_socket.c_str(), R_OK | W_OK) != 0) {
       have_wayland = false;
+      rkg::log::warn(std::string("Wayland socket not accessible: ") + wl_socket + format_errno());
     }
   }
   const bool have_x11 = (display && *display);
@@ -268,6 +278,11 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
                   " XAUTHORITY=" + (env_xauthority ? env_xauthority : "") +
                   " SDL_VIDEODRIVER=" + (forced ? forced : "") +
                   " EUID=" + (is_root ? "0" : "user"));
+  if (env_xauthority && *env_xauthority) {
+    if (access(env_xauthority, R_OK) != 0) {
+      rkg::log::warn(std::string("XAUTHORITY not readable: ") + env_xauthority + format_errno());
+    }
+  }
   return false;
 }
 
@@ -325,3 +340,8 @@ void* platform_native_window(const Platform* self) {
 }
 
 } // namespace rkg::platform::detail
+std::string format_errno() {
+  const int err = errno;
+  if (err == 0) return "";
+  return std::string(" errno=") + std::to_string(err) + " (" + std::strerror(err) + ")";
+}
