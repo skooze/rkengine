@@ -45,6 +45,13 @@ std::string list_video_drivers() {
   return list.empty() ? "none" : list;
 }
 
+#ifndef SDL_HINT_INPUT_LINUXEV
+#define SDL_HINT_INPUT_LINUXEV "SDL_INPUT_LINUXEV"
+#endif
+#ifndef SDL_HINT_INPUT_EVDEV
+#define SDL_HINT_INPUT_EVDEV "SDL_INPUT_EVDEV"
+#endif
+
 } // namespace
 
 bool platform_init(Platform* self, const WindowDesc& desc) {
@@ -56,6 +63,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
   const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
+  const char* env_xdg_runtime = std::getenv("XDG_RUNTIME_DIR");
   std::string err;
   auto apply_evdev_setting = [&](bool disable_evdev) {
     if (!disable_evdev) return;
@@ -65,6 +73,8 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!env_evdev || !*env_evdev) {
       setenv("SDL_INPUT_EVDEV", "0", 1);
     }
+    SDL_SetHint(SDL_HINT_INPUT_LINUXEV, "0");
+    SDL_SetHint(SDL_HINT_INPUT_EVDEV, "0");
   };
 
   auto try_init_with_driver = [&](const char* driver, bool disable_evdev) -> bool {
@@ -96,8 +106,12 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   auto init_events = [&](bool disable_evdev) -> bool {
     if (disable_evdev) {
       setenv("SDL_INPUT_LINUXEV", "0", 1);
+      setenv("SDL_INPUT_EVDEV", "0", 1);
+      SDL_SetHint(SDL_HINT_INPUT_LINUXEV, "0");
+      SDL_SetHint(SDL_HINT_INPUT_EVDEV, "0");
     } else {
       unsetenv("SDL_INPUT_LINUXEV");
+      unsetenv("SDL_INPUT_EVDEV");
     }
     if (SDL_InitSubSystem(SDL_INIT_EVENTS) != 0) {
       const char* sdl_err = SDL_GetError();
@@ -161,6 +175,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
                   " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
                   " XDG_SESSION_TYPE=" + (session ? session : "") +
+                  " XDG_RUNTIME_DIR=" + (env_xdg_runtime ? env_xdg_runtime : "") +
                   " SDL_VIDEODRIVER=" + (forced ? forced : ""));
   return false;
 }
