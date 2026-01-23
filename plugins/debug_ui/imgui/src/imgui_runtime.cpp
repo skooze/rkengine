@@ -20,6 +20,7 @@
 #include <chrono>
 #include <fstream>
 #include <optional>
+#include <type_traits>
 
 namespace rkg::debug_ui {
 
@@ -159,15 +160,13 @@ static bool texture_id_is_empty(ImTextureID tex_id) {
 }
 
 template <typename T>
-static ImTextureID draw_cmd_texture_id(const T& cmd) {
-  if constexpr (requires { cmd.GetTexID(); }) {
-    return cmd.GetTexID();
-  } else if constexpr (requires { cmd.TextureId; }) {
+static std::optional<ImTextureID> draw_cmd_texture_id(const T& cmd) {
+  if constexpr (requires { cmd.TextureId; }) {
     return cmd.TextureId;
   } else if constexpr (requires { cmd.TexID; }) {
     return cmd.TexID;
   } else {
-    return static_cast<ImTextureID>(0);
+    return std::nullopt;
   }
 }
 
@@ -182,13 +181,56 @@ static bool draw_data_has_empty_texture(const ImDrawData* draw_data) {
     }
     for (int cmd_index = 0; cmd_index < list->CmdBuffer.Size; ++cmd_index) {
       const ImDrawCmd& cmd = list->CmdBuffer[cmd_index];
-      if (texture_id_is_empty(draw_cmd_texture_id(cmd))) {
+      const auto tex_id = draw_cmd_texture_id(cmd);
+      if (tex_id && texture_id_is_empty(*tex_id)) {
         return true;
       }
     }
   }
   return false;
 }
+
+#if IMGUI_VERSION_NUM >= 19000
+template <typename T>
+static auto* draw_data_textures(T* draw_data) {
+  if constexpr (requires { draw_data->Textures; }) {
+    if constexpr (std::is_pointer_v<decltype(draw_data->Textures)>) {
+      return draw_data->Textures;
+    } else {
+      return &draw_data->Textures;
+    }
+  } else {
+    return static_cast<void*>(nullptr);
+  }
+}
+
+static ImTextureData* texture_ptr_from_entry(auto& entry) {
+  if constexpr (std::is_pointer_v<std::decay_t<decltype(entry)>>) {
+    return entry;
+  } else {
+    return &entry;
+  }
+}
+
+static void process_texture_requests(ImDrawData* draw_data) {
+  auto* textures = draw_data_textures(draw_data);
+  if (!textures) {
+    return;
+  }
+  for (int i = 0; i < textures->Size; ++i) {
+    auto& entry = (*textures)[i];
+    ImTextureData* tex = texture_ptr_from_entry(entry);
+    if (!tex) {
+      continue;
+    }
+    if (tex->Status == ImTextureStatus_WantCreate ||
+        tex->Status == ImTextureStatus_WantUpdates ||
+        tex->Status == ImTextureStatus_WantDestroy) {
+      ImGui_ImplVulkan_UpdateTexture(tex);
+    }
+  }
+}
+#endif
 
 void maybe_refresh_ai_status() {
   const auto path = g_state.root / "build" / "ai_results.json";
@@ -341,6 +383,9 @@ bool init_vulkan() {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
   }
+#if IMGUI_VERSION_NUM >= 19000
+  ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+#endif
 
   g_state.initialized = true;
   g_state.has_draw_data = false;
@@ -468,6 +513,9 @@ void new_frame(float dt_seconds) {
   }
 
   ImGui::Render();
+#if IMGUI_VERSION_NUM >= 19000
+  process_texture_requests(ImGui::GetDrawData());
+#endif
   g_state.has_draw_data = true;
 }
 
