@@ -36,6 +36,8 @@ KeyCode map_sdl_scancode(SDL_Scancode scancode) {
   }
 }
 
+std::string format_errno();
+
 namespace {
 
 std::string list_video_drivers() {
