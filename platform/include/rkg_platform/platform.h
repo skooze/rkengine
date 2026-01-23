@@ -21,13 +21,15 @@ struct WindowDesc {
   const char* title = "rkg";
 };
 
+class Platform;
+
 namespace detail {
-bool platform_init(class Platform* self, const WindowDesc& desc);
-void platform_shutdown(class Platform* self);
-void platform_poll_events(class Platform* self);
-bool platform_should_quit(const class Platform* self);
-float platform_delta_seconds(class Platform* self);
-void* platform_native_window(const class Platform* self);
+bool platform_init(Platform* self, const WindowDesc& desc);
+void platform_shutdown(Platform* self);
+void platform_poll_events(Platform* self);
+bool platform_should_quit(const Platform* self);
+float platform_delta_seconds(Platform* self);
+void* platform_native_window(const Platform* self);
 } // namespace detail
 
 class Platform {

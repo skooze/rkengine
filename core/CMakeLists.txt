@@ -21,6 +21,7 @@ rkg_add_library(rkg_core
 target_include_directories(rkg_core
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/../platform/include
 )
 
 if(RKG_ENABLE_DATA_JSON)

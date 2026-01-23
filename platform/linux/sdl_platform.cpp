@@ -7,21 +7,21 @@
 
 namespace rkg::platform::detail {
 
-KeyCode map_sdl_key(SDL_Keycode key) {
-  switch (key) {
-    case SDLK_w:
+KeyCode map_sdl_scancode(SDL_Scancode scancode) {
+  switch (scancode) {
+    case SDL_SCANCODE_W:
       return KeyCode::W;
-    case SDLK_a:
+    case SDL_SCANCODE_A:
       return KeyCode::A;
-    case SDLK_s:
+    case SDL_SCANCODE_S:
       return KeyCode::S;
-    case SDLK_d:
+    case SDL_SCANCODE_D:
       return KeyCode::D;
-    case SDLK_ESCAPE:
+    case SDL_SCANCODE_ESCAPE:
       return KeyCode::Escape;
-    case SDLK_F1:
+    case SDL_SCANCODE_F1:
       return KeyCode::F1;
-    case SDLK_F5:
+    case SDL_SCANCODE_F5:
       return KeyCode::F5;
     default:
       return KeyCode::Unknown;
@@ -69,7 +69,7 @@ void platform_poll_events(Platform* self) {
       self->quit_ = true;
     }
     if (event.type == SDL_EVENT_KEY_DOWN) {
-      const auto code = map_sdl_key(event.key.keysym.sym);
+      const auto code = map_sdl_scancode(event.key.scancode);
       if (code != KeyCode::Unknown) {
         self->keys_down_.insert(code);
       }
@@ -78,7 +78,7 @@ void platform_poll_events(Platform* self) {
       }
     }
     if (event.type == SDL_EVENT_KEY_UP) {
-      const auto code = map_sdl_key(event.key.keysym.sym);
+      const auto code = map_sdl_scancode(event.key.scancode);
       if (code != KeyCode::Unknown) {
         self->keys_down_.erase(code);
       }

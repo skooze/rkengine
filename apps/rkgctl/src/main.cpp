@@ -24,9 +24,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -62,6 +64,23 @@ class ILlmProvider {
  public:
   virtual ~ILlmProvider() = default;
   virtual LlmResult GeneratePlan(const json& request) = 0;
+};
+
+struct AiRuntimeConfig {
+  std::string provider;
+  std::string model;
+  std::string base_url;
+  std::string templates_dir;
+  int timeout_seconds = 60;
+};
+
+struct AiConfigResolved {
+  AiRuntimeConfig values;
+  std::string provider_source;
+  std::string model_source;
+  std::string base_url_source;
+  std::string templates_dir_source;
+  std::string timeout_source;
 };
 
 struct ValidationError {
@@ -106,12 +125,64 @@ struct PackEntry {
   std::string payload;
 };
 
+constexpr size_t kContextFileCap = 500;
+
+struct FileListMeta {
+  bool truncated = false;
+  size_t total_count = 0;
+  size_t included_count = 0;
+};
+
+struct FileChangeSummary {
+  size_t added = 0;
+  size_t removed = 0;
+  size_t modified = 0;
+  std::vector<std::string> changed_paths;
+};
+
 void write_u16(std::ofstream& out, uint16_t value);
 void write_u32(std::ofstream& out, uint32_t value);
 void write_u64(std::ofstream& out, uint64_t value);
 uint16_t read_u16(std::ifstream& in);
 uint32_t read_u32(std::ifstream& in);
 uint64_t read_u64(std::ifstream& in);
+
+std::string result_status_from_rc(int rc);
+bool write_json_file(const fs::path& path, const json& value);
+void print_plan_errors(const std::vector<PlanValidationError>& errors);
+
+AiConfigResolved resolve_ai_config(const rkg::ProjectConfig& cfg,
+                                   const std::string& provider_override,
+                                   const std::string& model_override,
+                                   const std::string& base_url_override,
+                                   const std::string& templates_dir_override,
+                                   const std::optional<int>& timeout_override);
+std::string format_ai_config_line(const AiConfigResolved& cfg, const std::string& provider_note);
+json build_run_info(const std::string& run_id,
+                    const std::string& goal,
+                    const std::string& mode,
+                    const AiConfigResolved& cfg,
+                    const std::string& provider_note,
+                    bool strict_enums);
+
+std::string project_name_or_dir(const rkg::ProjectConfig& cfg, const fs::path& project_root);
+json build_context_fingerprint(const rkg::ResolvedPaths& paths, const fs::path& project_root);
+void collect_file_list(const fs::path& root,
+                       const fs::path& dir,
+                       size_t cap,
+                       json& out,
+                       FileListMeta& meta);
+bool compute_file_changes(const json& baseline_ctx,
+                          const fs::path& root,
+                          const fs::path& dir,
+                          size_t cap,
+                          const std::string& list_key,
+                          FileChangeSummary& out,
+                          FileListMeta& current_meta);
+
+std::unique_ptr<ILlmProvider> create_openai_provider(const std::string& api_key,
+                                                     const std::string& base_url,
+                                                     int timeout_seconds);
 
 
 std::string now_iso() {
@@ -2643,23 +2714,6 @@ json build_run_info(const std::string& run_id,
   return info;
 }
 
-struct AiRuntimeConfig {
-  std::string provider;
-  std::string model;
-  std::string base_url;
-  std::string templates_dir;
-  int timeout_seconds = 60;
-};
-
-struct AiConfigResolved {
-  AiRuntimeConfig values;
-  std::string provider_source;
-  std::string model_source;
-  std::string base_url_source;
-  std::string templates_dir_source;
-  std::string timeout_source;
-};
-
 std::string to_lower(std::string value) {
   std::transform(value.begin(), value.end(), value.begin(),
                  [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -2816,14 +2870,6 @@ json build_context_fingerprint(const rkg::ResolvedPaths& paths, const fs::path& 
   return fp;
 }
 
-constexpr size_t kContextFileCap = 500;
-
-struct FileListMeta {
-  size_t total_count = 0;
-  size_t included_count = 0;
-  bool truncated = false;
-};
-
 void collect_file_list(const fs::path& root,
                        const fs::path& dir,
                        size_t cap,
@@ -2855,13 +2901,6 @@ void collect_file_list(const fs::path& root,
     out_files.push_back(item);
   }
 }
-
-struct FileChangeSummary {
-  size_t added = 0;
-  size_t removed = 0;
-  size_t modified = 0;
-  std::vector<std::string> changed_paths;
-};
 
 bool compute_file_changes_from_list(const json& baseline_files,
                                     const json& current_files,
@@ -3064,8 +3103,9 @@ int agent_openai_plan(const char* argv0,
 
   write_json_file(run_dir / "openai_request.json", request);
 
-  OpenAiProvider provider(api_key, base_url, ai_cfg.values.timeout_seconds);
-  const LlmResult llm = provider.GeneratePlan(request);
+  std::unique_ptr<ILlmProvider> provider =
+      create_openai_provider(api_key, base_url, ai_cfg.values.timeout_seconds);
+  const LlmResult llm = provider->GeneratePlan(request);
   if (!llm.error.empty()) {
     if (!llm.raw_json.empty()) {
       rkg::data::write_text_file(run_dir / "openai_response.json", llm.raw_json);
@@ -3221,8 +3261,9 @@ int agent_openai_apply(const char* argv0,
 
   write_json_file(run_dir / "openai_request.json", request);
 
-  OpenAiProvider provider(api_key, base_url, ai_cfg.values.timeout_seconds);
-  const LlmResult llm = provider.GeneratePlan(request);
+  std::unique_ptr<ILlmProvider> provider =
+      create_openai_provider(api_key, base_url, ai_cfg.values.timeout_seconds);
+  const LlmResult llm = provider->GeneratePlan(request);
   if (!llm.error.empty()) {
     if (!llm.raw_json.empty()) {
       rkg::data::write_text_file(run_dir / "openai_response.json", llm.raw_json);
@@ -4074,7 +4115,8 @@ bool extract_plan_json_from_openai_response(const json& response,
     }
   }
 
-  auto try_extract_from_content = [&](const json& content) -> bool {
+  std::function<bool(const json&)> try_extract_from_content;
+  try_extract_from_content = [&](const json& content) -> bool {
     if (content.contains("text") && content["text"].is_string()) {
       return try_parse_candidate(content["text"].get<std::string>());
     }
@@ -4304,6 +4346,12 @@ class OpenAiProvider : public ILlmProvider {
   std::string base_url_;
   int timeout_seconds_ = 60;
 };
+
+std::unique_ptr<ILlmProvider> create_openai_provider(const std::string& api_key,
+                                                     const std::string& base_url,
+                                                     int timeout_seconds) {
+  return std::make_unique<OpenAiProvider>(api_key, base_url, timeout_seconds);
+}
 
 int orchestrate(const CliOptions& opts) {
   rkg::log::init();

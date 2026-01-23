@@ -22,8 +22,9 @@ class FileWatcher {
   void stop();
   std::string backend_name() const;
 
- private:
   struct Impl;
+
+ private:
   Impl* impl_ = nullptr;
 };
 

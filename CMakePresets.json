@@ -51,6 +51,15 @@
       }
     },
     {
+      "name": "linux-debug-sandbox",
+      "displayName": "Linux Debug (sandbox)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/test_sandbox/build/linux-debug",
+        "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
       "name": "windows-release",
       "inherits": "base",
       "generator": "Ninja",

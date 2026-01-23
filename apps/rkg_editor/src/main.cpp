@@ -82,6 +82,12 @@ struct AgentRunSummary {
   std::string error_code;
   std::string error_message;
   std::string error_stage;
+  std::string selector_type;
+  std::string selector_value;
+  std::string selector_warning;
+  std::string entity_id;
+  std::string entity_name;
+  std::vector<std::string> conflict_files;
 };
 
 struct AgentStatusSnapshot {

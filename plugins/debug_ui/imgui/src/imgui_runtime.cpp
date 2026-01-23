@@ -91,44 +91,7 @@ bool create_descriptor_pool() {
 }
 
 bool upload_fonts() {
-  VkCommandPool command_pool = VK_NULL_HANDLE;
-  VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-
-  VkCommandPoolCreateInfo pool_info{};
-  pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  pool_info.queueFamilyIndex = g_state.queue_family;
-  if (vkCreateCommandPool(g_state.device, &pool_info, nullptr, &command_pool) != VK_SUCCESS) {
-    return false;
-  }
-
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandPool = command_pool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc_info.commandBufferCount = 1;
-  if (vkAllocateCommandBuffers(g_state.device, &alloc_info, &command_buffer) != VK_SUCCESS) {
-    vkDestroyCommandPool(g_state.device, command_pool, nullptr);
-    return false;
-  }
-
-  VkCommandBufferBeginInfo begin_info{};
-  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(command_buffer, &begin_info);
-  ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-  vkEndCommandBuffer(command_buffer);
-
-  VkSubmitInfo submit_info{};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer;
-  vkQueueSubmit(g_state.queue, 1, &submit_info, VK_NULL_HANDLE);
-  vkQueueWaitIdle(g_state.queue);
-
-  ImGui_ImplVulkan_DestroyFontUploadObjects();
-  vkDestroyCommandPool(g_state.device, command_pool, nullptr);
-  return true;
+  return ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void maybe_refresh_ai_status() {
@@ -263,8 +226,9 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
+  init_info.RenderPass = g_state.render_pass;
 
-  if (!ImGui_ImplVulkan_Init(&init_info, g_state.render_pass)) {
+  if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
   }

@@ -14,6 +14,13 @@
 
 Note: CMake will try to FetchContent `yaml-cpp` and `nlohmann/json` if system packages are not found.
 
+Arch Linux (pacman) example:
+```
+sudo pacman -S --needed cmake ninja pkgconf gcc \
+  sdl3 vulkan-headers vulkan-icd-loader vulkan-tools \
+  yaml-cpp nlohmann-json sqlite curl
+```
+
 ## Configure + Build (Presets)
 Linux:
 ```

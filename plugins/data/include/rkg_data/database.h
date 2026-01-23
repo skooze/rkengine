@@ -2,9 +2,9 @@
 
 #include <string>
 
-namespace rkg::data {
-
 struct sqlite3;
+
+namespace rkg::data {
 
 class IDatabase {
  public:
@@ -18,10 +18,10 @@ class SqliteDatabase final : public IDatabase {
   bool open(const std::string& path) override;
   bool exec(const std::string& sql) override;
   void close();
-  ~SqliteDatabase() override;
+ ~SqliteDatabase() override;
 
  private:
-  struct sqlite3* db_ = nullptr;
+  ::sqlite3* db_ = nullptr;
 };
 
 } // namespace rkg::data
