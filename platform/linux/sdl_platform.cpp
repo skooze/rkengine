@@ -339,9 +339,10 @@ void* platform_native_window(const Platform* self) {
   return self->window_;
 }
 
-} // namespace rkg::platform::detail
 std::string format_errno() {
   const int err = errno;
   if (err == 0) return "";
   return std::string(" errno=") + std::to_string(err) + " (" + std::strerror(err) + ")";
 }
+
+} // namespace rkg::platform::detail
