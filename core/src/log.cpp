@@ -12,6 +12,11 @@
 #include <mutex>
 #include <sstream>
 
+#if defined(__linux__)
+#include <execinfo.h>
+#include <unistd.h>
+#endif
+
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -130,6 +135,15 @@ std::vector<std::string> recent(size_t max_entries) {
 namespace {
 void signal_handler(int sig) {
   log_line("ERROR", std::string("crash signal: ") + std::to_string(sig));
+#if defined(__linux__)
+  void* frames[64];
+  const int count = ::backtrace(frames, 64);
+  if (count > 0) {
+    const char header[] = "backtrace (most recent call first):\n";
+    ::write(STDERR_FILENO, header, sizeof(header) - 1);
+    ::backtrace_symbols_fd(frames, count, STDERR_FILENO);
+  }
+#endif
   std::_Exit(1);
 }
 
