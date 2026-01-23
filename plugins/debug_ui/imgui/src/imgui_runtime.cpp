@@ -155,6 +155,18 @@ void set_pipeline_rendering_info(T& info, VkPipelineRenderingCreateInfo* renderi
   }
 }
 
+constexpr bool has_init_renderpass_overload() {
+  return requires(ImGui_ImplVulkan_InitInfo* info, VkRenderPass pass) {
+    ImGui_ImplVulkan_Init(info, pass);
+  };
+}
+
+constexpr bool has_init_single_arg() {
+  return requires(ImGui_ImplVulkan_InitInfo* info) {
+    ImGui_ImplVulkan_Init(info);
+  };
+}
+
 static bool texture_id_is_empty(ImTextureID tex_id) {
   return tex_id == static_cast<ImTextureID>(0);
 }
@@ -374,15 +386,21 @@ bool init_vulkan() {
   const bool has_dynamic_rendering = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
   const bool has_color_format = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
   const bool has_pipeline_rendering = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
-  const bool can_render_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
+  const bool has_renderpass_overload = has_init_renderpass_overload();
+  const bool has_single_arg = has_init_single_arg();
+  const bool can_render_pass = g_state.render_pass != VK_NULL_HANDLE &&
+                               (has_render_pass || has_renderpass_overload);
+  const bool can_dynamic_rendering = has_dynamic_rendering && has_color_format && has_pipeline_rendering && has_single_arg;
   g_state.render_inside_pass = can_render_pass;
-  const bool use_dynamic_rendering = !g_state.render_inside_pass && has_dynamic_rendering;
+  const bool use_dynamic_rendering = !g_state.render_inside_pass && can_dynamic_rendering;
   rkg::log::info(std::string("debug_ui: backend caps render_pass=") + (has_render_pass ? "yes" : "no") +
                  " dynamic=" + (has_dynamic_rendering ? "yes" : "no") +
                  " color_format=" + (has_color_format ? "yes" : "no") +
-                 " pipeline_rendering=" + (has_pipeline_rendering ? "yes" : "no"));
-  if (!can_render_pass && !has_dynamic_rendering) {
-    rkg::log::warn("debug_ui: ImGui Vulkan backend lacks render pass and dynamic rendering support");
+                 " pipeline_rendering=" + (has_pipeline_rendering ? "yes" : "no") +
+                 " init_single=" + (has_single_arg ? "yes" : "no") +
+                 " init_renderpass=" + (has_renderpass_overload ? "yes" : "no"));
+  if (!can_render_pass && !can_dynamic_rendering) {
+    rkg::log::warn("debug_ui: ImGui Vulkan backend lacks usable render pass or dynamic rendering support");
     return false;
   }
 
@@ -430,11 +448,14 @@ bool init_vulkan() {
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
     set_pipeline_rendering_info(init_info, &rendering_info);
-    if (!has_color_format || !has_pipeline_rendering) {
-      rkg::log::warn("debug_ui: dynamic rendering enabled but backend lacks format/pipeline fields; using defaults");
-    }
   }
-  if (!ImGui_ImplVulkan_Init(&init_info)) {
+  bool init_ok = false;
+  if constexpr (has_init_single_arg()) {
+    init_ok = ImGui_ImplVulkan_Init(&init_info);
+  } else if constexpr (has_init_renderpass_overload()) {
+    init_ok = ImGui_ImplVulkan_Init(&init_info, g_state.render_pass);
+  }
+  if (!init_ok) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
   }
