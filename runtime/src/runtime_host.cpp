@@ -881,6 +881,12 @@ rkg::input::ActionState RuntimeHost::input_action(const std::string& name) const
 void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& action_state_provider) {
   const float frame_dt = params.frame_dt;
   const float sim_dt = params.run_simulation ? params.sim_dt : 0.0f;
+  static bool logged_tick = false;
+  const bool first_tick = !logged_tick;
+  if (first_tick) {
+    rkg::log::info("tick: begin");
+    logged_tick = true;
+  }
 
   if (params.update_input) {
     input_.update(platform_);
@@ -903,6 +909,9 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
 #endif
 
   if (!renderer_plugin_.empty()) {
+    if (first_tick) {
+      rkg::log::info("tick: renderer update");
+    }
     host_.update_plugin(renderer_plugin_, frame_dt);
   }
   for (const auto& name : active_plugins_) {

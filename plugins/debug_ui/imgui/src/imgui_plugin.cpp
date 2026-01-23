@@ -21,7 +21,15 @@ void debug_ui_shutdown() {
 }
 
 void debug_ui_update(float dt) {
+  static bool logged = false;
+  if (!logged) {
+    rkg::log::info("debug_ui: new_frame begin");
+  }
   rkg::debug_ui::new_frame(dt);
+  if (!logged) {
+    rkg::log::info("debug_ui: new_frame end");
+    logged = true;
+  }
 }
 
 rkg::RkgPluginApi g_api{

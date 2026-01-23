@@ -1234,8 +1234,16 @@ void vulkan_shutdown() {
 }
 
 void vulkan_update(float) {
+  static bool logged = false;
+  if (!logged) {
+    rkg::log::info("renderer:vulkan update begin");
+  }
   if (!draw_frame()) {
     rkg::log::warn("renderer:vulkan draw_frame failed");
+  }
+  if (!logged) {
+    rkg::log::info("renderer:vulkan update end");
+    logged = true;
   }
 }
 
