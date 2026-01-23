@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <cstdlib>
+#include <unistd.h>
 #include <string>
 #include <vector>
 
@@ -60,12 +61,13 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
 #if RKG_ENABLE_VULKAN
   window_flags |= SDL_WINDOW_VULKAN;
 #endif
-  const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
+  const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
   const char* env_evdev = std::getenv("SDL_INPUT_EVDEV");
   const char* env_xdg_runtime = std::getenv("XDG_RUNTIME_DIR");
-  const char* display = SDL_getenv("DISPLAY");
+  const char* display = std::getenv("DISPLAY");
   std::string err;
+  std::string last_driver;
   auto apply_evdev_setting = [&](bool disable_evdev) {
     if (!disable_evdev) return;
     if (!env_linuxev || !*env_linuxev) {
@@ -85,6 +87,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     } else {
       unsetenv("SDL_VIDEODRIVER");
     }
+    last_driver = (driver && *driver) ? driver : "(default)";
     if (SDL_Init(init_flags) != 0) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
@@ -124,13 +127,6 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     return true;
   };
 
-  if (try_init_with_driver(env_driver, false)) {
-    if (!init_events(false)) {
-      init_events(true);
-    }
-    return true;
-  }
-
   std::vector<const char*> fallback_drivers;
   // Prefer x11 if XDG_RUNTIME_DIR is missing but DISPLAY is present (e.g., sudo/root shells).
   if ((!env_xdg_runtime || !*env_xdg_runtime) && display && *display) {
@@ -145,41 +141,45 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
   fallback_drivers.push_back("offscreen");
   fallback_drivers.push_back("dummy");
 #endif
-  for (const char* driver : fallback_drivers) {
-    if (env_driver && *env_driver && std::string(env_driver) == driver) {
-      continue;
-    }
-    if (try_init_with_driver(driver, false)) {
-      rkg::log::warn(std::string("SDL_Init failed, recovered by forcing video driver: ") + driver);
-      if (!init_events(false)) {
+  auto attempt_with_evdev = [&](bool disable_evdev) -> bool {
+    if (try_init_with_driver(env_driver, disable_evdev)) {
+      if (!init_events(disable_evdev)) {
         init_events(true);
       }
       return true;
     }
-  }
-
-  if (try_init_with_driver(env_driver, true)) {
-    rkg::log::warn("SDL_Init recovered by disabling evdev input");
-    init_events(true);
-    return true;
-  }
-
-  for (const char* driver : fallback_drivers) {
-    if (env_driver && *env_driver && std::string(env_driver) == driver) {
-      continue;
+    for (const char* driver : fallback_drivers) {
+      if (env_driver && *env_driver && std::string(env_driver) == driver) {
+        continue;
+      }
+      if (try_init_with_driver(driver, disable_evdev)) {
+        rkg::log::warn(std::string("SDL_Init recovered by forcing video driver: ") + driver);
+        if (!init_events(disable_evdev)) {
+          init_events(true);
+        }
+        return true;
+      }
     }
-    if (try_init_with_driver(driver, true)) {
-      rkg::log::warn(std::string("SDL_Init recovered by disabling evdev input and forcing video driver: ") + driver);
-      init_events(true);
+    return false;
+  };
+
+  const bool prefer_disable_evdev = (geteuid() != 0);
+  if (prefer_disable_evdev) {
+    if (attempt_with_evdev(true) || attempt_with_evdev(false)) {
+      return true;
+    }
+  } else {
+    if (attempt_with_evdev(false) || attempt_with_evdev(true)) {
       return true;
     }
   }
 
-  rkg::log::error(std::string("SDL_Init failed: ") + err);
+  rkg::log::error(std::string("SDL_Init failed: ") + err +
+                  (last_driver.empty() ? "" : std::string(" (driver=") + last_driver + ")"));
   rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
-  const char* wayland = SDL_getenv("WAYLAND_DISPLAY");
-  const char* session = SDL_getenv("XDG_SESSION_TYPE");
-  const char* forced = SDL_getenv("SDL_VIDEODRIVER");
+  const char* wayland = std::getenv("WAYLAND_DISPLAY");
+  const char* session = std::getenv("XDG_SESSION_TYPE");
+  const char* forced = std::getenv("SDL_VIDEODRIVER");
   rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
                   " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
                   " XDG_SESSION_TYPE=" + (session ? session : "") +
