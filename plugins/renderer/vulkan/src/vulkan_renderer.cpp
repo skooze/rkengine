@@ -1394,7 +1394,9 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     log_step("dynamic rendering: begin (renderer)");
 #endif
     g_state.cmd_begin_rendering(cmd, &rendering_info);
-    log_step("imgui: render dynamic");
+    if (rkg::debug_ui::is_initialized()) {
+      log_step("imgui: render dynamic");
+    }
     rkg::debug_ui::render(cmd);
     log_step("dynamic rendering: end (renderer)");
     g_state.cmd_end_rendering(cmd);

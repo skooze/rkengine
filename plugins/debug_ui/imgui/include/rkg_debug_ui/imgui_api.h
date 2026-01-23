@@ -10,6 +10,7 @@ using DrawCallback = void (*)(void* user_data);
 
 bool init_vulkan();
 void shutdown();
+bool is_initialized();
 void new_frame(float dt_seconds);
 void render(VkCommandBuffer cmd);
 bool render_inside_pass();
