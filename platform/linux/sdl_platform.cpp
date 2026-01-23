@@ -12,7 +12,9 @@
 #include <pwd.h>
 #include <dlfcn.h>
 #include <chrono>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <thread>
 #include <sys/resource.h>
@@ -158,6 +160,31 @@ std::string format_mode(mode_t mode) {
   return out;
 }
 
+bool log_unix_socket_connect(const std::string& path, const char* label) {
+  if (path.empty()) return false;
+  const int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0) {
+    rkg::log::warn(std::string(label) + " socket open failed: " + path + format_errno());
+    return false;
+  }
+  sockaddr_un addr{};
+  addr.sun_family = AF_UNIX;
+  if (path.size() >= sizeof(addr.sun_path)) {
+    rkg::log::warn(std::string(label) + " socket path too long: " + path);
+    close(fd);
+    return false;
+  }
+  std::strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+  bool ok = (connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
+  if (ok) {
+    rkg::log::info(std::string(label) + " socket connect ok: " + path);
+  } else {
+    rkg::log::warn(std::string(label) + " socket connect failed: " + path + format_errno());
+  }
+  close(fd);
+  return ok;
+}
+
 void log_rlimit_nofile() {
   struct rlimit lim;
   if (getrlimit(RLIMIT_NOFILE, &lim) == 0) {
@@ -216,9 +243,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     }
   }
 
+  SDL_SetMainReady();
   log_rlimit_nofile();
   install_sdl_logging();
-  SDL_SetMainReady();
 
   const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
@@ -359,6 +386,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       have_wayland = false;
       rkg::log::warn(std::string("Wayland socket not accessible: ") + wl_socket + format_errno());
     }
+    if (have_wayland) {
+      log_unix_socket_connect(wl_socket, "Wayland");
+    }
   }
   const bool have_x11 = (display && *display);
   if (have_x11) {
@@ -376,6 +406,7 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       if (access(x_sock.c_str(), R_OK | W_OK) != 0) {
         rkg::log::warn(std::string("X11 socket not accessible: ") + x_sock + format_errno());
       }
+      log_unix_socket_connect(x_sock, "X11");
     } else {
       rkg::log::warn(std::string("Unrecognized DISPLAY format: ") + display);
     }
