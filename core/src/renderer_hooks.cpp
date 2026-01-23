@@ -11,6 +11,9 @@ VulkanViewportHooks g_viewport{};
 bool g_has_viewport = false;
 uint32_t g_viewport_request_width = 0;
 uint32_t g_viewport_request_height = 0;
+uint32_t g_viewport_active_width = 0;
+uint32_t g_viewport_active_height = 0;
+bool g_viewport_request_dirty = false;
 VulkanViewportDrawList g_viewport_draw_list{};
 } // namespace
 
@@ -45,11 +48,21 @@ const VulkanViewportHooks* get_vulkan_viewport() {
 void set_vulkan_viewport_request(uint32_t width, uint32_t height) {
   g_viewport_request_width = width;
   g_viewport_request_height = height;
+  g_viewport_request_dirty = true;
 }
 
 void get_vulkan_viewport_request(uint32_t& width, uint32_t& height) {
-  width = g_viewport_request_width;
-  height = g_viewport_request_height;
+  width = g_viewport_active_width;
+  height = g_viewport_active_height;
+}
+
+void commit_vulkan_viewport_request() {
+  if (!g_viewport_request_dirty) {
+    return;
+  }
+  g_viewport_active_width = g_viewport_request_width;
+  g_viewport_active_height = g_viewport_request_height;
+  g_viewport_request_dirty = false;
 }
 
 void set_vulkan_viewport_draw_list(const float* mvp,

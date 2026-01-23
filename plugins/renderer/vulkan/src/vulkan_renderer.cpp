@@ -1318,20 +1318,55 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 }
 
 bool draw_frame() {
+  static bool logged_state = false;
   vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
   vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
 
   update_offscreen_target();
 
+  if (g_state.swapchain_extent.width == 0 || g_state.swapchain_extent.height == 0) {
+    if (!logged_state) {
+      rkg::log::warn("renderer:vulkan swapchain extent is 0; skipping frame");
+      logged_state = true;
+    }
+    rkg::commit_vulkan_viewport_request();
+    return true;
+  }
+
+  if (!logged_state) {
+    rkg::log::info(std::string("renderer:vulkan swapchain=") + std::to_string(reinterpret_cast<uintptr_t>(g_state.swapchain)));
+    rkg::log::info("renderer:vulkan swapchain images=" + std::to_string(g_state.swapchain_images.size()) +
+                   " views=" + std::to_string(g_state.swapchain_image_views.size()) +
+                   " framebuffers=" + std::to_string(g_state.framebuffers.size()) +
+                   " cmd_buffers=" + std::to_string(g_state.command_buffers.size()));
+    rkg::log::info("renderer:vulkan extent=" + std::to_string(g_state.swapchain_extent.width) + "x" +
+                   std::to_string(g_state.swapchain_extent.height));
+    logged_state = true;
+  }
+
   uint32_t image_index = 0;
   VkResult result = vkAcquireNextImageKHR(
       g_state.device, g_state.swapchain, UINT64_MAX, g_state.image_available, VK_NULL_HANDLE, &image_index);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    rkg::log::warn("renderer:vulkan swapchain out of date/suboptimal; skipping frame");
+    rkg::commit_vulkan_viewport_request();
+    return true;
+  }
   if (result != VK_SUCCESS) {
+    rkg::log::error("renderer:vulkan vkAcquireNextImageKHR failed");
+    rkg::commit_vulkan_viewport_request();
+    return false;
+  }
+  if (image_index >= g_state.command_buffers.size() || image_index >= g_state.swapchain_image_views.size() ||
+      image_index >= g_state.framebuffers.size()) {
+    rkg::log::error("renderer:vulkan swapchain image index out of range");
+    rkg::commit_vulkan_viewport_request();
     return false;
   }
 
   vkResetCommandBuffer(g_state.command_buffers[image_index], 0);
   if (!record_command_buffer(g_state.command_buffers[image_index], image_index)) {
+    rkg::commit_vulkan_viewport_request();
     return false;
   }
 
@@ -1350,6 +1385,7 @@ bool draw_frame() {
   submit_info.pSignalSemaphores = signal_semaphores;
 
   if (vkQueueSubmit(g_state.graphics_queue, 1, &submit_info, g_state.in_flight_fence) != VK_SUCCESS) {
+    rkg::commit_vulkan_viewport_request();
     return false;
   }
 
@@ -1362,6 +1398,7 @@ bool draw_frame() {
   present_info.pImageIndices = &image_index;
 
   result = vkQueuePresentKHR(g_state.present_queue, &present_info);
+  rkg::commit_vulkan_viewport_request();
   return result == VK_SUCCESS;
 }
 

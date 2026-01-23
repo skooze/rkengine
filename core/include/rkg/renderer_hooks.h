@@ -32,6 +32,7 @@ void register_vulkan_viewport(const VulkanViewportHooks* hooks);
 const VulkanViewportHooks* get_vulkan_viewport();
 void set_vulkan_viewport_request(uint32_t width, uint32_t height);
 void get_vulkan_viewport_request(uint32_t& width, uint32_t& height);
+void commit_vulkan_viewport_request();
 
 struct VulkanViewportDrawList {
   static constexpr uint32_t kMaxInstances = 64;
