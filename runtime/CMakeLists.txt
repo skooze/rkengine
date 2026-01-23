@@ -7,6 +7,13 @@ target_include_directories(rkg_runtime
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
+if(RKG_ENABLE_IMGUI)
+  target_include_directories(rkg_runtime
+    PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/../plugins/debug_ui/imgui/include
+  )
+endif()
+
 target_link_libraries(rkg_runtime
   PUBLIC
     rkg_core
