@@ -23,4 +23,8 @@ target_link_libraries(rkg_plugins_renderer_vulkan
     SDL3::SDL3
 )
 
+if(RKG_ENABLE_IMGUI)
+  target_link_libraries(rkg_plugins_renderer_vulkan PUBLIC rkg_plugins_debug_ui_imgui)
+endif()
+
 target_compile_definitions(rkg_plugins_renderer_vulkan PUBLIC RKG_ENABLE_VULKAN=1)

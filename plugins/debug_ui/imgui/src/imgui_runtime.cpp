@@ -25,25 +25,6 @@
 namespace rkg::debug_ui {
 
 namespace {
-template <typename T>
-constexpr bool kHasRenderPassMember = requires(T value) { value.RenderPass; };
-
-constexpr bool kInitWithRenderPass = requires(ImGui_ImplVulkan_InitInfo* info, VkRenderPass pass) {
-  ImGui_ImplVulkan_Init(info, pass);
-};
-
-constexpr bool kCreateFontsTextureCmd = requires(VkCommandBuffer cmd) {
-  ImGui_ImplVulkan_CreateFontsTexture(cmd);
-};
-
-constexpr bool kCreateFontsTextureNoArg = requires {
-  ImGui_ImplVulkan_CreateFontsTexture();
-};
-
-constexpr bool kDestroyFontUploadObjects = requires {
-  ImGui_ImplVulkan_DestroyFontUploadObjects();
-};
-
 struct DebugUiState {
   bool initialized = false;
   bool visible = true;
@@ -111,55 +92,8 @@ bool create_descriptor_pool() {
 }
 
 bool upload_fonts() {
-  if constexpr (!kCreateFontsTextureCmd && !kCreateFontsTextureNoArg) {
-    rkg::log::warn("debug_ui: ImGui Vulkan font upload API not available");
-    return true;
-  }
-
-  if constexpr (kCreateFontsTextureNoArg && !kCreateFontsTextureCmd) {
-    ImGui_ImplVulkan_CreateFontsTexture();
-    return true;
-  }
-
-  VkCommandPool command_pool = VK_NULL_HANDLE;
-  VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-
-  VkCommandPoolCreateInfo pool_info{};
-  pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  pool_info.queueFamilyIndex = g_state.queue_family;
-  if (vkCreateCommandPool(g_state.device, &pool_info, nullptr, &command_pool) != VK_SUCCESS) {
-    return false;
-  }
-
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.commandPool = command_pool;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc_info.commandBufferCount = 1;
-  if (vkAllocateCommandBuffers(g_state.device, &alloc_info, &command_buffer) != VK_SUCCESS) {
-    vkDestroyCommandPool(g_state.device, command_pool, nullptr);
-    return false;
-  }
-
-  VkCommandBufferBeginInfo begin_info{};
-  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(command_buffer, &begin_info);
-  ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-  vkEndCommandBuffer(command_buffer);
-
-  VkSubmitInfo submit_info{};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer;
-  vkQueueSubmit(g_state.queue, 1, &submit_info, VK_NULL_HANDLE);
-  vkQueueWaitIdle(g_state.queue);
-
-  if constexpr (kDestroyFontUploadObjects) {
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
-  }
-  vkDestroyCommandPool(g_state.device, command_pool, nullptr);
+  // Newer ImGui Vulkan backends handle font upload internally.
+  // Keep this as a no-op for compatibility across backend versions.
   return true;
 }
 
@@ -295,22 +229,11 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  if constexpr (requires(ImGui_ImplVulkan_InitInfo value) { value.MSAASamples; }) {
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-  }
-  if constexpr (requires(ImGui_ImplVulkan_InitInfo value) { value.ColorAttachmentFormat; }) {
-    init_info.ColorAttachmentFormat = VK_FORMAT_B8G8R8A8_UNORM;
-  }
-  if constexpr (kHasRenderPassMember<ImGui_ImplVulkan_InitInfo>) {
-    init_info.RenderPass = g_state.render_pass;
-  }
-
-  bool init_ok = false;
-  if constexpr (kInitWithRenderPass) {
-    init_ok = ImGui_ImplVulkan_Init(&init_info, g_state.render_pass);
-  } else {
-    init_ok = ImGui_ImplVulkan_Init(&init_info);
-  }
+  using InitFn = decltype(&ImGui_ImplVulkan_Init);
+  constexpr bool kInitWithRenderPass =
+      std::is_invocable_v<InitFn, ImGui_ImplVulkan_InitInfo*, VkRenderPass>;
+  const bool init_ok = kInitWithRenderPass ? ImGui_ImplVulkan_Init(&init_info, g_state.render_pass)
+                                           : ImGui_ImplVulkan_Init(&init_info);
   if (!init_ok) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
