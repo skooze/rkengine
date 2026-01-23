@@ -28,6 +28,7 @@ struct DebugUiState {
   bool initialized = false;
   bool visible = true;
   bool has_draw_data = false;
+  bool render_inside_pass = true;
   bool force_reload = false;
   bool show_builtin = true;
   bool docking_enabled = false;
@@ -42,6 +43,7 @@ struct DebugUiState {
   VkDevice device = VK_NULL_HANDLE;
   VkQueue queue = VK_NULL_HANDLE;
   VkRenderPass render_pass = VK_NULL_HANDLE;
+  VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
   uint32_t queue_family = 0;
   uint32_t image_count = 2;
   SDL_Window* window = nullptr;
@@ -89,6 +91,31 @@ bool create_descriptor_pool() {
   pool_info.poolSizeCount = static_cast<uint32_t>(std::size(pool_sizes));
   pool_info.pPoolSizes = pool_sizes;
   return vkCreateDescriptorPool(g_state.device, &pool_info, nullptr, &g_state.descriptor_pool) == VK_SUCCESS;
+}
+
+template <typename T>
+constexpr bool has_render_pass_member() {
+  return requires(T value) { value.RenderPass; };
+}
+
+template <typename T>
+constexpr bool has_dynamic_rendering_member() {
+  return requires(T value) { value.UseDynamicRendering; };
+}
+
+template <typename T>
+constexpr bool has_color_format_member() {
+  return requires(T value) { value.ColorAttachmentFormat; };
+}
+
+template <typename T>
+constexpr bool has_msaa_member() {
+  return requires(T value) { value.MSAASamples; };
+}
+
+template <typename T>
+constexpr bool has_pipeline_rendering_member() {
+  return requires(T value) { value.PipelineRenderingCreateInfo; };
 }
 
 bool upload_fonts() {
@@ -201,6 +228,10 @@ bool init_vulkan() {
   g_state.window = reinterpret_cast<SDL_Window*>(hooks->window);
   g_state.queue_family = hooks->queue_family;
   g_state.image_count = hooks->image_count;
+  g_state.swapchain_format = hooks->swapchain_format != 0
+                                 ? static_cast<VkFormat>(hooks->swapchain_format)
+                                 : VK_FORMAT_UNDEFINED;
+  g_state.render_inside_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -229,6 +260,27 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
+  if constexpr (has_render_pass_member<ImGui_ImplVulkan_InitInfo>()) {
+    init_info.RenderPass = g_state.render_pass;
+  }
+  if constexpr (has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>()) {
+    init_info.UseDynamicRendering = !g_state.render_inside_pass;
+  }
+  if constexpr (has_color_format_member<ImGui_ImplVulkan_InitInfo>()) {
+    if (g_state.swapchain_format != VK_FORMAT_UNDEFINED) {
+      init_info.ColorAttachmentFormat = g_state.swapchain_format;
+    }
+  }
+  if constexpr (has_msaa_member<ImGui_ImplVulkan_InitInfo>()) {
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  }
+  if constexpr (has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>()) {
+    static VkPipelineRenderingCreateInfo rendering_info{};
+    rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
+    init_info.PipelineRenderingCreateInfo = &rendering_info;
+  }
   if (!ImGui_ImplVulkan_Init(&init_info)) {
     rkg::log::warn("debug_ui: ImGui Vulkan init failed");
     return false;
@@ -373,6 +425,10 @@ void render(VkCommandBuffer cmd) {
     return;
   }
   ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
+}
+
+bool render_inside_pass() {
+  return g_state.render_inside_pass;
 }
 
 void set_visible(bool visible) {

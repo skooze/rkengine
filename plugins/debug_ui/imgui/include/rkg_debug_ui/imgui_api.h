@@ -12,6 +12,7 @@ bool init_vulkan();
 void shutdown();
 void new_frame(float dt_seconds);
 void render(VkCommandBuffer cmd);
+bool render_inside_pass();
 void set_visible(bool visible);
 bool is_visible();
 void process_event(const void* event);

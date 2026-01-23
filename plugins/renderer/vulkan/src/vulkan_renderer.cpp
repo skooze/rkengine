@@ -1131,10 +1131,18 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
   vkCmdClearAttachments(cmd, 1, &clear_attachment, 1, &rect);
 
 #if RKG_ENABLE_IMGUI
-  rkg::debug_ui::render(cmd);
+  if (rkg::debug_ui::render_inside_pass()) {
+    rkg::debug_ui::render(cmd);
+  }
 #endif
 
   vkCmdEndRenderPass(cmd);
+
+#if RKG_ENABLE_IMGUI
+  if (!rkg::debug_ui::render_inside_pass()) {
+    rkg::debug_ui::render(cmd);
+  }
+#endif
 
   return vkEndCommandBuffer(cmd) == VK_SUCCESS;
 }
@@ -1221,6 +1229,7 @@ bool vulkan_init(void* host) {
   hooks.window = g_state.window;
   hooks.queue_family = g_state.graphics_queue_family;
   hooks.image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
+  hooks.swapchain_format = static_cast<uint32_t>(g_state.swapchain_format);
   rkg::register_vulkan_hooks(&hooks);
 
   rkg::log::info("renderer:vulkan init");

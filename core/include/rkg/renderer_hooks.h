@@ -13,6 +13,7 @@ struct VulkanHooks {
   void* window = nullptr;
   uint32_t queue_family = 0;
   uint32_t image_count = 0;
+  uint32_t swapchain_format = 0;
 };
 
 void register_vulkan_hooks(const VulkanHooks* hooks);
