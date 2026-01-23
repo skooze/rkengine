@@ -908,12 +908,6 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
   }
 #endif
 
-  if (!renderer_plugin_.empty()) {
-    if (first_tick) {
-      rkg::log::info("tick: renderer update");
-    }
-    host_.update_plugin(renderer_plugin_, frame_dt);
-  }
   for (const auto& name : active_plugins_) {
     if (name == renderer_plugin_) continue;
     float dt = frame_dt;
@@ -923,6 +917,12 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       }
     }
     host_.update_plugin(name, dt);
+  }
+  if (!renderer_plugin_.empty()) {
+    if (first_tick) {
+      rkg::log::info("tick: renderer update");
+    }
+    host_.update_plugin(renderer_plugin_, frame_dt);
   }
 
   const bool manual_reload = manual_reload_requested_ || action_state("Reload").pressed;

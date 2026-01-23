@@ -1170,7 +1170,57 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 
 #if RKG_ENABLE_IMGUI
   if (!rkg::debug_ui::render_inside_pass()) {
+    VkImageMemoryBarrier to_color{};
+    to_color.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    to_color.srcAccessMask = 0;
+    to_color.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    to_color.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    to_color.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    to_color.image = g_state.swapchain_images[image_index];
+    to_color.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_color.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_color.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    to_color.subresourceRange.baseMipLevel = 0;
+    to_color.subresourceRange.levelCount = 1;
+    to_color.subresourceRange.baseArrayLayer = 0;
+    to_color.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &to_color);
+
     rkg::debug_ui::render(cmd);
+
+    VkImageMemoryBarrier to_present{};
+    to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    to_present.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    to_present.dstAccessMask = 0;
+    to_present.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    to_present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    to_present.image = g_state.swapchain_images[image_index];
+    to_present.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_present.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    to_present.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    to_present.subresourceRange.baseMipLevel = 0;
+    to_present.subresourceRange.levelCount = 1;
+    to_present.subresourceRange.baseArrayLayer = 0;
+    to_present.subresourceRange.layerCount = 1;
+    vkCmdPipelineBarrier(cmd,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &to_present);
   }
 #endif
 
