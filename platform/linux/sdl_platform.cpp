@@ -116,9 +116,10 @@ void install_sdl_logging() {
   static bool installed = false;
   if (installed) return;
   SDL_SetLogOutputFunction(sdl_log_output, nullptr);
-  SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_DEBUG);
-  SDL_SetLogPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_DEBUG);
-  SDL_SetLogPriority(SDL_LOG_CATEGORY_SYSTEM, SDL_LOG_PRIORITY_DEBUG);
+  SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_VIDEO, SDL_LOG_PRIORITY_VERBOSE);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_VERBOSE);
+  SDL_SetLogPriority(SDL_LOG_CATEGORY_SYSTEM, SDL_LOG_PRIORITY_VERBOSE);
   installed = true;
 }
 
@@ -280,8 +281,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!init_ok) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
-      if (err == "unknown error") {
-        err += format_errno();
+      const std::string errno_suffix = format_errno();
+      if (!errno_suffix.empty() && err.find("errno=") == std::string::npos) {
+        err += errno_suffix;
       }
       attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
@@ -302,8 +304,9 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!window) {
       const char* sdl_err = SDL_GetError();
       err = (sdl_err && *sdl_err) ? sdl_err : "unknown error";
-      if (err == "unknown error") {
-        err += format_errno();
+      const std::string errno_suffix = format_errno();
+      if (!errno_suffix.empty() && err.find("errno=") == std::string::npos) {
+        err += errno_suffix;
       }
       attempt_errors.push_back(last_driver + ": " + err);
       SDL_Quit();
