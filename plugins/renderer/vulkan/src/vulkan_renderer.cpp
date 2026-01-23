@@ -73,6 +73,16 @@ struct VulkanState {
 
 VulkanState g_state{};
 
+static bool g_log_steps = true;
+static int g_log_step_index = 0;
+
+static void log_step(const std::string& label) {
+  if (!g_log_steps) {
+    return;
+  }
+  rkg::log::info("renderer:vulkan step " + std::to_string(g_log_step_index++) + ": " + label);
+}
+
 bool create_viewport_pipeline();
 bool create_viewport_vertex_buffer();
 
@@ -1088,6 +1098,7 @@ void destroy_vulkan() {
 }
 
 bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
+  log_step("vkBeginCommandBuffer");
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
@@ -1127,6 +1138,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     offscreen_depth_to_attachment.subresourceRange.layerCount = 1;
 
     VkImageMemoryBarrier offscreen_barriers[] = {offscreen_color_to_attachment, offscreen_depth_to_attachment};
+    log_step("offscreen: pipeline barrier to attachment");
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
@@ -1156,6 +1168,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     offscreen_info.clearValueCount = 2;
     offscreen_info.pClearValues = offscreen_clears;
 
+    log_step("offscreen: begin render pass");
     vkCmdBeginRenderPass(cmd, &offscreen_info, VK_SUBPASS_CONTENTS_INLINE);
     const auto* draw_list = rkg::get_vulkan_viewport_draw_list();
     if (g_state.viewport_pipeline != VK_NULL_HANDLE && g_state.viewport_pipeline_layout != VK_NULL_HANDLE &&
@@ -1200,6 +1213,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
         vkCmdDraw(cmd, vertex_count, 1, 0, 0);
       }
     }
+    log_step("offscreen: end render pass");
     vkCmdEndRenderPass(cmd);
 
     // Ensure offscreen color attachment writes are visible to fragment sampling (ImGui viewport).
@@ -1217,6 +1231,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     offscreen_barrier.subresourceRange.levelCount = 1;
     offscreen_barrier.subresourceRange.baseArrayLayer = 0;
     offscreen_barrier.subresourceRange.layerCount = 1;
+    log_step("offscreen: barrier to shader read");
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -1256,6 +1271,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     to_color.subresourceRange.levelCount = 1;
     to_color.subresourceRange.baseArrayLayer = 0;
     to_color.subresourceRange.layerCount = 1;
+    log_step("swapchain: barrier to color attachment");
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1282,6 +1298,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     render_pass_info.clearValueCount = 1;
     render_pass_info.pClearValues = &clear_color;
 
+    log_step("swapchain: begin render pass");
     vkCmdBeginRenderPass(cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment clear_attachment{};
@@ -1296,11 +1313,14 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                         static_cast<int32_t>(g_state.swapchain_extent.height / 4)};
     rect.rect.extent = {g_state.swapchain_extent.width / 2, g_state.swapchain_extent.height / 2};
 
+    log_step("swapchain: clear attachments");
     vkCmdClearAttachments(cmd, 1, &clear_attachment, 1, &rect);
 
 #if RKG_ENABLE_IMGUI
+    log_step("imgui: render inside pass");
     rkg::debug_ui::render(cmd);
 #endif
+    log_step("swapchain: end render pass");
     vkCmdEndRenderPass(cmd);
     if (image_index < g_state.swapchain_image_layouts.size()) {
       g_state.swapchain_image_layouts[image_index] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -1336,6 +1356,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     to_color.subresourceRange.levelCount = 1;
     to_color.subresourceRange.baseArrayLayer = 0;
     to_color.subresourceRange.layerCount = 1;
+    log_step("dynamic rendering: barrier to color attachment");
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -1367,8 +1388,13 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       rkg::log::warn("debug_ui render skipped: dynamic rendering entrypoints missing");
       return vkEndCommandBuffer(cmd) == VK_SUCCESS;
     }
+    log_step("dynamic rendering: begin");
     g_state.cmd_begin_rendering(cmd, &rendering_info);
+#if RKG_ENABLE_IMGUI
+    log_step("imgui: render dynamic");
+#endif
     rkg::debug_ui::render(cmd);
+    log_step("dynamic rendering: end");
     g_state.cmd_end_rendering(cmd);
 
     VkImageMemoryBarrier to_present{};
@@ -1385,6 +1411,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     to_present.subresourceRange.levelCount = 1;
     to_present.subresourceRange.baseArrayLayer = 0;
     to_present.subresourceRange.layerCount = 1;
+    log_step("dynamic rendering: barrier to present");
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
@@ -1402,11 +1429,13 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
   }
 #endif
 
+  log_step("vkEndCommandBuffer");
   return vkEndCommandBuffer(cmd) == VK_SUCCESS;
 }
 
 bool draw_frame() {
   static bool logged_state = false;
+  log_step("draw_frame: wait fence");
   vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
   vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
 
@@ -1432,6 +1461,7 @@ bool draw_frame() {
     logged_state = true;
   }
 
+  log_step("vkAcquireNextImageKHR");
   uint32_t image_index = 0;
   VkResult result = vkAcquireNextImageKHR(
       g_state.device, g_state.swapchain, UINT64_MAX, g_state.image_available, VK_NULL_HANDLE, &image_index);
@@ -1452,6 +1482,7 @@ bool draw_frame() {
     return false;
   }
 
+  log_step("vkResetCommandBuffer");
   vkResetCommandBuffer(g_state.command_buffers[image_index], 0);
   if (!record_command_buffer(g_state.command_buffers[image_index], image_index)) {
     rkg::commit_vulkan_viewport_request();
@@ -1472,6 +1503,7 @@ bool draw_frame() {
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = signal_semaphores;
 
+  log_step("vkQueueSubmit");
   if (vkQueueSubmit(g_state.graphics_queue, 1, &submit_info, g_state.in_flight_fence) != VK_SUCCESS) {
     rkg::commit_vulkan_viewport_request();
     return false;
@@ -1485,8 +1517,12 @@ bool draw_frame() {
   present_info.pSwapchains = &g_state.swapchain;
   present_info.pImageIndices = &image_index;
 
+  log_step("vkQueuePresentKHR");
   result = vkQueuePresentKHR(g_state.present_queue, &present_info);
   rkg::commit_vulkan_viewport_request();
+  if (result == VK_SUCCESS) {
+    g_log_steps = false;
+  }
   return result == VK_SUCCESS;
 }
 

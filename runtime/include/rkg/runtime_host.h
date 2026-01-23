@@ -27,6 +27,7 @@ struct RuntimeHostInit {
   std::string app_name = "rkg_app";
   rkg::platform::WindowDesc window{};
   bool force_debug_ui = false;
+  bool disable_debug_ui = false;
 };
 
 struct FrameParams {
@@ -90,7 +91,7 @@ class RuntimeHost {
   rkg::input::InputSystem& input() { return input_; }
 
  private:
-  void setup_plugins(bool force_debug_ui, std::string& error);
+  void setup_plugins(bool force_debug_ui, bool disable_debug_ui, std::string& error);
   void handle_reload(bool manual_requested);
   bool reload_content(bool raw_changed, const std::string& reason);
   void reset_runtime();

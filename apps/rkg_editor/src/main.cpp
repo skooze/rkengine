@@ -6,6 +6,7 @@
 #include "subprocess_runner.h"
 
 #include "rkg/log.h"
+#include "rkg/paths.h"
 #include "rkg/renderer_hooks.h"
 
 #include <algorithm>
@@ -3714,11 +3715,39 @@ void draw_editor_ui(void* user_data) {
 
 int main(int argc, char** argv) {
   std::optional<fs::path> project_override;
+  bool disable_ui = false;
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "--project" && i + 1 < argc) {
       project_override = fs::path(argv[++i]);
+    } else if (arg == "--no-ui" || arg == "--disable-debug-ui") {
+      disable_ui = true;
     }
+  }
+
+  if (!project_override.has_value()) {
+    const auto paths = rkg::resolve_paths(argc > 0 ? argv[0] : nullptr, std::nullopt, "demo_game");
+    const fs::path blank_root = paths.root / "build" / "blank_project";
+    std::error_code ec;
+    fs::create_directories(blank_root / "content" / "levels", ec);
+    const fs::path project_path = blank_root / "project.yaml";
+    if (!fs::exists(project_path)) {
+      std::ofstream out(project_path);
+      out << "project:\n";
+      out << "  name: blank_project\n";
+      out << "  renderer: vulkan\n";
+      out << "  plugins:\n";
+      out << "    - debug_ui_imgui\n";
+      out << "  initial_level: content/levels/blank.yaml\n";
+      out << "  dev_mode: true\n";
+    }
+    const fs::path level_path = blank_root / "content" / "levels" / "blank.yaml";
+    if (!fs::exists(level_path)) {
+      std::ofstream level_out(level_path);
+      level_out << "name: blank\n";
+      level_out << "entities: []\n";
+    }
+    project_override = blank_root;
   }
 
   rkg::runtime::RuntimeHost runtime;
@@ -3728,7 +3757,8 @@ int main(int argc, char** argv) {
   init.default_project = "demo_game";
   init.app_name = "rkg_editor";
   init.window = {1600, 900, "rkg_editor"};
-  init.force_debug_ui = true;
+  init.force_debug_ui = !disable_ui;
+  init.disable_debug_ui = disable_ui;
 
   std::string error;
   if (!runtime.init(init, error)) {
@@ -3737,16 +3767,20 @@ int main(int argc, char** argv) {
   }
 
 #if RKG_EDITOR_IMGUI
-  rkg::debug_ui::set_show_builtin(false);
-  rkg::debug_ui::set_docking_enabled(true);
+  if (!disable_ui) {
+    rkg::debug_ui::set_show_builtin(false);
+    rkg::debug_ui::set_docking_enabled(true);
 
-  EditorState state;
-  state.runtime = &runtime;
-  state.agent.openai_available = openai_available(state.agent.openai_error);
-  state.overrides.path = runtime.project_root() / "editor_overrides.yaml";
-  sync_overrides_state(state);
+    EditorState state;
+    state.runtime = &runtime;
+    state.agent.openai_available = openai_available(state.agent.openai_error);
+    state.overrides.path = runtime.project_root() / "editor_overrides.yaml";
+    sync_overrides_state(state);
 
-  rkg::debug_ui::set_draw_callback(&draw_editor_ui, &state);
+    rkg::debug_ui::set_draw_callback(&draw_editor_ui, &state);
+  } else {
+    rkg::log::warn("debug_ui disabled via --no-ui");
+  }
 #else
   rkg::log::error("rkg_editor requires ImGui + Vulkan (RKG_ENABLE_IMGUI && RKG_ENABLE_VULKAN)");
   runtime.shutdown();

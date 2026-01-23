@@ -727,7 +727,7 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
     return false;
   }
 
-  setup_plugins(init.force_debug_ui, error);
+  setup_plugins(init.force_debug_ui, init.disable_debug_ui, error);
   if (!error.empty()) {
     return false;
   }
@@ -780,7 +780,7 @@ void RuntimeHost::shutdown() {
   rkg::log::shutdown();
 }
 
-void RuntimeHost::setup_plugins(bool force_debug_ui, std::string& error) {
+void RuntimeHost::setup_plugins(bool force_debug_ui, bool disable_debug_ui, std::string& error) {
   host_.register_plugin(rkg_plugin_get_api_renderer_null(rkg::kRkgPluginApiVersion));
 #if RKG_ENABLE_D3D12
   host_.register_plugin(rkg_plugin_get_api_renderer_d3d12(rkg::kRkgPluginApiVersion));
@@ -842,11 +842,17 @@ void RuntimeHost::setup_plugins(bool force_debug_ui, std::string& error) {
 
   active_plugins_ = project_.plugins;
 #if RKG_ENABLE_IMGUI
-  debug_ui_requested_ = std::find(active_plugins_.begin(), active_plugins_.end(), "debug_ui_imgui") !=
-                        active_plugins_.end();
-  if (force_debug_ui && !debug_ui_requested_) {
-    active_plugins_.push_back("debug_ui_imgui");
-    debug_ui_requested_ = true;
+  if (disable_debug_ui) {
+    active_plugins_.erase(std::remove(active_plugins_.begin(), active_plugins_.end(), "debug_ui_imgui"),
+                          active_plugins_.end());
+    debug_ui_requested_ = false;
+  } else {
+    debug_ui_requested_ = std::find(active_plugins_.begin(), active_plugins_.end(), "debug_ui_imgui") !=
+                          active_plugins_.end();
+    if (force_debug_ui && !debug_ui_requested_) {
+      active_plugins_.push_back("debug_ui_imgui");
+      debug_ui_requested_ = true;
+    }
   }
 #endif
 
