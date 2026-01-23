@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 #include <cstdlib>
 #include <pwd.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string>
@@ -46,6 +47,16 @@ std::string list_video_drivers() {
     list += name;
   }
   return list.empty() ? "none" : list;
+}
+
+bool have_shared_lib(const char* name) {
+  if (!name || !*name) return false;
+  void* handle = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
+  if (!handle) {
+    return false;
+  }
+  dlclose(handle);
+  return true;
 }
 
 #ifndef SDL_HINT_INPUT_LINUXEV
@@ -184,6 +195,16 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     }
   }
   const bool have_x11 = (display && *display);
+  if (have_wayland) {
+    if (!have_shared_lib("libwayland-client.so.0")) {
+      rkg::log::warn("Wayland display detected but libwayland-client.so.0 is missing.");
+    }
+  }
+  if (have_x11) {
+    if (!have_shared_lib("libX11.so.6")) {
+      rkg::log::warn("X11 display detected but libX11.so.6 is missing.");
+    }
+  }
   if (have_wayland) {
     fallback_drivers.push_back("wayland");
   }
