@@ -96,6 +96,12 @@ void log_rlimit_nofile() {
     rkg::log::info(std::string("RLIMIT_NOFILE: ") + std::to_string(lim.rlim_cur) +
                    "/" + std::to_string(lim.rlim_max));
   }
+#ifdef RLIMIT_NPROC
+  if (getrlimit(RLIMIT_NPROC, &lim) == 0) {
+    rkg::log::info(std::string("RLIMIT_NPROC: ") + std::to_string(lim.rlim_cur) +
+                   "/" + std::to_string(lim.rlim_max));
+  }
+#endif
 }
 
 #ifndef SDL_HINT_INPUT_LINUXEV
