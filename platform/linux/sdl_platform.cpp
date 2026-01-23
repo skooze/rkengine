@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <cerrno>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <pwd.h>
@@ -61,6 +62,18 @@ bool have_shared_lib(const char* name) {
   }
   dlclose(handle);
   return true;
+}
+
+std::string x11_socket_path(const char* display) {
+  if (!display || *display != ':') return "";
+  const char* p = display + 1;
+  int num = 0;
+  if (!std::isdigit(static_cast<unsigned char>(*p))) return "";
+  while (std::isdigit(static_cast<unsigned char>(*p))) {
+    num = (num * 10) + (*p - '0');
+    ++p;
+  }
+  return std::string("/tmp/.X11-unix/X") + std::to_string(num);
 }
 
 #ifndef SDL_HINT_INPUT_LINUXEV
@@ -207,6 +220,16 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     }
   }
   const bool have_x11 = (display && *display);
+  if (have_x11) {
+    const std::string x_sock = x11_socket_path(display);
+    if (!x_sock.empty()) {
+      if (access(x_sock.c_str(), R_OK | W_OK) != 0) {
+        rkg::log::warn(std::string("X11 socket not accessible: ") + x_sock + format_errno());
+      }
+    } else {
+      rkg::log::warn(std::string("Unrecognized DISPLAY format: ") + display);
+    }
+  }
   if (have_wayland) {
     if (!have_shared_lib("libwayland-client.so.0")) {
       rkg::log::warn("Wayland display detected but libwayland-client.so.0 is missing.");
