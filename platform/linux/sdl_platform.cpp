@@ -28,9 +28,38 @@ KeyCode map_sdl_scancode(SDL_Scancode scancode) {
   }
 }
 
+namespace {
+
+std::string list_video_drivers() {
+  const int count = SDL_GetNumVideoDrivers();
+  if (count <= 0) return "none";
+  std::string list;
+  for (int i = 0; i < count; ++i) {
+    const char* name = SDL_GetVideoDriver(i);
+    if (!name) continue;
+    if (!list.empty()) list += ", ";
+    list += name;
+  }
+  return list.empty() ? "none" : list;
+}
+
+} // namespace
+
 bool platform_init(Platform* self, const WindowDesc& desc) {
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    rkg::log::error(std::string("SDL_Init failed: ") + SDL_GetError());
+  SDL_SetMainReady();
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+    const char* err = SDL_GetError();
+    if (!err || !*err) {
+      err = "unknown error";
+    }
+    rkg::log::error(std::string("SDL_Init failed: ") + err);
+    rkg::log::error(std::string("SDL video drivers: ") + list_video_drivers());
+    const char* display = SDL_getenv("DISPLAY");
+    const char* wayland = SDL_getenv("WAYLAND_DISPLAY");
+    const char* session = SDL_getenv("XDG_SESSION_TYPE");
+    rkg::log::error(std::string("Env DISPLAY=") + (display ? display : "") +
+                    " WAYLAND_DISPLAY=" + (wayland ? wayland : "") +
+                    " XDG_SESSION_TYPE=" + (session ? session : ""));
     return false;
   }
 
