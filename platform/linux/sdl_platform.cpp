@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/resource.h>
 #include <string>
 #include <vector>
 
@@ -87,6 +88,14 @@ std::string format_mode(mode_t mode) {
   return out;
 }
 
+void log_rlimit_nofile() {
+  struct rlimit lim;
+  if (getrlimit(RLIMIT_NOFILE, &lim) == 0) {
+    rkg::log::info(std::string("RLIMIT_NOFILE: ") + std::to_string(lim.rlim_cur) +
+                   "/" + std::to_string(lim.rlim_max));
+  }
+}
+
 #ifndef SDL_HINT_INPUT_LINUXEV
 #define SDL_HINT_INPUT_LINUXEV "SDL_INPUT_LINUXEV"
 #endif
@@ -130,6 +139,8 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
       }
     }
   }
+
+  log_rlimit_nofile();
 
   const char* env_driver = std::getenv("SDL_VIDEODRIVER");
   const char* env_linuxev = std::getenv("SDL_INPUT_LINUXEV");
@@ -264,10 +275,37 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (!have_shared_lib("libwayland-client.so.0")) {
       rkg::log::warn("Wayland display detected but libwayland-client.so.0 is missing.");
     }
+    if (!have_shared_lib("libxkbcommon.so.0")) {
+      rkg::log::warn("Wayland display detected but libxkbcommon.so.0 is missing.");
+    }
+    if (!have_shared_lib("libdecor-0.so.0")) {
+      rkg::log::warn("Wayland display detected but libdecor-0.so.0 is missing.");
+    }
   }
   if (have_x11) {
     if (!have_shared_lib("libX11.so.6")) {
       rkg::log::warn("X11 display detected but libX11.so.6 is missing.");
+    }
+    if (!have_shared_lib("libXcursor.so.1")) {
+      rkg::log::warn("X11 display detected but libXcursor.so.1 is missing.");
+    }
+    if (!have_shared_lib("libXrandr.so.2")) {
+      rkg::log::warn("X11 display detected but libXrandr.so.2 is missing.");
+    }
+    if (!have_shared_lib("libXi.so.6")) {
+      rkg::log::warn("X11 display detected but libXi.so.6 is missing.");
+    }
+    if (!have_shared_lib("libXext.so.6")) {
+      rkg::log::warn("X11 display detected but libXext.so.6 is missing.");
+    }
+    if (!have_shared_lib("libXfixes.so.3")) {
+      rkg::log::warn("X11 display detected but libXfixes.so.3 is missing.");
+    }
+    if (!have_shared_lib("libXrender.so.1")) {
+      rkg::log::warn("X11 display detected but libXrender.so.1 is missing.");
+    }
+    if (!have_shared_lib("libxcb.so.1")) {
+      rkg::log::warn("X11 display detected but libxcb.so.1 is missing.");
     }
   }
   if (have_wayland) {
