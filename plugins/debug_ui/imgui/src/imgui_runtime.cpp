@@ -27,6 +27,7 @@ namespace {
 struct DebugUiState {
   bool initialized = false;
   bool visible = true;
+  bool has_draw_data = false;
   bool force_reload = false;
   bool show_builtin = true;
   bool docking_enabled = false;
@@ -235,6 +236,7 @@ bool init_vulkan() {
 
   upload_fonts();
   g_state.initialized = true;
+  g_state.has_draw_data = false;
   return true;
 }
 
@@ -249,6 +251,7 @@ void shutdown() {
     g_state.descriptor_pool = VK_NULL_HANDLE;
   }
   g_state.initialized = false;
+  g_state.has_draw_data = false;
 }
 
 void new_frame(float dt_seconds) {
@@ -358,13 +361,18 @@ void new_frame(float dt_seconds) {
   }
 
   ImGui::Render();
+  g_state.has_draw_data = true;
 }
 
 void render(VkCommandBuffer cmd) {
-  if (!g_state.initialized || !g_state.visible) {
+  if (!g_state.initialized || !g_state.visible || !g_state.has_draw_data) {
     return;
   }
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+  ImDrawData* draw_data = ImGui::GetDrawData();
+  if (!draw_data || !draw_data->Valid || draw_data->CmdListsCount == 0) {
+    return;
+  }
+  ImGui_ImplVulkan_RenderDrawData(draw_data, cmd);
 }
 
 void set_visible(bool visible) {
