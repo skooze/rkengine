@@ -369,10 +369,23 @@ bool init_vulkan() {
   g_state.swapchain_format = hooks->swapchain_format != 0
                                  ? static_cast<VkFormat>(hooks->swapchain_format)
                                  : VK_FORMAT_UNDEFINED;
+  rkg::log::info("debug_ui: swapchain_format=" + std::to_string(static_cast<int>(g_state.swapchain_format)));
   const bool has_render_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
-  g_state.render_inside_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
-  const bool use_dynamic_rendering =
-      !g_state.render_inside_pass && has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_dynamic_rendering = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_color_format = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_pipeline_rendering = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool can_render_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
+  const bool can_dynamic_rendering = has_dynamic_rendering && has_color_format && has_pipeline_rendering;
+  g_state.render_inside_pass = can_render_pass;
+  const bool use_dynamic_rendering = !g_state.render_inside_pass && can_dynamic_rendering;
+  rkg::log::info(std::string("debug_ui: backend caps render_pass=") + (has_render_pass ? "yes" : "no") +
+                 " dynamic=" + (has_dynamic_rendering ? "yes" : "no") +
+                 " color_format=" + (has_color_format ? "yes" : "no") +
+                 " pipeline_rendering=" + (has_pipeline_rendering ? "yes" : "no"));
+  if (!can_render_pass && !can_dynamic_rendering) {
+    rkg::log::warn("debug_ui: ImGui Vulkan backend lacks render pass and dynamic rendering support");
+    return false;
+  }
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -428,6 +441,9 @@ bool init_vulkan() {
 #endif
   rkg::log::info(std::string("debug_ui: render path ") +
                  (g_state.render_inside_pass ? "render_pass" : "dynamic_rendering"));
+  if (!g_state.render_inside_pass) {
+    rkg::log::info("debug_ui: dynamic rendering scope owned by renderer");
+  }
 
   g_state.initialized = true;
   g_state.has_draw_data = false;

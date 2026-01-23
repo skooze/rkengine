@@ -1365,16 +1365,39 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          1,
                          &to_color);
 
-    // ImGui backend owns vkCmdBeginRendering/vkCmdEndRendering when using dynamic rendering.
-    // Do not start a rendering scope here to avoid nested begin/end on some drivers.
+    VkClearValue clear_color{};
+    clear_color.color = {{0.02f, 0.02f, 0.05f, 1.0f}};
+
+    VkRenderingAttachmentInfo color_attach{};
+    color_attach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+    color_attach.pNext = nullptr;
+    color_attach.imageView = g_state.swapchain_image_views[image_index];
+    color_attach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attach.clearValue = clear_color;
+
+    VkRenderingInfo rendering_info{};
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+    rendering_info.pNext = nullptr;
+    rendering_info.renderArea.offset = {0, 0};
+    rendering_info.renderArea.extent = g_state.swapchain_extent;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attach;
+
     if (!g_state.cmd_begin_rendering || !g_state.cmd_end_rendering) {
       rkg::log::warn("debug_ui render skipped: dynamic rendering entrypoints missing");
       return vkEndCommandBuffer(cmd) == VK_SUCCESS;
     }
 #if RKG_ENABLE_IMGUI
-    log_step("imgui: render dynamic (backend begin/end)");
+    log_step("dynamic rendering: begin (renderer)");
 #endif
+    g_state.cmd_begin_rendering(cmd, &rendering_info);
+    log_step("imgui: render dynamic");
     rkg::debug_ui::render(cmd);
+    log_step("dynamic rendering: end (renderer)");
+    g_state.cmd_end_rendering(cmd);
 
     VkImageMemoryBarrier to_present{};
     to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
