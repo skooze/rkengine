@@ -145,16 +145,13 @@ static const uint32_t rkg_viewport_frag_spv[] = {
 };
 
 bool create_instance() {
-  uint32_t ext_count = 0;
-  if (!SDL_Vulkan_GetInstanceExtensions(g_state.window, &ext_count, nullptr)) {
+  Uint32 ext_count = 0;
+  const char* const* ext_list = SDL_Vulkan_GetInstanceExtensions(&ext_count);
+  if (!ext_list || ext_count == 0) {
     rkg::log::error("SDL_Vulkan_GetInstanceExtensions failed");
     return false;
   }
-  std::vector<const char*> extensions(ext_count);
-  if (!SDL_Vulkan_GetInstanceExtensions(g_state.window, &ext_count, extensions.data())) {
-    rkg::log::error("SDL_Vulkan_GetInstanceExtensions failed");
-    return false;
-  }
+  std::vector<const char*> extensions(ext_list, ext_list + ext_count);
 
   VkApplicationInfo app_info{};
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -175,7 +172,7 @@ bool create_instance() {
 }
 
 bool create_surface() {
-  if (!SDL_Vulkan_CreateSurface(g_state.window, g_state.instance, &g_state.surface)) {
+  if (!SDL_Vulkan_CreateSurface(g_state.window, g_state.instance, nullptr, &g_state.surface)) {
     rkg::log::error("SDL_Vulkan_CreateSurface failed");
     return false;
   }

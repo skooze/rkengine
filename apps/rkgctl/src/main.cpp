@@ -2952,7 +2952,7 @@ bool compute_file_changes(const json& baseline_ctx,
                           const fs::path& root,
                           const fs::path& dir,
                           size_t cap,
-                          const char* list_key,
+                          const std::string& list_key,
                           FileChangeSummary& out,
                           FileListMeta& current_meta) {
   if (!baseline_ctx.contains(list_key) || !baseline_ctx[list_key].is_array()) {
