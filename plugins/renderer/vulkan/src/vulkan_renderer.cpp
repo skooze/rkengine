@@ -1170,6 +1170,11 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 
 #if RKG_ENABLE_IMGUI
   if (!rkg::debug_ui::render_inside_pass()) {
+    if (!g_state.dynamic_rendering_enabled) {
+      rkg::log::warn("debug_ui render skipped: dynamic rendering not enabled");
+      return vkEndCommandBuffer(cmd) == VK_SUCCESS;
+    }
+
     VkImageMemoryBarrier to_color{};
     to_color.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     to_color.srcAccessMask = 0;
@@ -1195,7 +1200,24 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
                          1,
                          &to_color);
 
+    VkRenderingAttachmentInfo color_attach{};
+    color_attach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    color_attach.imageView = g_state.swapchain_image_views[image_index];
+    color_attach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo rendering_info{};
+    rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    rendering_info.renderArea.offset = {0, 0};
+    rendering_info.renderArea.extent = g_state.swapchain_extent;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attach;
+
+    vkCmdBeginRendering(cmd, &rendering_info);
     rkg::debug_ui::render(cmd);
+    vkCmdEndRendering(cmd);
 
     VkImageMemoryBarrier to_present{};
     to_present.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
