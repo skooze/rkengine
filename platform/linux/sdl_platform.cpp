@@ -48,23 +48,18 @@ std::string list_video_drivers() {
 } // namespace
 
 bool platform_init(Platform* self, const WindowDesc& desc) {
-  const Uint32 init_flags = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+  const Uint32 init_flags = SDL_INIT_VIDEO;
   Uint32 window_flags = SDL_WINDOW_RESIZABLE;
 #if RKG_ENABLE_VULKAN
   window_flags |= SDL_WINDOW_VULKAN;
 #endif
   const char* env_driver = SDL_getenv("SDL_VIDEODRIVER");
   std::string err;
-  auto try_init_with_driver = [&](const char* driver, bool disable_evdev) -> bool {
+  auto try_init_with_driver = [&](const char* driver) -> bool {
     if (driver && *driver) {
       setenv("SDL_VIDEODRIVER", driver, 1);
     } else {
       unsetenv("SDL_VIDEODRIVER");
-    }
-    if (disable_evdev) {
-      setenv("SDL_INPUT_LINUXEV", "0", 1);
-    } else {
-      unsetenv("SDL_INPUT_LINUXEV");
     }
     if (SDL_Init(init_flags) != 0) {
       const char* sdl_err = SDL_GetError();
@@ -85,7 +80,26 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     return true;
   };
 
-  if (try_init_with_driver(env_driver, false)) {
+  auto init_events = [&](bool disable_evdev) -> bool {
+    if (disable_evdev) {
+      setenv("SDL_INPUT_LINUXEV", "0", 1);
+    } else {
+      unsetenv("SDL_INPUT_LINUXEV");
+    }
+    if (SDL_InitSubSystem(SDL_INIT_EVENTS) != 0) {
+      const char* sdl_err = SDL_GetError();
+      rkg::log::warn(std::string("SDL_InitSubSystem(SDL_INIT_EVENTS) failed: ") +
+                     ((sdl_err && *sdl_err) ? sdl_err : "unknown error"));
+      SDL_ClearError();
+      return false;
+    }
+    return true;
+  };
+
+  if (try_init_with_driver(env_driver)) {
+    if (!init_events(false)) {
+      init_events(true);
+    }
     return true;
   }
 
@@ -99,23 +113,11 @@ bool platform_init(Platform* self, const WindowDesc& desc) {
     if (env_driver && *env_driver && std::string(env_driver) == driver) {
       continue;
     }
-    if (try_init_with_driver(driver, false)) {
+    if (try_init_with_driver(driver)) {
       rkg::log::warn(std::string("SDL_Init failed, recovered by forcing video driver: ") + driver);
-      return true;
-    }
-  }
-
-  if (try_init_with_driver(env_driver, true)) {
-    rkg::log::warn("SDL_Init recovered by disabling evdev input");
-    return true;
-  }
-
-  for (const char* driver : fallback_drivers) {
-    if (env_driver && *env_driver && std::string(env_driver) == driver) {
-      continue;
-    }
-    if (try_init_with_driver(driver, true)) {
-      rkg::log::warn(std::string("SDL_Init recovered by disabling evdev input and forcing video driver: ") + driver);
+      if (!init_events(false)) {
+        init_events(true);
+      }
       return true;
     }
   }
@@ -142,6 +144,9 @@ void platform_shutdown(Platform* self) {
 }
 
 void platform_poll_events(Platform* self) {
+  if ((SDL_WasInit(SDL_INIT_EVENTS) & SDL_INIT_EVENTS) == 0) {
+    return;
+  }
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (self->event_callback_) {
