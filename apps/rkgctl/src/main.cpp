@@ -1575,7 +1575,6 @@ StageResult stage_commit_overrides(const fs::path& root,
   std::string selector_type = "all";
   std::string selector_value;
   std::string selector_warning;
-  bool use_name_selector = false;
   if (entity_id.has_value() && !entity_id->empty()) {
     selector_type = "id";
     selector_value = entity_id.value();
@@ -1583,7 +1582,6 @@ StageResult stage_commit_overrides(const fs::path& root,
     selector_type = "name";
     selector_value = entity_name.value();
     selector_warning = "Staging by name is less reliable; add id to level YAML for stability.";
-    use_name_selector = true;
   }
 
   std::vector<std::pair<std::string, YAML::Node>> override_entries;

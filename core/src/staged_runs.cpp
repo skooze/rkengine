@@ -13,6 +13,7 @@
 namespace rkg {
 namespace fs = std::filesystem;
 
+#if !RKG_ENABLE_DATA_JSON
 static std::string read_text_file(const fs::path& path) {
   std::ifstream in(path, std::ios::binary);
   if (!in) return {};
@@ -20,6 +21,7 @@ static std::string read_text_file(const fs::path& path) {
   ss << in.rdbuf();
   return ss.str();
 }
+#endif
 
 static bool results_is_stage(const fs::path& results_path) {
 #if RKG_ENABLE_DATA_JSON

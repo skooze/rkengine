@@ -1137,8 +1137,10 @@ const char* mesh_id_label(rkg::ecs::MeshId mesh) {
       return "cube";
     case rkg::ecs::MeshId::Quad:
       return "quad";
+    case rkg::ecs::MeshId::Unknown:
+      return "unknown";
   }
-  return "cube";
+  return "unknown";
 }
 
 bool parse_mesh_id_text(const std::string& value, rkg::ecs::MeshId& out) {
@@ -2231,7 +2233,10 @@ bool draw_diff_entries_viewer(std::vector<DiffPreviewEntry>& entries,
 void build_dock_layout(EditorState& state) {
   ImGuiID dockspace_id = ImGui::GetID("EditorDockspace");
   ImGui::DockBuilderRemoveNode(dockspace_id);
-  ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_PassthruCentralNode);
+  ImGuiDockNodeFlags dock_flags =
+      static_cast<ImGuiDockNodeFlags>(ImGuiDockNodeFlags_DockSpace) |
+      static_cast<ImGuiDockNodeFlags>(ImGuiDockNodeFlags_PassthruCentralNode);
+  ImGui::DockBuilderAddNode(dockspace_id, dock_flags);
   ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->Size);
 
   ImGuiID dock_main = dockspace_id;

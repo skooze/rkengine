@@ -1823,6 +1823,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 bool draw_frame() {
   static bool logged_state = false;
   static bool logged_defer = false;
+  static bool logged_rebuild = false;
 
   if (g_state.device_lost) {
     rkg::log::error("renderer:vulkan device lost; skipping frame");
@@ -1846,12 +1847,16 @@ bool draw_frame() {
       return true;
     }
     logged_defer = false;
-    rkg::log::warn("renderer:vulkan swapchain rebuild requested");
+    if (!logged_rebuild) {
+      rkg::log::warn("renderer:vulkan swapchain rebuild requested");
+      logged_rebuild = true;
+    }
     if (!recreate_swapchain()) {
       rkg::log::warn("renderer:vulkan swapchain rebuild failed; will retry");
       return true;
     }
     g_state.swapchain_needs_rebuild = false;
+    logged_rebuild = false;
     return true;
   }
 
