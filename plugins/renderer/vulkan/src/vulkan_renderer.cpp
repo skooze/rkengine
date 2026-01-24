@@ -999,7 +999,7 @@ bool recreate_swapchain() {
   if (g_state.device == VK_NULL_HANDLE || g_state.surface == VK_NULL_HANDLE) {
     return false;
   }
-  vkDeviceWaitIdle(g_state.device);
+  // draw_frame already waited for the in-flight fence; avoid device-wide stalls here.
   destroy_swapchain();
   if (!create_swapchain()) return false;
   if (!create_render_pass()) return false;
@@ -1495,6 +1495,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 
 bool draw_frame() {
   static bool logged_state = false;
+  static bool logged_defer = false;
   log_step("draw_frame: wait fence");
   vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
   vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
@@ -1502,6 +1503,18 @@ bool draw_frame() {
   update_offscreen_target();
 
   if (g_state.swapchain_needs_rebuild) {
+    int w = 0;
+    int h = 0;
+    SDL_GetWindowSize(g_state.window, &w, &h);
+    if (w == 0 || h == 0) {
+      if (!logged_defer) {
+        rkg::log::warn("renderer:vulkan swapchain rebuild deferred (window size 0)");
+        logged_defer = true;
+      }
+      rkg::commit_vulkan_viewport_request();
+      return true;
+    }
+    logged_defer = false;
     rkg::log::warn("renderer:vulkan swapchain rebuild requested");
     if (!recreate_swapchain()) {
       rkg::log::error("renderer:vulkan swapchain rebuild failed");
