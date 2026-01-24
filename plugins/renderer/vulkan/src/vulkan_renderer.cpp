@@ -748,7 +748,7 @@ bool create_viewport_pipeline() {
   raster.rasterizerDiscardEnable = VK_FALSE;
   raster.polygonMode = VK_POLYGON_MODE_FILL;
   raster.lineWidth = 1.0f;
-  raster.cullMode = VK_CULL_MODE_BACK_BIT;
+  raster.cullMode = VK_CULL_MODE_NONE;
   raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   raster.depthBiasEnable = VK_FALSE;
 
