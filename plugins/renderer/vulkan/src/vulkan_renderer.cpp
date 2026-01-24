@@ -559,7 +559,9 @@ bool create_offscreen(uint32_t width, uint32_t height) {
   attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  // Keep the offscreen color attachment in COLOR_ATTACHMENT_OPTIMAL after the render pass.
+  // We explicitly transition it to SHADER_READ_ONLY_OPTIMAL with a pipeline barrier below.
+  attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   attachments[1].format = g_state.offscreen_depth_format;
   attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
