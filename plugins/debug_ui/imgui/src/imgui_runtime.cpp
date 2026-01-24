@@ -122,6 +122,56 @@ constexpr bool has_pipeline_rendering_member() {
 }
 
 template <typename T>
+constexpr bool has_pipeline_info_main_member() {
+  return requires { &T::PipelineInfoMain; };
+}
+
+template <typename T>
+constexpr bool has_pipeline_info_viewports_member() {
+  return requires { &T::PipelineInfoForViewports; };
+}
+
+template <typename T>
+constexpr bool pipeline_info_has_render_pass() {
+  if constexpr (has_pipeline_info_main_member<T>()) {
+    using PipelineInfo = decltype(std::declval<T&>().PipelineInfoMain);
+    return requires { &PipelineInfo::RenderPass; };
+  } else {
+    return false;
+  }
+}
+
+template <typename T>
+constexpr bool pipeline_info_has_subpass() {
+  if constexpr (has_pipeline_info_main_member<T>()) {
+    using PipelineInfo = decltype(std::declval<T&>().PipelineInfoMain);
+    return requires { &PipelineInfo::Subpass; };
+  } else {
+    return false;
+  }
+}
+
+template <typename T>
+constexpr bool pipeline_info_has_msaa() {
+  if constexpr (has_pipeline_info_main_member<T>()) {
+    using PipelineInfo = decltype(std::declval<T&>().PipelineInfoMain);
+    return requires { &PipelineInfo::MSAASamples; };
+  } else {
+    return false;
+  }
+}
+
+template <typename T>
+constexpr bool pipeline_info_has_pipeline_rendering() {
+  if constexpr (has_pipeline_info_main_member<T>()) {
+    using PipelineInfo = decltype(std::declval<T&>().PipelineInfoMain);
+    return requires { &PipelineInfo::PipelineRenderingCreateInfo; };
+  } else {
+    return false;
+  }
+}
+
+template <typename T>
 void set_render_pass(T& info, VkRenderPass pass) {
   if constexpr (has_render_pass_member<T>()) {
     info.RenderPass = pass;
@@ -153,6 +203,15 @@ template <typename T>
 void set_pipeline_rendering_info(T& info, VkPipelineRenderingCreateInfo* rendering_info) {
   if constexpr (has_pipeline_rendering_member<T>()) {
     info.PipelineRenderingCreateInfo = rendering_info;
+  }
+}
+
+template <typename PipelineInfo>
+void set_pipeline_rendering_info_struct(PipelineInfo& info, const VkPipelineRenderingCreateInfo& rendering_info) {
+  if constexpr (requires { info.PipelineRenderingCreateInfo = rendering_info; }) {
+    info.PipelineRenderingCreateInfo = rendering_info;
+  } else if constexpr (requires { info.PipelineRenderingCreateInfo = &rendering_info; }) {
+    info.PipelineRenderingCreateInfo = &rendering_info;
   }
 }
 
@@ -371,18 +430,35 @@ bool init_vulkan() {
                                  ? static_cast<VkFormat>(hooks->swapchain_format)
                                  : VK_FORMAT_UNDEFINED;
   rkg::log::info("debug_ui: swapchain_format=" + std::to_string(static_cast<int>(g_state.swapchain_format)));
-  const bool has_render_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
-  const bool has_dynamic = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
-  const bool has_color_format = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
-  const bool has_pipeline_info = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
-  const bool can_render_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
-  const bool can_dynamic_rendering = has_dynamic && has_color_format && has_pipeline_info;
+  constexpr bool kHasRenderPass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kHasDynamic = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kHasColorFormat = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kHasPipelineInfo = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kHasPipelineMain = has_pipeline_info_main_member<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kPipelineMainHasRenderPass = pipeline_info_has_render_pass<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kPipelineMainHasPipeline = pipeline_info_has_pipeline_rendering<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kPipelineMainHasMsaa = pipeline_info_has_msaa<ImGui_ImplVulkan_InitInfo>();
+  constexpr bool kHasPipelineViewports = has_pipeline_info_viewports_member<ImGui_ImplVulkan_InitInfo>();
 
-  rkg::log::info(std::string("debug_ui: backend caps render_pass=") +
-                 (has_render_pass ? "yes" : "no") +
-                 " dynamic=" + (has_dynamic ? "yes" : "no") +
-                 " color_format=" + (has_color_format ? "yes" : "no") +
-                 " pipeline_rendering=" + (has_pipeline_info ? "yes" : "no"));
+  const bool can_render_pass = g_state.render_pass != VK_NULL_HANDLE &&
+                               (kHasRenderPass || (kHasPipelineMain && kPipelineMainHasRenderPass));
+
+  bool can_dynamic_rendering = false;
+  if constexpr (kHasDynamic) {
+    if constexpr (kHasPipelineInfo) {
+      can_dynamic_rendering = kHasColorFormat;
+    } else if constexpr (kHasPipelineMain && kPipelineMainHasPipeline) {
+      can_dynamic_rendering = true;
+    }
+  }
+
+  rkg::log::info(std::string("debug_ui: backend caps api=") +
+                 (kHasPipelineMain ? "pipeline_info_main" : "legacy") +
+                 " render_pass=" + ((kHasRenderPass || kPipelineMainHasRenderPass) ? "yes" : "no") +
+                 " dynamic=" + (kHasDynamic ? "yes" : "no") +
+                 " color_format=" + (kHasColorFormat ? "yes" : "no") +
+                 " pipeline_rendering=" + ((kHasPipelineInfo || kPipelineMainHasPipeline) ? "yes" : "no") +
+                 " msaa=" + (kPipelineMainHasMsaa ? "yes" : "no"));
 
   bool use_dynamic_rendering = false;
   if (!can_render_pass && can_dynamic_rendering) {
@@ -422,10 +498,34 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  if (g_state.render_inside_pass) {
-    set_render_pass(init_info, g_state.render_pass);
+  if constexpr (kHasPipelineMain) {
+    auto& pipeline_main = init_info.PipelineInfoMain;
+    if (g_state.render_inside_pass) {
+      if constexpr (kPipelineMainHasRenderPass) {
+        pipeline_main.RenderPass = g_state.render_pass;
+      }
+      if constexpr (pipeline_info_has_subpass<ImGui_ImplVulkan_InitInfo>()) {
+        pipeline_main.Subpass = 0;
+      }
+    } else {
+      if constexpr (kPipelineMainHasRenderPass) {
+        pipeline_main.RenderPass = VK_NULL_HANDLE;
+      }
+    }
+    if constexpr (kPipelineMainHasMsaa) {
+      pipeline_main.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    }
+    if constexpr (kHasPipelineViewports) {
+      if constexpr (requires { init_info.PipelineInfoForViewports = pipeline_main; }) {
+        init_info.PipelineInfoForViewports = pipeline_main;
+      }
+    }
   } else {
-    set_render_pass(init_info, VK_NULL_HANDLE);
+    if (g_state.render_inside_pass) {
+      set_render_pass(init_info, g_state.render_pass);
+    } else {
+      set_render_pass(init_info, VK_NULL_HANDLE);
+    }
   }
   set_dynamic_rendering(init_info, use_dynamic_rendering);
 #if defined(IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING)
@@ -434,14 +534,27 @@ bool init_vulkan() {
       rkg::log::warn("debug_ui: dynamic rendering requires a valid swapchain format");
       return false;
     }
-    set_color_format(init_info, g_state.swapchain_format);
-    set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
     static VkPipelineRenderingCreateInfo rendering_info{};
     rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     rendering_info.pNext = nullptr;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
-    set_pipeline_rendering_info(init_info, &rendering_info);
+    if constexpr (kHasPipelineInfo) {
+      set_color_format(init_info, g_state.swapchain_format);
+      set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
+      set_pipeline_rendering_info(init_info, &rendering_info);
+    } else if constexpr (kHasPipelineMain && kPipelineMainHasPipeline) {
+      auto& pipeline_main = init_info.PipelineInfoMain;
+      set_pipeline_rendering_info_struct(pipeline_main, rendering_info);
+      if constexpr (kPipelineMainHasMsaa) {
+        pipeline_main.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+      }
+      if constexpr (kHasPipelineViewports) {
+        if constexpr (requires { init_info.PipelineInfoForViewports = pipeline_main; }) {
+          init_info.PipelineInfoForViewports = pipeline_main;
+        }
+      }
+    }
   }
 #endif
   if (!ImGui_ImplVulkan_Init(&init_info)) {
