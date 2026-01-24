@@ -1058,6 +1058,10 @@ bool recreate_swapchain() {
     }
     return false;
   }
+  if (old_format != VK_FORMAT_UNDEFINED && g_state.swapchain_format != old_format) {
+    rkg::log::info("renderer:vulkan swapchain format changed; rebuilding offscreen resources");
+    destroy_offscreen();
+  }
   bool render_pass_changed = false;
   bool image_count_changed = false;
   if (old_render_pass == VK_NULL_HANDLE || g_state.swapchain_format != old_format) {
