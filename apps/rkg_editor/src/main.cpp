@@ -353,6 +353,7 @@ struct EditorState {
   bool show_world_grid = true;
   bool show_character_grid = true;
   bool show_world_axes = true;
+  bool show_face_labels = true;
   bool show_skeleton_debug = true;
   float grid_half_extent = 10.0f;
   float grid_step = 1.0f;
@@ -2348,6 +2349,8 @@ void draw_viewport(EditorState& state) {
     ImGui::SameLine();
     ImGui::Checkbox("World Axes", &state.show_world_axes);
     ImGui::SameLine();
+    ImGui::Checkbox("Face Labels", &state.show_face_labels);
+    ImGui::SameLine();
     ImGui::Checkbox("Skeletons", &state.show_skeleton_debug);
     ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
     ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
@@ -2435,197 +2438,6 @@ void draw_viewport(EditorState& state) {
     }
   }
   ImGui::EndChild();
-
-  if (width > 0 && height > 0) {
-    const float* view_proj = state.camera_view_proj;
-    auto project_to_screen = [&](const Vec3& world, ImVec2& out) -> bool {
-      const float x = world.x;
-      const float y = world.y;
-      const float z = world.z;
-      const float clip_x = view_proj[0] * x + view_proj[4] * y + view_proj[8] * z + view_proj[12];
-      const float clip_y = view_proj[1] * x + view_proj[5] * y + view_proj[9] * z + view_proj[13];
-      const float clip_w = view_proj[3] * x + view_proj[7] * y + view_proj[11] * z + view_proj[15];
-      if (clip_w <= 0.0001f) {
-        return false;
-      }
-      const float inv_w = 1.0f / clip_w;
-      const float ndc_x = clip_x * inv_w;
-      const float ndc_y = clip_y * inv_w;
-      out.x = state.viewport_pos[0] + (ndc_x * 0.5f + 0.5f) * state.viewport_size[0];
-      out.y = state.viewport_pos[1] + (-ndc_y * 0.5f + 0.5f) * state.viewport_size[1];
-      return true;
-    };
-
-    auto transform_point = [&](const Mat4& m, const Vec3& v) -> Vec3 {
-      return {
-          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z + m.m[12],
-          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z + m.m[13],
-          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
-      };
-    };
-    auto transform_dir = [&](const Mat4& m, const Vec3& v) -> Vec3 {
-      return {
-          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z,
-          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z,
-          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z,
-      };
-    };
-
-    rkg::ecs::Entity label_entity = player;
-    if (label_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(label_entity)) {
-      label_entity = state.selected_entity;
-    }
-    if (label_entity != rkg::ecs::kInvalidEntity) {
-      if (const auto* transform = registry.get_transform(label_entity)) {
-      const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
-      const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
-      const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
-      const Mat4 rot_m = mat4_rotation_xyz(rot);
-      const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(rot_m, mat4_scale(scl)));
-
-      struct GlyphSegment {
-        float x1;
-        float y1;
-        float x2;
-        float y2;
-      };
-      auto glyph_segments = [&](char c, const GlyphSegment*& segs, size_t& count) -> bool {
-        switch (c) {
-          case 'A': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0.5f,1,0.5f}};
-            segs = k; count = 3; return true;
-          }
-          case 'B': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{0,0,1,0},{1,0,1,1}};
-            segs = k; count = 5; return true;
-          }
-          case 'C': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0,1,0}};
-            segs = k; count = 3; return true;
-          }
-          case 'E': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{0,0,1,0}};
-            segs = k; count = 4; return true;
-          }
-          case 'F': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f}};
-            segs = k; count = 3; return true;
-          }
-          case 'G': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0,1,0},{1,0,1,0.5f},{0.5f,0.5f,1,0.5f}};
-            segs = k; count = 5; return true;
-          }
-          case 'H': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0.5f,1,0.5f}};
-            segs = k; count = 3; return true;
-          }
-          case 'I': {
-            static const GlyphSegment k[] = {{0,1,1,1},{0.5f,0,0.5f,1},{0,0,1,0}};
-            segs = k; count = 3; return true;
-          }
-          case 'K': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,1,0,0.5f},{0,0.5f,1,0}};
-            segs = k; count = 3; return true;
-          }
-          case 'L': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,0,1,0}};
-            segs = k; count = 2; return true;
-          }
-          case 'M': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,1,0.5f,0},{0.5f,0,1,1}};
-            segs = k; count = 4; return true;
-          }
-          case 'N': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0,1,1}};
-            segs = k; count = 3; return true;
-          }
-          case 'O': {
-            static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,1,1,1},{0,0,1,0}};
-            segs = k; count = 4; return true;
-          }
-          case 'R': {
-            static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{1,0.5f,1,1},{0,0.5f,1,0}};
-            segs = k; count = 5; return true;
-          }
-          case 'T': {
-            static const GlyphSegment k[] = {{0,1,1,1},{0.5f,0,0.5f,1}};
-            segs = k; count = 2; return true;
-          }
-          default:
-            return false;
-        }
-      };
-
-      struct Face {
-        Vec3 normal;
-        Vec3 u;
-        Vec3 v;
-        const char* word;
-      };
-      const Face faces[] = {
-          {{0,0,1}, {1,0,0}, {0,1,0}, "FRONT"},
-          {{0,0,-1}, {-1,0,0}, {0,1,0}, "BACK"},
-          {{1,0,0}, {0,0,-1}, {0,1,0}, "RIGHT"},
-          {{-1,0,0}, {0,0,1}, {0,1,0}, "LEFT"},
-          {{0,1,0}, {1,0,0}, {0,0,1}, "TOP"},
-          {{0,-1,0}, {1,0,0}, {0,0,-1}, "BOTTOM"},
-      };
-
-      auto* draw = ImGui::GetForegroundDrawList();
-      const Vec3 cam_pos = {state.camera_eye[0], state.camera_eye[1], state.camera_eye[2]};
-      const float spacing = 0.2f;
-      const float face_half = 0.5f;
-      const float normal_offset = 0.02f;
-
-      for (const auto& face : faces) {
-        const Vec3 local_center = vec3_mul(face.normal, face_half);
-        const Vec3 world_center = transform_point(model, local_center);
-        const Vec3 world_normal = vec3_normalize(transform_dir(rot_m, face.normal));
-        const Vec3 to_camera = vec3_normalize(vec3_sub(cam_pos, world_center));
-        if (vec3_dot(world_normal, to_camera) <= 0.0f) {
-          continue;
-        }
-        const int letter_count = static_cast<int>(std::strlen(face.word));
-        if (letter_count <= 0) {
-          continue;
-        }
-        const float size = 0.7f / (letter_count + spacing * (letter_count - 1));
-        const float word_w = size * (letter_count + spacing * (letter_count - 1));
-        const float word_h = size;
-        const Vec3 origin = vec3_add(local_center,
-                                     vec3_add(vec3_mul(face.u, -word_w * 0.5f),
-                                              vec3_mul(face.v, -word_h * 0.5f)));
-        for (int i = 0; i < letter_count; ++i) {
-          const char c = face.word[i];
-          const GlyphSegment* segs = nullptr;
-          size_t seg_count = 0;
-          if (!glyph_segments(c, segs, seg_count)) {
-            continue;
-          }
-          const float base_x = i * size * (1.0f + spacing);
-          for (size_t s = 0; s < seg_count; ++s) {
-            const auto& seg = segs[s];
-            const Vec3 p0_local = vec3_add(origin,
-                                           vec3_add(vec3_mul(face.u, (base_x + seg.x1 * size)),
-                                                    vec3_add(vec3_mul(face.v, seg.y1 * size),
-                                                             vec3_mul(face.normal, normal_offset))));
-            const Vec3 p1_local = vec3_add(origin,
-                                           vec3_add(vec3_mul(face.u, (base_x + seg.x2 * size)),
-                                                    vec3_add(vec3_mul(face.v, seg.y2 * size),
-                                                             vec3_mul(face.normal, normal_offset))));
-            const Vec3 p0 = transform_point(model, p0_local);
-            const Vec3 p1 = transform_point(model, p1_local);
-            ImVec2 s0;
-            ImVec2 s1;
-            if (project_to_screen(p0, s0) && project_to_screen(p1, s1)) {
-              draw->AddLine(s0, s1, IM_COL32(0, 0, 0, 255), 1.5f);
-            }
-          }
-        }
-      }
-    }
-  }
-  }
   ImGui::End();
 }
 
@@ -3944,6 +3756,167 @@ void update_camera_and_draw_list(EditorState& state) {
       const Vec3 tip = vec3_add(pos, vec3_mul(vel, vel_scale));
       const float vel_color[4] = {1.0f, 0.4f, 0.9f, 1.0f};
       add_line(pos, tip, vel_color);
+    }
+  }
+
+  if (state.show_face_labels) {
+    auto transform_point = [&](const Mat4& m, const Vec3& v) -> Vec3 {
+      return {
+          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z + m.m[12],
+          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z + m.m[13],
+          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
+      };
+    };
+    auto transform_dir = [&](const Mat4& m, const Vec3& v) -> Vec3 {
+      return {
+          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z,
+          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z,
+          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z,
+      };
+    };
+
+    struct GlyphSegment {
+      float x1;
+      float y1;
+      float x2;
+      float y2;
+    };
+    auto glyph_segments = [&](char c, const GlyphSegment*& segs, size_t& count) -> bool {
+      switch (c) {
+        case 'A': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0.5f,1,0.5f}};
+          segs = k; count = 3; return true;
+        }
+        case 'B': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{0,0,1,0},{1,0,1,1}};
+          segs = k; count = 5; return true;
+        }
+        case 'C': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0,1,0}};
+          segs = k; count = 3; return true;
+        }
+        case 'E': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{0,0,1,0}};
+          segs = k; count = 4; return true;
+        }
+        case 'F': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f}};
+          segs = k; count = 3; return true;
+        }
+        case 'G': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0,1,0},{1,0,1,0.5f},{0.5f,0.5f,1,0.5f}};
+          segs = k; count = 5; return true;
+        }
+        case 'H': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0.5f,1,0.5f}};
+          segs = k; count = 3; return true;
+        }
+        case 'I': {
+          static const GlyphSegment k[] = {{0,1,1,1},{0.5f,0,0.5f,1},{0,0,1,0}};
+          segs = k; count = 3; return true;
+        }
+        case 'K': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,1,0,0.5f},{0,0.5f,1,0}};
+          segs = k; count = 3; return true;
+        }
+        case 'L': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,0,1,0}};
+          segs = k; count = 2; return true;
+        }
+        case 'M': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,1,0.5f,0},{0.5f,0,1,1}};
+          segs = k; count = 4; return true;
+        }
+        case 'N': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,0,1,1}};
+          segs = k; count = 3; return true;
+        }
+        case 'O': {
+          static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,1,1,1},{0,0,1,0}};
+          segs = k; count = 4; return true;
+        }
+        case 'R': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{1,0.5f,1,1},{0,0.5f,1,0}};
+          segs = k; count = 5; return true;
+        }
+        case 'T': {
+          static const GlyphSegment k[] = {{0,1,1,1},{0.5f,0,0.5f,1}};
+          segs = k; count = 2; return true;
+        }
+        default:
+          return false;
+      }
+    };
+
+    struct Face {
+      Vec3 normal;
+      Vec3 u;
+      Vec3 v;
+      const char* word;
+    };
+    const Face faces[] = {
+        {{0,0,1}, {1,0,0}, {0,1,0}, "FRONT"},
+        {{0,0,-1}, {-1,0,0}, {0,1,0}, "BACK"},
+        {{1,0,0}, {0,0,-1}, {0,1,0}, "RIGHT"},
+        {{-1,0,0}, {0,0,1}, {0,1,0}, "LEFT"},
+        {{0,1,0}, {1,0,0}, {0,0,1}, "TOP"},
+        {{0,-1,0}, {1,0,0}, {0,0,-1}, "BOTTOM"},
+    };
+
+    rkg::ecs::Entity label_entity = player;
+    if (label_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(label_entity)) {
+      label_entity = state.selected_entity;
+    }
+    if (label_entity != rkg::ecs::kInvalidEntity) {
+      if (const auto* transform = registry.get_transform(label_entity)) {
+        const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
+        const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+        const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
+        const Mat4 rot_m = mat4_rotation_xyz(rot);
+        const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(rot_m, mat4_scale(scl)));
+        const float spacing = 0.2f;
+        const float face_half = 0.5f;
+        const float normal_offset = 0.02f;
+        const float text_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+        for (const auto& face : faces) {
+          const Vec3 local_center = vec3_mul(face.normal, face_half);
+          const Vec3 world_center = transform_point(model, local_center);
+          const int letter_count = static_cast<int>(std::strlen(face.word));
+          if (letter_count <= 0) {
+            continue;
+          }
+          const float size = 0.7f / (letter_count + spacing * (letter_count - 1));
+          const float word_w = size * (letter_count + spacing * (letter_count - 1));
+          const float word_h = size;
+          const Vec3 origin = vec3_add(local_center,
+                                       vec3_add(vec3_mul(face.u, -word_w * 0.5f),
+                                                vec3_mul(face.v, -word_h * 0.5f)));
+          for (int i = 0; i < letter_count; ++i) {
+            const char c = face.word[i];
+            const GlyphSegment* segs = nullptr;
+            size_t seg_count = 0;
+            if (!glyph_segments(c, segs, seg_count)) {
+              continue;
+            }
+            const float base_x = i * size * (1.0f + spacing);
+            for (size_t s = 0; s < seg_count; ++s) {
+              const auto& seg = segs[s];
+              const Vec3 p0_local = vec3_add(origin,
+                                             vec3_add(vec3_mul(face.u, (base_x + seg.x1 * size)),
+                                                      vec3_add(vec3_mul(face.v, seg.y1 * size),
+                                                               vec3_mul(face.normal, normal_offset))));
+              const Vec3 p1_local = vec3_add(origin,
+                                             vec3_add(vec3_mul(face.u, (base_x + seg.x2 * size)),
+                                                      vec3_add(vec3_mul(face.v, seg.y2 * size),
+                                                               vec3_mul(face.normal, normal_offset))));
+              const Vec3 p0 = transform_point(model, p0_local);
+              const Vec3 p1 = transform_point(model, p1_local);
+              add_line(p0, p1, text_color);
+            }
+          }
+        }
+      }
     }
   }
 
