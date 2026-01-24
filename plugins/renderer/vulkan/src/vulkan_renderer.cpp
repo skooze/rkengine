@@ -44,6 +44,7 @@ struct VulkanState {
   bool dynamic_rendering_enabled = false;
   PFN_vkCmdBeginRenderingKHR cmd_begin_rendering = nullptr;
   PFN_vkCmdEndRenderingKHR cmd_end_rendering = nullptr;
+  bool swapchain_needs_rebuild = false;
 
   VkImage offscreen_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
@@ -81,6 +82,27 @@ static void log_step(const std::string& label) {
     return;
   }
   rkg::log::info("renderer:vulkan step " + std::to_string(g_log_step_index++) + ": " + label);
+}
+
+static const char* vk_result_name(VkResult result) {
+  switch (result) {
+    case VK_SUCCESS:
+      return "VK_SUCCESS";
+    case VK_SUBOPTIMAL_KHR:
+      return "VK_SUBOPTIMAL_KHR";
+    case VK_ERROR_OUT_OF_DATE_KHR:
+      return "VK_ERROR_OUT_OF_DATE_KHR";
+    case VK_ERROR_SURFACE_LOST_KHR:
+      return "VK_ERROR_SURFACE_LOST_KHR";
+    case VK_ERROR_DEVICE_LOST:
+      return "VK_ERROR_DEVICE_LOST";
+    case VK_ERROR_OUT_OF_HOST_MEMORY:
+      return "VK_ERROR_OUT_OF_HOST_MEMORY";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+      return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    default:
+      return "VK_ERROR_UNKNOWN";
+  }
 }
 
 bool create_viewport_pipeline();
@@ -968,6 +990,35 @@ bool create_render_pass() {
   return true;
 }
 
+bool recreate_swapchain() {
+  if (g_state.device == VK_NULL_HANDLE || g_state.surface == VK_NULL_HANDLE) {
+    return false;
+  }
+  vkDeviceWaitIdle(g_state.device);
+  destroy_swapchain();
+  if (!create_swapchain()) return false;
+  if (!create_render_pass()) return false;
+  if (!create_framebuffers()) return false;
+  if (g_state.command_pool != VK_NULL_HANDLE) {
+    vkResetCommandPool(g_state.device, g_state.command_pool, 0);
+  }
+  if (!create_command_buffers()) return false;
+
+  rkg::VulkanHooks hooks;
+  hooks.instance = g_state.instance;
+  hooks.physical_device = g_state.physical_device;
+  hooks.device = g_state.device;
+  hooks.queue = g_state.graphics_queue;
+  hooks.render_pass = g_state.render_pass;
+  hooks.window = g_state.window;
+  hooks.queue_family = g_state.graphics_queue_family;
+  hooks.image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
+  hooks.swapchain_format = static_cast<uint32_t>(g_state.swapchain_format);
+  rkg::register_vulkan_hooks(&hooks);
+
+  return true;
+}
+
 bool create_framebuffers() {
   g_state.framebuffers.resize(g_state.swapchain_image_views.size());
   for (size_t i = 0; i < g_state.swapchain_image_views.size(); ++i) {
@@ -1445,6 +1496,16 @@ bool draw_frame() {
 
   update_offscreen_target();
 
+  if (g_state.swapchain_needs_rebuild) {
+    rkg::log::warn("renderer:vulkan swapchain rebuild requested");
+    if (!recreate_swapchain()) {
+      rkg::log::error("renderer:vulkan swapchain rebuild failed");
+      return false;
+    }
+    g_state.swapchain_needs_rebuild = false;
+    return true;
+  }
+
   if (g_state.swapchain_extent.width == 0 || g_state.swapchain_extent.height == 0) {
     if (!logged_state) {
       rkg::log::warn("renderer:vulkan swapchain extent is 0; skipping frame");
@@ -1470,12 +1531,16 @@ bool draw_frame() {
   VkResult result = vkAcquireNextImageKHR(
       g_state.device, g_state.swapchain, UINT64_MAX, g_state.image_available, VK_NULL_HANDLE, &image_index);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    rkg::log::warn("renderer:vulkan swapchain out of date/suboptimal; skipping frame");
+    rkg::log::warn(std::string("renderer:vulkan swapchain acquire: ") + vk_result_name(result));
+    g_state.swapchain_needs_rebuild = true;
     rkg::commit_vulkan_viewport_request();
     return true;
   }
   if (result != VK_SUCCESS) {
-    rkg::log::error("renderer:vulkan vkAcquireNextImageKHR failed");
+    rkg::log::error(std::string("renderer:vulkan vkAcquireNextImageKHR failed: ") + vk_result_name(result));
+    if (result == VK_ERROR_SURFACE_LOST_KHR) {
+      g_state.swapchain_needs_rebuild = true;
+    }
     rkg::commit_vulkan_viewport_request();
     return false;
   }
@@ -1524,10 +1589,17 @@ bool draw_frame() {
   log_step("vkQueuePresentKHR");
   result = vkQueuePresentKHR(g_state.present_queue, &present_info);
   rkg::commit_vulkan_viewport_request();
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    rkg::log::warn(std::string("renderer:vulkan present: ") + vk_result_name(result));
+    g_state.swapchain_needs_rebuild = true;
+    return true;
+  }
   if (result == VK_SUCCESS) {
     g_log_steps = false;
+    return true;
   }
-  return result == VK_SUCCESS;
+  rkg::log::error(std::string("renderer:vulkan vkQueuePresentKHR failed: ") + vk_result_name(result));
+  return false;
 }
 
 bool vulkan_init(void* host) {
@@ -1579,6 +1651,10 @@ void vulkan_shutdown() {
   rkg::log::info("renderer:vulkan shutdown");
 }
 
+void vulkan_on_window_resized(int, int) {
+  g_state.swapchain_needs_rebuild = true;
+}
+
 void vulkan_update(float) {
   static bool logged = false;
   if (!logged) {
@@ -1604,7 +1680,7 @@ rkg::RkgPluginApi g_api{
     &vulkan_init,
     &vulkan_shutdown,
     &vulkan_update,
-    nullptr};
+    &vulkan_on_window_resized};
 } // namespace
 
 extern "C" rkg::RkgPluginApi* rkg_plugin_get_api_renderer_vulkan(uint32_t host_api_version) {
