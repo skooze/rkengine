@@ -1017,7 +1017,13 @@ bool recreate_swapchain() {
   if (g_state.device == VK_NULL_HANDLE || g_state.surface == VK_NULL_HANDLE) {
     return false;
   }
-  // draw_frame already waited for the in-flight fence; avoid device-wide stalls here.
+  // Ensure no pending work is using the swapchain before destroying it.
+  if (g_state.graphics_queue != VK_NULL_HANDLE) {
+    vkQueueWaitIdle(g_state.graphics_queue);
+  }
+  if (g_state.present_queue != VK_NULL_HANDLE && g_state.present_queue != g_state.graphics_queue) {
+    vkQueueWaitIdle(g_state.present_queue);
+  }
   destroy_swapchain();
   if (!create_swapchain()) {
     if (g_state.swapchain_needs_rebuild) {
@@ -1582,12 +1588,11 @@ bool draw_frame() {
     return true;
   }
   if (result != VK_SUCCESS) {
-    rkg::log::error(std::string("renderer:vulkan vkAcquireNextImageKHR failed: ") + vk_result_name(result));
-    if (result == VK_ERROR_SURFACE_LOST_KHR) {
-      g_state.swapchain_needs_rebuild = true;
-    }
+    rkg::log::error(std::string("renderer:vulkan vkAcquireNextImageKHR failed: ") +
+                    vk_result_name(result) + " (" + std::to_string(result) + ")");
+    g_state.swapchain_needs_rebuild = true;
     rkg::commit_vulkan_viewport_request();
-    return false;
+    return true;
   }
   if (image_index >= g_state.command_buffers.size() || image_index >= g_state.swapchain_image_views.size() ||
       image_index >= g_state.framebuffers.size()) {
