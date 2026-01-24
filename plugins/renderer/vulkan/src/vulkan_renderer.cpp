@@ -895,7 +895,8 @@ bool create_swapchain() {
   VkPresentModeKHR present_mode = choose_present_mode(present_modes);
   VkExtent2D extent = choose_extent(caps);
   if (extent.width == 0 || extent.height == 0) {
-    rkg::log::warn("renderer:vulkan swapchain extent is 0; create_swapchain skipped");
+    g_state.swapchain_needs_rebuild = true;
+    rkg::log::warn("renderer:vulkan swapchain extent is 0; create_swapchain deferred");
     return false;
   }
 
@@ -1018,7 +1019,13 @@ bool recreate_swapchain() {
   }
   // draw_frame already waited for the in-flight fence; avoid device-wide stalls here.
   destroy_swapchain();
-  if (!create_swapchain()) return false;
+  if (!create_swapchain()) {
+    if (g_state.swapchain_needs_rebuild) {
+      rkg::log::warn("renderer:vulkan swapchain not ready; deferring init");
+      return true;
+    }
+    return false;
+  }
   if (!create_render_pass()) return false;
   if (!create_framebuffers()) return false;
   if (g_state.command_pool != VK_NULL_HANDLE) {
@@ -1513,11 +1520,11 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 bool draw_frame() {
   static bool logged_state = false;
   static bool logged_defer = false;
-  log_step("draw_frame: wait fence");
-  vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
-  vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
-
   update_offscreen_target();
+
+  if (g_state.swapchain == VK_NULL_HANDLE || g_state.swapchain_images.empty()) {
+    g_state.swapchain_needs_rebuild = true;
+  }
 
   if (g_state.swapchain_needs_rebuild) {
     int w = 0;
@@ -1549,6 +1556,10 @@ bool draw_frame() {
     rkg::commit_vulkan_viewport_request();
     return true;
   }
+
+  log_step("draw_frame: wait fence");
+  vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
+  vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
 
   if (!logged_state) {
     rkg::log::info(std::string("renderer:vulkan swapchain=") + std::to_string(reinterpret_cast<uintptr_t>(g_state.swapchain)));
