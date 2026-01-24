@@ -45,6 +45,8 @@ struct VulkanState {
   PFN_vkCmdBeginRenderingKHR cmd_begin_rendering = nullptr;
   PFN_vkCmdEndRenderingKHR cmd_end_rendering = nullptr;
   bool swapchain_needs_rebuild = false;
+  bool surface_lost = false;
+  bool device_lost = false;
 
   VkImage offscreen_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
@@ -96,6 +98,14 @@ static const char* vk_result_name(VkResult result) {
       return "VK_ERROR_SURFACE_LOST_KHR";
     case VK_ERROR_DEVICE_LOST:
       return "VK_ERROR_DEVICE_LOST";
+    case VK_TIMEOUT:
+      return "VK_TIMEOUT";
+    case VK_NOT_READY:
+      return "VK_NOT_READY";
+#ifdef VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT
+    case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
+      return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
+#endif
     case VK_ERROR_OUT_OF_HOST_MEMORY:
       return "VK_ERROR_OUT_OF_HOST_MEMORY";
     case VK_ERROR_OUT_OF_DEVICE_MEMORY:
@@ -1014,15 +1024,26 @@ bool create_render_pass() {
 }
 
 bool recreate_swapchain() {
-  if (g_state.device == VK_NULL_HANDLE || g_state.surface == VK_NULL_HANDLE) {
+  if (g_state.device == VK_NULL_HANDLE) {
+    return false;
+  }
+  if (g_state.surface_lost) {
+    if (g_state.surface != VK_NULL_HANDLE) {
+      vkDestroySurfaceKHR(g_state.instance, g_state.surface, nullptr);
+      g_state.surface = VK_NULL_HANDLE;
+    }
+    if (!create_surface()) {
+      rkg::log::error("renderer:vulkan recreate surface failed");
+      return false;
+    }
+    g_state.surface_lost = false;
+  }
+  if (g_state.surface == VK_NULL_HANDLE) {
     return false;
   }
   // Ensure no pending work is using the swapchain before destroying it.
-  if (g_state.graphics_queue != VK_NULL_HANDLE) {
-    vkQueueWaitIdle(g_state.graphics_queue);
-  }
-  if (g_state.present_queue != VK_NULL_HANDLE && g_state.present_queue != g_state.graphics_queue) {
-    vkQueueWaitIdle(g_state.present_queue);
+  if (g_state.device != VK_NULL_HANDLE) {
+    vkDeviceWaitIdle(g_state.device);
   }
   const VkFormat old_format = g_state.swapchain_format;
   const uint32_t old_image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
@@ -1561,6 +1582,11 @@ bool draw_frame() {
   static bool logged_defer = false;
   update_offscreen_target();
 
+  if (g_state.device_lost) {
+    rkg::log::error("renderer:vulkan device lost; skipping frame");
+    return false;
+  }
+
   if (g_state.swapchain == VK_NULL_HANDLE || g_state.swapchain_images.empty()) {
     g_state.swapchain_needs_rebuild = true;
   }
@@ -1597,7 +1623,16 @@ bool draw_frame() {
   }
 
   log_step("draw_frame: wait fence");
-  vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
+  const VkResult fence_result = vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
+  if (fence_result != VK_SUCCESS) {
+    rkg::log::error(std::string("renderer:vulkan vkWaitForFences failed: ") +
+                    vk_result_name(fence_result) + " (" + std::to_string(fence_result) + ")");
+    if (fence_result == VK_ERROR_DEVICE_LOST) {
+      g_state.device_lost = true;
+      return false;
+    }
+    return true;
+  }
 
   if (!logged_state) {
     rkg::log::info(std::string("renderer:vulkan swapchain=") + std::to_string(reinterpret_cast<uintptr_t>(g_state.swapchain)));
@@ -1620,9 +1655,20 @@ bool draw_frame() {
     rkg::commit_vulkan_viewport_request();
     return true;
   }
+  if (result == VK_ERROR_SURFACE_LOST_KHR) {
+    rkg::log::error("renderer:vulkan surface lost during acquire");
+    g_state.surface_lost = true;
+    g_state.swapchain_needs_rebuild = true;
+    rkg::commit_vulkan_viewport_request();
+    return true;
+  }
   if (result != VK_SUCCESS) {
     rkg::log::error(std::string("renderer:vulkan vkAcquireNextImageKHR failed: ") +
                     vk_result_name(result) + " (" + std::to_string(result) + ")");
+    if (result == VK_ERROR_DEVICE_LOST) {
+      g_state.device_lost = true;
+      return false;
+    }
     g_state.swapchain_needs_rebuild = true;
     rkg::commit_vulkan_viewport_request();
     return true;
@@ -1663,13 +1709,14 @@ bool draw_frame() {
   if (submit_result != VK_SUCCESS) {
     rkg::log::error(std::string("renderer:vulkan vkQueueSubmit failed: ") +
                     vk_result_name(submit_result) + " (" + std::to_string(submit_result) + ")");
-    if (submit_result != VK_ERROR_DEVICE_LOST) {
-      g_state.swapchain_needs_rebuild = true;
+    if (submit_result == VK_ERROR_DEVICE_LOST) {
+      g_state.device_lost = true;
       rkg::commit_vulkan_viewport_request();
-      return true;
+      return false;
     }
+    g_state.swapchain_needs_rebuild = true;
     rkg::commit_vulkan_viewport_request();
-    return false;
+    return true;
   }
 
   VkPresentInfoKHR present_info{};
@@ -1683,6 +1730,12 @@ bool draw_frame() {
   log_step("vkQueuePresentKHR");
   result = vkQueuePresentKHR(g_state.present_queue, &present_info);
   rkg::commit_vulkan_viewport_request();
+  if (result == VK_ERROR_SURFACE_LOST_KHR) {
+    rkg::log::error("renderer:vulkan surface lost during present");
+    g_state.surface_lost = true;
+    g_state.swapchain_needs_rebuild = true;
+    return true;
+  }
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     rkg::log::warn(std::string("renderer:vulkan present: ") + vk_result_name(result));
     g_state.swapchain_needs_rebuild = true;
