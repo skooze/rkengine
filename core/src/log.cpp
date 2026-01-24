@@ -30,6 +30,7 @@ std::deque<std::string> g_ring;
 constexpr size_t kRingMax = 200;
 std::string g_app_name = "rkg";
 std::filesystem::path g_root_path;
+std::filesystem::path g_log_path;
 
 std::string timestamp_now() {
   using namespace std::chrono;
@@ -87,9 +88,10 @@ void init(const std::string& app_name, const std::filesystem::path& root) {
   std::error_code ec;
   std::filesystem::create_directories(log_dir, ec);
   const std::string file_name = g_app_name + "_" + timestamp_for_filename() + ".log";
-  const std::filesystem::path log_path = log_dir / file_name;
-  g_log_file.open(log_path, std::ios::out | std::ios::app);
+  g_log_path = log_dir / file_name;
+  g_log_file.open(g_log_path, std::ios::out | std::ios::app);
   log_line("INFO", "log init");
+  log_line("INFO", std::string("log file: ") + g_log_path.string());
 #if defined(_WIN32)
   log_line("INFO", "platform: windows");
 #elif defined(__linux__)
