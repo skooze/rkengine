@@ -1564,7 +1564,16 @@ bool draw_frame() {
   log_step("vkAcquireNextImageKHR");
   uint32_t image_index = 0;
   VkResult result = vkAcquireNextImageKHR(
-      g_state.device, g_state.swapchain, UINT64_MAX, g_state.image_available, VK_NULL_HANDLE, &image_index);
+      g_state.device, g_state.swapchain, 0, g_state.image_available, VK_NULL_HANDLE, &image_index);
+  if (result == VK_TIMEOUT) {
+    static bool logged_timeout = false;
+    if (!logged_timeout) {
+      rkg::log::warn("renderer:vulkan vkAcquireNextImageKHR timeout; skipping frame");
+      logged_timeout = true;
+    }
+    rkg::commit_vulkan_viewport_request();
+    return true;
+  }
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     rkg::log::warn(std::string("renderer:vulkan swapchain acquire: ") + vk_result_name(result));
     g_state.swapchain_needs_rebuild = true;

@@ -664,7 +664,8 @@ void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
     }
   }
 #endif
-  if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED) {
+  if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED ||
+      sdl_event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
     const int width = sdl_event->window.data1;
     const int height = sdl_event->window.data2;
     if (!self->renderer_plugin_.empty()) {
