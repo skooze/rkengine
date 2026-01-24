@@ -98,27 +98,27 @@ bool create_descriptor_pool() {
 
 template <typename T>
 constexpr bool has_render_pass_member() {
-  return requires { std::declval<T&>().RenderPass; };
+  return requires { &T::RenderPass; };
 }
 
 template <typename T>
 constexpr bool has_dynamic_rendering_member() {
-  return requires { std::declval<T&>().UseDynamicRendering; };
+  return requires { &T::UseDynamicRendering; };
 }
 
 template <typename T>
 constexpr bool has_color_format_member() {
-  return requires { std::declval<T&>().ColorAttachmentFormat; };
+  return requires { &T::ColorAttachmentFormat; };
 }
 
 template <typename T>
 constexpr bool has_msaa_member() {
-  return requires { std::declval<T&>().MSAASamples; };
+  return requires { &T::MSAASamples; };
 }
 
 template <typename T>
 constexpr bool has_pipeline_rendering_member() {
-  return requires { std::declval<T&>().PipelineRenderingCreateInfo; };
+  return requires { &T::PipelineRenderingCreateInfo; };
 }
 
 template <typename T>
