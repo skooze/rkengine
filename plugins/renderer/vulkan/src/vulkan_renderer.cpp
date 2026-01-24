@@ -111,7 +111,7 @@ bool create_swapchain();
 bool create_render_pass();
 bool create_framebuffers();
 bool create_command_buffers();
-void destroy_swapchain();
+void destroy_swapchain(bool keep_render_pass = false);
 
 static void get_window_drawable_size(int& w, int& h) {
   w = 0;
@@ -1024,7 +1024,10 @@ bool recreate_swapchain() {
   if (g_state.present_queue != VK_NULL_HANDLE && g_state.present_queue != g_state.graphics_queue) {
     vkQueueWaitIdle(g_state.present_queue);
   }
-  destroy_swapchain();
+  const VkFormat old_format = g_state.swapchain_format;
+  const uint32_t old_image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
+  VkRenderPass old_render_pass = g_state.render_pass;
+  destroy_swapchain(true);
   if (!create_swapchain()) {
     if (g_state.swapchain_needs_rebuild) {
       rkg::log::warn("renderer:vulkan swapchain not ready; deferring init");
@@ -1032,7 +1035,19 @@ bool recreate_swapchain() {
     }
     return false;
   }
-  if (!create_render_pass()) return false;
+  bool render_pass_changed = false;
+  bool image_count_changed = false;
+  if (old_render_pass == VK_NULL_HANDLE || g_state.swapchain_format != old_format) {
+    if (old_render_pass != VK_NULL_HANDLE) {
+      vkDestroyRenderPass(g_state.device, old_render_pass, nullptr);
+    }
+    g_state.render_pass = VK_NULL_HANDLE;
+  }
+  if (g_state.render_pass == VK_NULL_HANDLE) {
+    if (!create_render_pass()) return false;
+    render_pass_changed = true;
+  }
+  image_count_changed = old_image_count != static_cast<uint32_t>(g_state.swapchain_images.size());
   if (!create_framebuffers()) return false;
   if (g_state.command_pool != VK_NULL_HANDLE) {
     vkResetCommandPool(g_state.device, g_state.command_pool, 0);
@@ -1050,6 +1065,15 @@ bool recreate_swapchain() {
   hooks.image_count = static_cast<uint32_t>(g_state.swapchain_images.size());
   hooks.swapchain_format = static_cast<uint32_t>(g_state.swapchain_format);
   rkg::register_vulkan_hooks(&hooks);
+#if RKG_ENABLE_IMGUI
+  if ((render_pass_changed || image_count_changed) && rkg::debug_ui::is_initialized()) {
+    rkg::log::info("debug_ui: reinit after swapchain change");
+    rkg::debug_ui::shutdown();
+    if (!rkg::debug_ui::init_vulkan()) {
+      rkg::log::warn("debug_ui: reinit failed after swapchain change");
+    }
+  }
+#endif
 
   return true;
 }
@@ -1127,13 +1151,13 @@ bool create_sync_objects() {
   return true;
 }
 
-void destroy_swapchain() {
+void destroy_swapchain(bool keep_render_pass) {
   for (auto fb : g_state.framebuffers) {
     vkDestroyFramebuffer(g_state.device, fb, nullptr);
   }
   g_state.framebuffers.clear();
 
-  if (g_state.render_pass != VK_NULL_HANDLE) {
+  if (!keep_render_pass && g_state.render_pass != VK_NULL_HANDLE) {
     vkDestroyRenderPass(g_state.device, g_state.render_pass, nullptr);
     g_state.render_pass = VK_NULL_HANDLE;
   }
