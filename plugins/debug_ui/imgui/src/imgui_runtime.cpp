@@ -371,15 +371,18 @@ bool init_vulkan() {
                                  ? static_cast<VkFormat>(hooks->swapchain_format)
                                  : VK_FORMAT_UNDEFINED;
   rkg::log::info("debug_ui: swapchain_format=" + std::to_string(static_cast<int>(g_state.swapchain_format)));
-  const bool can_render_pass = g_state.render_pass != VK_NULL_HANDLE;
-  bool can_dynamic_rendering = false;
-#if defined(IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING)
-  can_dynamic_rendering = true;
-#endif
+  const bool has_render_pass = has_render_pass_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_dynamic = has_dynamic_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_color_format = has_color_format_member<ImGui_ImplVulkan_InitInfo>();
+  const bool has_pipeline_info = has_pipeline_rendering_member<ImGui_ImplVulkan_InitInfo>();
+  const bool can_render_pass = has_render_pass && g_state.render_pass != VK_NULL_HANDLE;
+  const bool can_dynamic_rendering = has_dynamic && has_color_format && has_pipeline_info;
 
   rkg::log::info(std::string("debug_ui: backend caps render_pass=") +
-                 (can_render_pass ? "yes" : "no") +
-                 " dynamic=" + (can_dynamic_rendering ? "yes" : "no"));
+                 (has_render_pass ? "yes" : "no") +
+                 " dynamic=" + (has_dynamic ? "yes" : "no") +
+                 " color_format=" + (has_color_format ? "yes" : "no") +
+                 " pipeline_rendering=" + (has_pipeline_info ? "yes" : "no"));
 
   bool use_dynamic_rendering = false;
   if (!can_render_pass && can_dynamic_rendering) {
@@ -419,24 +422,26 @@ bool init_vulkan() {
   init_info.DescriptorPool = g_state.descriptor_pool;
   init_info.MinImageCount = g_state.image_count;
   init_info.ImageCount = g_state.image_count;
-  init_info.RenderPass = g_state.render_inside_pass ? g_state.render_pass : VK_NULL_HANDLE;
-#if defined(IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING)
-  init_info.UseDynamicRendering = use_dynamic_rendering;
-#endif
+  if (g_state.render_inside_pass) {
+    set_render_pass(init_info, g_state.render_pass);
+  } else {
+    set_render_pass(init_info, VK_NULL_HANDLE);
+  }
+  set_dynamic_rendering(init_info, use_dynamic_rendering);
 #if defined(IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING)
   if (use_dynamic_rendering) {
     if (g_state.swapchain_format == VK_FORMAT_UNDEFINED) {
       rkg::log::warn("debug_ui: dynamic rendering requires a valid swapchain format");
       return false;
     }
-    init_info.ColorAttachmentFormat = g_state.swapchain_format;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    set_color_format(init_info, g_state.swapchain_format);
+    set_msaa_samples(init_info, VK_SAMPLE_COUNT_1_BIT);
     static VkPipelineRenderingCreateInfo rendering_info{};
     rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     rendering_info.pNext = nullptr;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &g_state.swapchain_format;
-    init_info.PipelineRenderingCreateInfo = &rendering_info;
+    set_pipeline_rendering_info(init_info, &rendering_info);
   }
 #endif
   if (!ImGui_ImplVulkan_Init(&init_info)) {
