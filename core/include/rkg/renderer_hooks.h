@@ -49,4 +49,25 @@ void set_vulkan_viewport_draw_list(const float* mvp,
                                    uint32_t instance_count);
 const VulkanViewportDrawList* get_vulkan_viewport_draw_list();
 
+struct VulkanViewportCamera {
+  float view_proj[16]{};
+  uint64_t version = 0;
+};
+
+void set_vulkan_viewport_camera(const float* view_proj);
+const VulkanViewportCamera* get_vulkan_viewport_camera();
+
+struct VulkanViewportLineList {
+  static constexpr uint32_t kMaxLines = 512;
+  float positions[kMaxLines * 6]{};
+  float colors[kMaxLines * 4]{};
+  uint32_t line_count = 0;
+  uint64_t version = 0;
+};
+
+void set_vulkan_viewport_line_list(const float* positions,
+                                   const float* colors,
+                                   uint32_t line_count);
+const VulkanViewportLineList* get_vulkan_viewport_line_list();
+
 } // namespace rkg

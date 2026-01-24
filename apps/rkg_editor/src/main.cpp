@@ -337,6 +337,11 @@ struct EditorState {
   float camera_pitch = 0.3f;
   float camera_distance = 4.0f;
   float camera_fov = 60.0f;
+  bool show_world_grid = true;
+  bool show_character_grid = true;
+  bool show_world_axes = true;
+  float grid_half_extent = 10.0f;
+  float grid_step = 1.0f;
 
   rkg::ecs::Entity selected_entity = rkg::ecs::kInvalidEntity;
   std::string selected_name;
@@ -2286,6 +2291,20 @@ void draw_viewport(EditorState& state) {
   ImGui::Begin("Viewport", nullptr,
                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                    ImGuiWindowFlags_NoCollapse);
+  if (ImGui::CollapsingHeader("Grid/Debug", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Checkbox("World Grid", &state.show_world_grid);
+    ImGui::SameLine();
+    ImGui::Checkbox("Character Grid", &state.show_character_grid);
+    ImGui::SameLine();
+    ImGui::Checkbox("World Axes", &state.show_world_axes);
+    ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
+    ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
+    if (state.grid_step < 0.25f) state.grid_step = 0.25f;
+    if (state.grid_half_extent < state.grid_step) {
+      state.grid_half_extent = state.grid_step;
+    }
+    ImGui::Separator();
+  }
   const ImVec2 avail = ImGui::GetContentRegionAvail();
   const ImVec2 cursor = ImGui::GetCursorScreenPos();
   state.viewport_pos[0] = cursor.x;
@@ -3450,6 +3469,72 @@ void update_camera_and_draw_list(EditorState& state) {
 
   Mat4 view = mat4_look_at(eye, focus_pos, {0.0f, 1.0f, 0.0f});
   Mat4 proj = mat4_perspective(state.camera_fov, static_cast<float>(viewport_w) / viewport_h, 0.1f, 50.0f);
+  Mat4 view_proj = mat4_mul(proj, view);
+  rkg::set_vulkan_viewport_camera(view_proj.m);
+
+  float line_positions[rkg::VulkanViewportLineList::kMaxLines * 6]{};
+  float line_colors[rkg::VulkanViewportLineList::kMaxLines * 4]{};
+  uint32_t line_count = 0;
+  auto add_line = [&](const Vec3& a, const Vec3& b, const float* color) {
+    if (line_count >= rkg::VulkanViewportLineList::kMaxLines) {
+      return;
+    }
+    const size_t base = static_cast<size_t>(line_count) * 6;
+    line_positions[base + 0] = a.x;
+    line_positions[base + 1] = a.y;
+    line_positions[base + 2] = a.z;
+    line_positions[base + 3] = b.x;
+    line_positions[base + 4] = b.y;
+    line_positions[base + 5] = b.z;
+    const size_t cbase = static_cast<size_t>(line_count) * 4;
+    line_colors[cbase + 0] = color[0];
+    line_colors[cbase + 1] = color[1];
+    line_colors[cbase + 2] = color[2];
+    line_colors[cbase + 3] = color[3];
+    line_count += 1;
+  };
+
+  const float world_grid_color[4] = {0.22f, 0.22f, 0.26f, 1.0f};
+  const float character_grid_color[4] = {0.28f, 0.34f, 0.5f, 1.0f};
+  const float axis_x_color[4] = {0.85f, 0.2f, 0.2f, 1.0f};
+  const float axis_y_color[4] = {0.2f, 0.85f, 0.2f, 1.0f};
+  const float axis_z_color[4] = {0.2f, 0.35f, 0.9f, 1.0f};
+
+  if (state.show_world_grid) {
+    const float extent = state.grid_half_extent;
+    const int steps = static_cast<int>(std::floor(extent / state.grid_step));
+    for (int i = -steps; i <= steps; ++i) {
+      const float coord = static_cast<float>(i) * state.grid_step;
+      add_line({-extent, 0.0f, coord}, {extent, 0.0f, coord}, world_grid_color);
+      add_line({coord, 0.0f, -extent}, {coord, 0.0f, extent}, world_grid_color);
+    }
+  }
+
+  if (state.show_character_grid) {
+    const float extent = state.grid_half_extent * 0.5f;
+    const float base_y = focus_pos.y;
+    const int steps = static_cast<int>(std::floor(extent / state.grid_step));
+    for (int i = -steps; i <= steps; ++i) {
+      const float coord = static_cast<float>(i) * state.grid_step;
+      add_line({focus_pos.x - extent, base_y, focus_pos.z + coord},
+               {focus_pos.x + extent, base_y, focus_pos.z + coord}, character_grid_color);
+      add_line({focus_pos.x + coord, base_y, focus_pos.z - extent},
+               {focus_pos.x + coord, base_y, focus_pos.z + extent}, character_grid_color);
+    }
+  }
+
+  if (state.show_world_axes) {
+    const float axis_len = std::max(1.0f, state.grid_half_extent * 0.5f);
+    add_line({0.0f, 0.0f, 0.0f}, {axis_len, 0.0f, 0.0f}, axis_x_color);
+    add_line({0.0f, 0.0f, 0.0f}, {0.0f, axis_len, 0.0f}, axis_y_color);
+    add_line({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, axis_len}, axis_z_color);
+  }
+
+  if (line_count > 0) {
+    rkg::set_vulkan_viewport_line_list(line_positions, line_colors, line_count);
+  } else {
+    rkg::set_vulkan_viewport_line_list(nullptr, nullptr, 0);
+  }
 
   if (state.pick_requested) {
     state.pick_requested = false;

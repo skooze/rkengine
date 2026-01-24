@@ -15,6 +15,8 @@ uint32_t g_viewport_active_width = 0;
 uint32_t g_viewport_active_height = 0;
 bool g_viewport_request_dirty = false;
 VulkanViewportDrawList g_viewport_draw_list{};
+VulkanViewportCamera g_viewport_camera{};
+VulkanViewportLineList g_viewport_line_list{};
 } // namespace
 
 void register_vulkan_hooks(const VulkanHooks* hooks) {
@@ -100,6 +102,54 @@ void set_vulkan_viewport_draw_list(const float* mvp,
 
 const VulkanViewportDrawList* get_vulkan_viewport_draw_list() {
   return &g_viewport_draw_list;
+}
+
+void set_vulkan_viewport_camera(const float* view_proj) {
+  if (!view_proj) {
+    g_viewport_camera.version += 1;
+    return;
+  }
+  for (size_t i = 0; i < 16; ++i) {
+    g_viewport_camera.view_proj[i] = view_proj[i];
+  }
+  g_viewport_camera.version += 1;
+}
+
+const VulkanViewportCamera* get_vulkan_viewport_camera() {
+  return &g_viewport_camera;
+}
+
+void set_vulkan_viewport_line_list(const float* positions,
+                                   const float* colors,
+                                   uint32_t line_count) {
+  if (!positions || line_count == 0) {
+    g_viewport_line_list.line_count = 0;
+    g_viewport_line_list.version += 1;
+    return;
+  }
+  if (line_count > VulkanViewportLineList::kMaxLines) {
+    line_count = VulkanViewportLineList::kMaxLines;
+  }
+  const size_t pos_count = static_cast<size_t>(line_count) * 6;
+  for (size_t i = 0; i < pos_count; ++i) {
+    g_viewport_line_list.positions[i] = positions[i];
+  }
+  const size_t color_count = static_cast<size_t>(line_count) * 4;
+  if (colors) {
+    for (size_t i = 0; i < color_count; ++i) {
+      g_viewport_line_list.colors[i] = colors[i];
+    }
+  } else {
+    for (size_t i = 0; i < color_count; ++i) {
+      g_viewport_line_list.colors[i] = 1.0f;
+    }
+  }
+  g_viewport_line_list.line_count = line_count;
+  g_viewport_line_list.version += 1;
+}
+
+const VulkanViewportLineList* get_vulkan_viewport_line_list() {
+  return &g_viewport_line_list;
 }
 
 } // namespace rkg

@@ -11,6 +11,7 @@
 #include "rkg/staged_runs.h"
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
+#include "rkg/renderer_hooks.h"
 #include "rkgctl/cli_api.h"
 
 #include <nlohmann/json.hpp>
@@ -127,6 +128,30 @@ int main(int argc, char** argv) {
     }
     if (rkg::renderer_display_name("renderer_null") != "Null") {
       std::cerr << "renderer display name (null) invalid\n";
+      ++failures;
+    }
+  }
+
+  // Test: viewport camera + line list hooks.
+  {
+    float view_proj[16]{};
+    view_proj[0] = 1.0f;
+    view_proj[5] = 1.0f;
+    view_proj[10] = 1.0f;
+    view_proj[15] = 1.0f;
+    rkg::set_vulkan_viewport_camera(view_proj);
+    const auto* camera = rkg::get_vulkan_viewport_camera();
+    if (!camera || camera->view_proj[0] != 1.0f || camera->view_proj[15] != 1.0f) {
+      std::cerr << "viewport camera set/get failed\n";
+      ++failures;
+    }
+
+    float positions[6] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    float colors[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+    rkg::set_vulkan_viewport_line_list(positions, colors, 1);
+    const auto* lines = rkg::get_vulkan_viewport_line_list();
+    if (!lines || lines->line_count != 1 || lines->positions[3] != 1.0f) {
+      std::cerr << "viewport line list set/get failed\n";
       ++failures;
     }
   }

@@ -1,0 +1,9 @@
+name: ground_plane
+components:
+  Transform:
+    position: [0.0, 0.0, 0.0]
+    rotation: [-1.5707963, 0.0, 0.0]
+    scale: [50.0, 50.0, 1.0]
+  Renderable:
+    mesh: quad
+    color: [0.12, 0.12, 0.14, 1.0]

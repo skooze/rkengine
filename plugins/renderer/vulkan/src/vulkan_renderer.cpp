@@ -66,13 +66,17 @@ struct VulkanState {
   VkImageLayout offscreen_depth_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkPipeline viewport_pipeline = VK_NULL_HANDLE;
+  VkPipeline viewport_line_pipeline = VK_NULL_HANDLE;
   VkPipelineLayout viewport_pipeline_layout = VK_NULL_HANDLE;
   VkBuffer viewport_cube_buffer = VK_NULL_HANDLE;
   VkDeviceMemory viewport_cube_memory = VK_NULL_HANDLE;
   VkBuffer viewport_quad_buffer = VK_NULL_HANDLE;
   VkDeviceMemory viewport_quad_memory = VK_NULL_HANDLE;
+  VkBuffer viewport_line_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory viewport_line_memory = VK_NULL_HANDLE;
   uint32_t viewport_cube_vertex_count = 0;
   uint32_t viewport_quad_vertex_count = 0;
+  uint32_t viewport_line_vertex_capacity = 0;
 };
 
 VulkanState g_state{};
@@ -117,6 +121,7 @@ static const char* vk_result_name(VkResult result) {
 }
 
 bool create_viewport_pipeline();
+bool create_viewport_line_pipeline();
 bool create_viewport_vertex_buffer();
 bool create_swapchain();
 bool create_render_pass();
@@ -379,6 +384,10 @@ void destroy_offscreen() {
     vkDestroyPipeline(g_state.device, g_state.viewport_pipeline, nullptr);
     g_state.viewport_pipeline = VK_NULL_HANDLE;
   }
+  if (g_state.viewport_line_pipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.viewport_line_pipeline, nullptr);
+    g_state.viewport_line_pipeline = VK_NULL_HANDLE;
+  }
   if (g_state.viewport_pipeline_layout != VK_NULL_HANDLE) {
     vkDestroyPipelineLayout(g_state.device, g_state.viewport_pipeline_layout, nullptr);
     g_state.viewport_pipeline_layout = VK_NULL_HANDLE;
@@ -399,8 +408,17 @@ void destroy_offscreen() {
     vkFreeMemory(g_state.device, g_state.viewport_quad_memory, nullptr);
     g_state.viewport_quad_memory = VK_NULL_HANDLE;
   }
+  if (g_state.viewport_line_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.viewport_line_buffer, nullptr);
+    g_state.viewport_line_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.viewport_line_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.viewport_line_memory, nullptr);
+    g_state.viewport_line_memory = VK_NULL_HANDLE;
+  }
   g_state.viewport_cube_vertex_count = 0;
   g_state.viewport_quad_vertex_count = 0;
+  g_state.viewport_line_vertex_capacity = 0;
 
   if (g_state.offscreen_depth_view != VK_NULL_HANDLE) {
     vkDestroyImageView(g_state.device, g_state.offscreen_depth_view, nullptr);
@@ -630,6 +648,10 @@ bool create_offscreen(uint32_t width, uint32_t height) {
     rkg::log::error("viewport pipeline setup failed");
     return false;
   }
+  if (!create_viewport_line_pipeline()) {
+    rkg::log::error("viewport line pipeline setup failed");
+    return false;
+  }
   if (!create_viewport_vertex_buffer()) {
     rkg::log::error("viewport vertex buffer setup failed");
     return false;
@@ -801,8 +823,134 @@ bool create_viewport_pipeline() {
   return true;
 }
 
+bool create_viewport_line_pipeline() {
+  if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
+  if (g_state.viewport_line_pipeline != VK_NULL_HANDLE) return true;
+  if (g_state.viewport_pipeline_layout == VK_NULL_HANDLE) {
+    if (!create_viewport_pipeline()) {
+      return false;
+    }
+  }
+
+  VkShaderModule vert = create_shader_module(rkg_viewport_vert_spv,
+                                             sizeof(rkg_viewport_vert_spv) / sizeof(uint32_t));
+  VkShaderModule frag = create_shader_module(rkg_viewport_frag_spv,
+                                             sizeof(rkg_viewport_frag_spv) / sizeof(uint32_t));
+  if (vert == VK_NULL_HANDLE || frag == VK_NULL_HANDLE) {
+    rkg::log::error("viewport line shader module creation failed");
+    if (vert != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, vert, nullptr);
+    if (frag != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, frag, nullptr);
+    return false;
+  }
+
+  VkPipelineShaderStageCreateInfo stages[2]{};
+  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = vert;
+  stages[0].pName = "main";
+  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = frag;
+  stages[1].pName = "main";
+
+  VkVertexInputBindingDescription binding{};
+  binding.binding = 0;
+  binding.stride = sizeof(float) * 3;
+  binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  VkVertexInputAttributeDescription attr{};
+  attr.binding = 0;
+  attr.location = 0;
+  attr.format = VK_FORMAT_R32G32B32_SFLOAT;
+  attr.offset = 0;
+
+  VkPipelineVertexInputStateCreateInfo vertex_input{};
+  vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_input.vertexBindingDescriptionCount = 1;
+  vertex_input.pVertexBindingDescriptions = &binding;
+  vertex_input.vertexAttributeDescriptionCount = 1;
+  vertex_input.pVertexAttributeDescriptions = &attr;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+  input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  input_assembly.primitiveRestartEnable = VK_FALSE;
+
+  VkPipelineViewportStateCreateInfo viewport_state{};
+  viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewport_state.viewportCount = 1;
+  viewport_state.scissorCount = 1;
+
+  VkPipelineRasterizationStateCreateInfo raster{};
+  raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  raster.depthClampEnable = VK_FALSE;
+  raster.rasterizerDiscardEnable = VK_FALSE;
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.lineWidth = 1.0f;
+  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.depthBiasEnable = VK_FALSE;
+
+  VkPipelineMultisampleStateCreateInfo multisample{};
+  multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineDepthStencilStateCreateInfo depth{};
+  depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depth.depthTestEnable = VK_TRUE;
+  depth.depthWriteEnable = VK_FALSE;
+  depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth.depthBoundsTestEnable = VK_FALSE;
+  depth.stencilTestEnable = VK_FALSE;
+
+  VkPipelineColorBlendAttachmentState color_blend_attach{};
+  color_blend_attach.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  color_blend_attach.blendEnable = VK_FALSE;
+
+  VkPipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  color_blend.attachmentCount = 1;
+  color_blend.pAttachments = &color_blend_attach;
+
+  VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{};
+  dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamics;
+
+  VkGraphicsPipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_info.stageCount = 2;
+  pipeline_info.pStages = stages;
+  pipeline_info.pVertexInputState = &vertex_input;
+  pipeline_info.pInputAssemblyState = &input_assembly;
+  pipeline_info.pViewportState = &viewport_state;
+  pipeline_info.pRasterizationState = &raster;
+  pipeline_info.pMultisampleState = &multisample;
+  pipeline_info.pDepthStencilState = &depth;
+  pipeline_info.pColorBlendState = &color_blend;
+  pipeline_info.pDynamicState = &dynamic;
+  pipeline_info.layout = g_state.viewport_pipeline_layout;
+  pipeline_info.renderPass = g_state.offscreen_render_pass;
+  pipeline_info.subpass = 0;
+
+  const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+                                                    &g_state.viewport_line_pipeline);
+  vkDestroyShaderModule(g_state.device, vert, nullptr);
+  vkDestroyShaderModule(g_state.device, frag, nullptr);
+  if (result != VK_SUCCESS) {
+    rkg::log::error("viewport line pipeline creation failed");
+    return false;
+  }
+  return true;
+}
+
 bool create_viewport_vertex_buffer() {
-  if (g_state.viewport_cube_buffer != VK_NULL_HANDLE && g_state.viewport_quad_buffer != VK_NULL_HANDLE) return true;
+  if (g_state.viewport_cube_buffer != VK_NULL_HANDLE && g_state.viewport_quad_buffer != VK_NULL_HANDLE &&
+      g_state.viewport_line_buffer != VK_NULL_HANDLE) {
+    return true;
+  }
 
   auto create_buffer = [&](const float* data, size_t byte_size, VkBuffer& buffer, VkDeviceMemory& memory) -> bool {
     VkBufferCreateInfo buffer_info{};
@@ -853,6 +1001,33 @@ bool create_viewport_vertex_buffer() {
       return false;
     }
     g_state.viewport_quad_vertex_count = kViewportQuadVertexCount;
+  }
+
+  if (g_state.viewport_line_buffer == VK_NULL_HANDLE) {
+    const size_t line_bytes =
+        static_cast<size_t>(rkg::VulkanViewportLineList::kMaxLines) * 2 * 3 * sizeof(float);
+    VkBufferCreateInfo buffer_info{};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = static_cast<VkDeviceSize>(line_bytes);
+    buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vkCreateBuffer(g_state.device, &buffer_info, nullptr, &g_state.viewport_line_buffer) != VK_SUCCESS) {
+      rkg::log::error("viewport line buffer create failed");
+      return false;
+    }
+    VkMemoryRequirements mem_req{};
+    vkGetBufferMemoryRequirements(g_state.device, g_state.viewport_line_buffer, &mem_req);
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_req.size;
+    alloc_info.memoryTypeIndex = find_memory_type(
+        mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (vkAllocateMemory(g_state.device, &alloc_info, nullptr, &g_state.viewport_line_memory) != VK_SUCCESS) {
+      rkg::log::error("viewport line memory alloc failed");
+      return false;
+    }
+    vkBindBufferMemory(g_state.device, g_state.viewport_line_buffer, g_state.viewport_line_memory, 0);
+    g_state.viewport_line_vertex_capacity = rkg::VulkanViewportLineList::kMaxLines * 2;
   }
 
   return true;
@@ -1354,6 +1529,55 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
         vkCmdPushConstants(cmd, g_state.viewport_pipeline_layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
         vkCmdDraw(cmd, vertex_count, 1, 0, 0);
+      }
+    }
+    const auto* camera = rkg::get_vulkan_viewport_camera();
+    const auto* line_list = rkg::get_vulkan_viewport_line_list();
+    if (camera && line_list && line_list->line_count > 0 &&
+        g_state.viewport_line_pipeline != VK_NULL_HANDLE &&
+        g_state.viewport_line_buffer != VK_NULL_HANDLE &&
+        g_state.viewport_pipeline_layout != VK_NULL_HANDLE) {
+      VkViewport viewport{};
+      viewport.x = 0.0f;
+      viewport.y = 0.0f;
+      viewport.width = static_cast<float>(g_state.offscreen_extent.width);
+      viewport.height = static_cast<float>(g_state.offscreen_extent.height);
+      viewport.minDepth = 0.0f;
+      viewport.maxDepth = 1.0f;
+      VkRect2D scissor{};
+      scissor.offset = {0, 0};
+      scissor.extent = g_state.offscreen_extent;
+      vkCmdSetViewport(cmd, 0, 1, &viewport);
+      vkCmdSetScissor(cmd, 0, 1, &scissor);
+      const uint32_t max_lines =
+          std::min(line_list->line_count, rkg::VulkanViewportLineList::kMaxLines);
+      const size_t vertex_count = static_cast<size_t>(max_lines) * 2;
+      if (vertex_count <= g_state.viewport_line_vertex_capacity) {
+        void* mapped = nullptr;
+        const size_t byte_count = static_cast<size_t>(max_lines) * 6 * sizeof(float);
+        if (vkMapMemory(g_state.device, g_state.viewport_line_memory, 0, byte_count, 0, &mapped) == VK_SUCCESS) {
+          std::memcpy(mapped, line_list->positions, byte_count);
+          vkUnmapMemory(g_state.device, g_state.viewport_line_memory);
+        }
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.viewport_line_pipeline);
+        VkBuffer line_buffer = g_state.viewport_line_buffer;
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(cmd, 0, 1, &line_buffer, offsets);
+
+        struct PushData {
+          float mvp[16];
+          float color[4];
+        } push{};
+        std::memcpy(push.mvp, camera->view_proj, sizeof(push.mvp));
+        for (uint32_t i = 0; i < max_lines; ++i) {
+          const float* color = line_list->colors + (i * 4);
+          std::memcpy(push.color, color, sizeof(push.color));
+          vkCmdPushConstants(cmd, g_state.viewport_pipeline_layout,
+                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushData), &push);
+          const uint32_t first_vertex = i * 2;
+          vkCmdDraw(cmd, 2, 1, first_vertex, 0);
+        }
       }
     }
     log_step("offscreen: end render pass");

@@ -1,5 +1,12 @@
 name: demo_level
 entities:
+  - name: ground_plane_1
+    id: ground_plane_1
+    prefab: ground_plane
+    transform:
+      position: [0.0, 0.0, 0.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
   - name: demo_cube_1
     id: demo_cube_1
     prefab: demo_cube
