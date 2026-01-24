@@ -80,6 +80,8 @@ struct Skeleton {
   std::vector<Transform> world_pose;
 };
 
+void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton);
+
 class Registry {
  public:
   Entity create_entity();
