@@ -1,5 +1,7 @@
 #include "rkg/ecs.h"
 
+#include "rkg/math.h"
+
 namespace rkg::ecs {
 
 Entity Registry::create_entity() {
@@ -54,6 +56,53 @@ const Renderable* Registry::get_renderable(Entity entity) const {
     return nullptr;
   }
   return &it->second;
+}
+
+void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton) {
+  const size_t bone_count = skeleton.bones.size();
+  if (bone_count == 0) {
+    skeleton.world_pose.clear();
+    return;
+  }
+  if (skeleton.world_pose.size() != bone_count) {
+    skeleton.world_pose.resize(bone_count);
+  }
+
+  const rkg::Vec3 root_pos{root.position[0], root.position[1], root.position[2]};
+  const rkg::Vec3 root_rot{root.rotation[0], root.rotation[1], root.rotation[2]};
+  const rkg::Vec3 root_scale{root.scale[0], root.scale[1], root.scale[2]};
+  const Mat4 root_model = mat4_mul(mat4_translation(root_pos),
+                                   mat4_mul(mat4_rotation_xyz(root_rot), mat4_scale(root_scale)));
+
+  std::vector<Mat4> world_mats;
+  world_mats.resize(bone_count);
+
+  for (size_t i = 0; i < bone_count; ++i) {
+    const Bone& bone = skeleton.bones[i];
+    const rkg::Vec3 local_pos{bone.local_pose.position[0], bone.local_pose.position[1], bone.local_pose.position[2]};
+    const rkg::Vec3 local_rot{bone.local_pose.rotation[0], bone.local_pose.rotation[1], bone.local_pose.rotation[2]};
+    const rkg::Vec3 local_scale{bone.local_pose.scale[0], bone.local_pose.scale[1], bone.local_pose.scale[2]};
+    const Mat4 local =
+        mat4_mul(mat4_translation(local_pos), mat4_mul(mat4_rotation_xyz(local_rot), mat4_scale(local_scale)));
+    if (bone.parent_index >= 0 && static_cast<size_t>(bone.parent_index) < bone_count &&
+        static_cast<size_t>(bone.parent_index) < i) {
+      world_mats[i] = mat4_mul(world_mats[bone.parent_index], local);
+    } else {
+      world_mats[i] = mat4_mul(root_model, local);
+    }
+
+    Transform world{};
+    world.position[0] = world_mats[i].m[12];
+    world.position[1] = world_mats[i].m[13];
+    world.position[2] = world_mats[i].m[14];
+    world.rotation[0] = bone.local_pose.rotation[0];
+    world.rotation[1] = bone.local_pose.rotation[1];
+    world.rotation[2] = bone.local_pose.rotation[2];
+    world.scale[0] = bone.local_pose.scale[0];
+    world.scale[1] = bone.local_pose.scale[1];
+    world.scale[2] = bone.local_pose.scale[2];
+    skeleton.world_pose[i] = world;
+  }
 }
 
 void Registry::remove_renderable(Entity entity) {

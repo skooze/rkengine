@@ -250,6 +250,48 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Test: skeleton world pose compute.
+  {
+    rkg::ecs::Transform root{};
+    root.position[0] = 1.0f;
+    root.position[1] = 0.0f;
+    root.position[2] = 0.0f;
+    rkg::ecs::Skeleton skeleton{};
+    rkg::ecs::Bone bone_root{};
+    bone_root.name = "root";
+    bone_root.parent_index = -1;
+    bone_root.local_pose.position[0] = 0.0f;
+    bone_root.local_pose.position[1] = 0.0f;
+    bone_root.local_pose.position[2] = 0.0f;
+    skeleton.bones.push_back(bone_root);
+    rkg::ecs::Bone bone_child{};
+    bone_child.name = "child";
+    bone_child.parent_index = 0;
+    bone_child.local_pose.position[0] = 0.0f;
+    bone_child.local_pose.position[1] = 1.0f;
+    bone_child.local_pose.position[2] = 0.0f;
+    skeleton.bones.push_back(bone_child);
+
+    rkg::ecs::compute_skeleton_world_pose(root, skeleton);
+    if (skeleton.world_pose.size() != 2) {
+      std::cerr << "skeleton world pose size wrong\n";
+      ++failures;
+    } else {
+      const auto& root_world = skeleton.world_pose[0];
+      const auto& child_world = skeleton.world_pose[1];
+      if (std::abs(root_world.position[0] - 1.0f) > 0.001f ||
+          std::abs(root_world.position[1] - 0.0f) > 0.001f) {
+        std::cerr << "skeleton root world pos wrong\n";
+        ++failures;
+      }
+      if (std::abs(child_world.position[0] - 1.0f) > 0.001f ||
+          std::abs(child_world.position[1] - 1.0f) > 0.001f) {
+        std::cerr << "skeleton child world pos wrong\n";
+        ++failures;
+      }
+    }
+  }
+
 #if RKG_ENABLE_PHYSICS_BASIC
   // Test: physics_basic plugin updates character controller.
   {

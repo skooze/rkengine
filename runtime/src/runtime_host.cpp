@@ -1134,6 +1134,35 @@ void RuntimeHost::load_initial_level() {
     rkg::ecs::CharacterController controller{};
     registry_.set_character_controller(player_, controller);
   }
+
+  if (player_ != rkg::ecs::kInvalidEntity && registry_.get_skeleton(player_) == nullptr) {
+    rkg::ecs::Skeleton skeleton{};
+    rkg::ecs::Bone root{};
+    root.name = "root";
+    root.parent_index = -1;
+    root.local_pose.position[0] = 0.0f;
+    root.local_pose.position[1] = 0.0f;
+    root.local_pose.position[2] = 0.0f;
+    skeleton.bones.push_back(root);
+
+    rkg::ecs::Bone spine{};
+    spine.name = "spine";
+    spine.parent_index = 0;
+    spine.local_pose.position[0] = 0.0f;
+    spine.local_pose.position[1] = 0.6f;
+    spine.local_pose.position[2] = 0.0f;
+    skeleton.bones.push_back(spine);
+
+    rkg::ecs::Bone head{};
+    head.name = "head";
+    head.parent_index = 1;
+    head.local_pose.position[0] = 0.0f;
+    head.local_pose.position[1] = 0.4f;
+    head.local_pose.position[2] = 0.0f;
+    skeleton.bones.push_back(head);
+
+    registry_.set_skeleton(player_, skeleton);
+  }
 }
 
 std::string RuntimeHost::renderer_display_name() const {

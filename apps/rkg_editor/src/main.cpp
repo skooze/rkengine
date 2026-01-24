@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -340,12 +341,14 @@ struct EditorState {
   bool show_world_grid = true;
   bool show_character_grid = true;
   bool show_world_axes = true;
+  bool show_skeleton_debug = true;
   float grid_half_extent = 10.0f;
   float grid_step = 1.0f;
 
   rkg::ecs::Entity selected_entity = rkg::ecs::kInvalidEntity;
   std::string selected_name;
   rkg::ecs::Entity fallback_entity = rkg::ecs::kInvalidEntity;
+  int selected_bone = -1;
 
   AgentPanelState agent;
   ContentPanelState content;
@@ -1161,6 +1164,7 @@ std::string entity_display_name(const rkg::runtime::RuntimeHost& runtime, rkg::e
 
 void set_selected_entity(EditorState& state, rkg::ecs::Entity entity) {
   state.selected_entity = entity;
+  state.selected_bone = -1;
   if (entity == rkg::ecs::kInvalidEntity) {
     state.selected_name.clear();
     return;
@@ -2297,6 +2301,8 @@ void draw_viewport(EditorState& state) {
     ImGui::Checkbox("Character Grid", &state.show_character_grid);
     ImGui::SameLine();
     ImGui::Checkbox("World Axes", &state.show_world_axes);
+    ImGui::SameLine();
+    ImGui::Checkbox("Skeletons", &state.show_skeleton_debug);
     ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
     ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
     if (state.grid_step < 0.25f) state.grid_step = 0.25f;
@@ -2489,6 +2495,67 @@ void draw_inspector_panel(EditorState& state) {
     }
     if (ImGui::IsItemDeactivatedAfterEdit()) {
       end_undo_edit(state.undo, color_id, entity, registry);
+    }
+  }
+
+  if (auto* skeleton = registry.get_skeleton(entity)) {
+    ImGui::Separator();
+    ImGui::Text("Skeleton");
+    ImGui::Text("Bones: %zu", skeleton->bones.size());
+    if (auto* transform = registry.get_transform(entity)) {
+      rkg::ecs::compute_skeleton_world_pose(*transform, *skeleton);
+      if (state.selected_bone >= 0 &&
+          static_cast<size_t>(state.selected_bone) < skeleton->bones.size()) {
+        const auto& bone = skeleton->bones[state.selected_bone];
+        const auto& world = skeleton->world_pose[state.selected_bone];
+        ImGui::Text("Selected: %d (%s)", state.selected_bone,
+                    bone.name.empty() ? "(unnamed)" : bone.name.c_str());
+        ImGui::Text("World Pos: %.2f %.2f %.2f",
+                    world.position[0], world.position[1], world.position[2]);
+      }
+
+      std::vector<std::vector<int>> children;
+      children.resize(skeleton->bones.size());
+      for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+        const int parent = skeleton->bones[i].parent_index;
+        if (parent >= 0 && static_cast<size_t>(parent) < skeleton->bones.size()) {
+          children[parent].push_back(static_cast<int>(i));
+        }
+      }
+
+      std::function<void(int)> draw_bone = [&](int idx) {
+        const auto& bone = skeleton->bones[idx];
+        const std::string label =
+            bone.name.empty() ? std::string("bone_") + std::to_string(idx) : bone.name;
+        const bool is_selected = state.selected_bone == idx;
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow |
+                                   ImGuiTreeNodeFlags_SpanFullWidth;
+        if (children[idx].empty()) {
+          flags |= ImGuiTreeNodeFlags_Leaf;
+        }
+        if (is_selected) {
+          flags |= ImGuiTreeNodeFlags_Selected;
+        }
+        const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<intptr_t>(idx)),
+                                            flags, "%s", label.c_str());
+        if (ImGui::IsItemClicked()) {
+          state.selected_bone = idx;
+        }
+        if (open) {
+          for (const int child : children[idx]) {
+            draw_bone(child);
+          }
+          ImGui::TreePop();
+        }
+      };
+
+      for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+        if (skeleton->bones[i].parent_index < 0) {
+          draw_bone(static_cast<int>(i));
+        }
+      }
+    } else {
+      ImGui::TextUnformatted("Transform required for world pose.");
     }
   }
 
@@ -3499,6 +3566,7 @@ void update_camera_and_draw_list(EditorState& state) {
   const float axis_x_color[4] = {0.85f, 0.2f, 0.2f, 1.0f};
   const float axis_y_color[4] = {0.2f, 0.85f, 0.2f, 1.0f};
   const float axis_z_color[4] = {0.2f, 0.35f, 0.9f, 1.0f};
+  const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
 
   if (state.show_world_grid) {
     const float extent = state.grid_half_extent;
@@ -3528,6 +3596,36 @@ void update_camera_and_draw_list(EditorState& state) {
     add_line({0.0f, 0.0f, 0.0f}, {axis_len, 0.0f, 0.0f}, axis_x_color);
     add_line({0.0f, 0.0f, 0.0f}, {0.0f, axis_len, 0.0f}, axis_y_color);
     add_line({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, axis_len}, axis_z_color);
+  }
+
+  if (state.show_skeleton_debug) {
+    for (auto& kv : registry.skeletons()) {
+      const auto entity = kv.first;
+      auto& skeleton = kv.second;
+      const auto* transform = registry.get_transform(entity);
+      if (!transform) {
+        continue;
+      }
+      rkg::ecs::compute_skeleton_world_pose(*transform, skeleton);
+      if (skeleton.world_pose.size() != skeleton.bones.size()) {
+        continue;
+      }
+      const float joint_len = 0.06f;
+      for (size_t i = 0; i < skeleton.bones.size(); ++i) {
+        const auto& bone = skeleton.bones[i];
+        const auto& world = skeleton.world_pose[i];
+        const Vec3 pos{world.position[0], world.position[1], world.position[2]};
+        if (bone.parent_index >= 0 &&
+            static_cast<size_t>(bone.parent_index) < skeleton.world_pose.size()) {
+          const auto& parent_world = skeleton.world_pose[bone.parent_index];
+          const Vec3 parent_pos{parent_world.position[0], parent_world.position[1], parent_world.position[2]};
+          add_line(parent_pos, pos, skeleton_color);
+        }
+        add_line({pos.x - joint_len, pos.y, pos.z}, {pos.x + joint_len, pos.y, pos.z}, skeleton_color);
+        add_line({pos.x, pos.y - joint_len, pos.z}, {pos.x, pos.y + joint_len, pos.z}, skeleton_color);
+        add_line({pos.x, pos.y, pos.z - joint_len}, {pos.x, pos.y, pos.z + joint_len}, skeleton_color);
+      }
+    }
   }
 
   if (line_count > 0) {
