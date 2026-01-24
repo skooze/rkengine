@@ -338,6 +338,17 @@ struct EditorState {
   float camera_pitch = 0.3f;
   float camera_distance = 4.0f;
   float camera_fov = 60.0f;
+  float camera_pan[3]{0.0f, 0.0f, 0.0f};
+  float editor_pivot_world[3]{0.0f, 0.0f, 0.0f};
+  bool lock_editor_pivot = false;
+  struct SavedEditorCamera {
+    bool valid = false;
+    float yaw = 0.0f;
+    float pitch = 0.0f;
+    float distance = 0.0f;
+    float pan[3]{0.0f, 0.0f, 0.0f};
+    float pivot[3]{0.0f, 0.0f, 0.0f};
+  } saved_editor_cam;
   bool show_world_grid = true;
   bool show_character_grid = true;
   bool show_world_axes = true;
@@ -1167,6 +1178,7 @@ std::string entity_display_name(const rkg::runtime::RuntimeHost& runtime, rkg::e
 void set_selected_entity(EditorState& state, rkg::ecs::Entity entity) {
   state.selected_entity = entity;
   state.selected_bone = -1;
+  state.lock_editor_pivot = false;
   if (entity == rkg::ecs::kInvalidEntity) {
     state.selected_name.clear();
     return;
@@ -2273,6 +2285,22 @@ void draw_toolbar(EditorState& state) {
   const float fps = dt > 0.0f ? (1.0f / dt) : 0.0f;
 
   if (ImGui::Button("Play")) {
+    if (state.play_state != PlayState::Play) {
+      state.saved_editor_cam.valid = true;
+      state.saved_editor_cam.yaw = state.camera_yaw;
+      state.saved_editor_cam.pitch = state.camera_pitch;
+      state.saved_editor_cam.distance = state.camera_distance;
+      state.saved_editor_cam.pan[0] = state.camera_pan[0];
+      state.saved_editor_cam.pan[1] = state.camera_pan[1];
+      state.saved_editor_cam.pan[2] = state.camera_pan[2];
+      state.saved_editor_cam.pivot[0] = state.editor_pivot_world[0];
+      state.saved_editor_cam.pivot[1] = state.editor_pivot_world[1];
+      state.saved_editor_cam.pivot[2] = state.editor_pivot_world[2];
+      state.camera_pan[0] = 0.0f;
+      state.camera_pan[1] = 0.0f;
+      state.camera_pan[2] = 0.0f;
+      state.lock_editor_pivot = false;
+    }
     state.play_state = PlayState::Play;
   }
   ImGui::SameLine();
@@ -2288,6 +2316,18 @@ void draw_toolbar(EditorState& state) {
   if (ImGui::Button("Stop")) {
     state.play_state = PlayState::Edit;
     state.stop_requested = true;
+    if (state.saved_editor_cam.valid) {
+      state.camera_yaw = state.saved_editor_cam.yaw;
+      state.camera_pitch = state.saved_editor_cam.pitch;
+      state.camera_distance = state.saved_editor_cam.distance;
+      state.camera_pan[0] = state.saved_editor_cam.pan[0];
+      state.camera_pan[1] = state.saved_editor_cam.pan[1];
+      state.camera_pan[2] = state.saved_editor_cam.pan[2];
+      state.editor_pivot_world[0] = state.saved_editor_cam.pivot[0];
+      state.editor_pivot_world[1] = state.saved_editor_cam.pivot[1];
+      state.editor_pivot_world[2] = state.saved_editor_cam.pivot[2];
+      state.lock_editor_pivot = true;
+    }
   }
 
   ImGui::SameLine();
@@ -2344,9 +2384,11 @@ void draw_viewport(EditorState& state) {
   const bool hovered = ImGui::IsWindowHovered();
   if (hovered && ImGui::IsMouseClicked(0) && !io.WantCaptureMouse) {
     state.viewport_focused = true;
-    state.pick_requested = true;
-    state.pick_mouse_pos[0] = io.MousePos.x;
-    state.pick_mouse_pos[1] = io.MousePos.y;
+    if (state.play_state != PlayState::Play || io.KeyCtrl) {
+      state.pick_requested = true;
+      state.pick_mouse_pos[0] = io.MousePos.x;
+      state.pick_mouse_pos[1] = io.MousePos.y;
+    }
   }
   if (!hovered && ImGui::IsMouseClicked(0) && !io.WantCaptureMouse) {
     state.viewport_focused = false;
@@ -2357,7 +2399,31 @@ void draw_viewport(EditorState& state) {
     state.selected_entity = rkg::ecs::kInvalidEntity;
     state.selected_name.clear();
   }
-  ImGui::Text("Focus: %s", state.viewport_focused ? "Viewport" : "UI");
+  const char* play_label = (state.play_state == PlayState::Play)
+                               ? "Play"
+                               : (state.play_state == PlayState::Pause ? "Pause" : "Edit");
+  ImGui::SetCursorScreenPos({state.viewport_pos[0] + 8.0f, state.viewport_pos[1] + 8.0f});
+  ImGui::BeginChild("ViewportHUD", ImVec2(320, 0),
+                    false, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
+                               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::Text("Viewport Focus: %s", state.viewport_focused ? "ON" : "OFF");
+  ImGui::Text("Mode: %s", play_label);
+  const auto player = state.runtime->player_entity();
+  const auto& registry = state.runtime->registry();
+  if (player != rkg::ecs::kInvalidEntity) {
+    if (const auto* transform = registry.get_transform(player)) {
+      ImGui::Text("Player Pos: %.2f %.2f %.2f",
+                  transform->position[0], transform->position[1], transform->position[2]);
+    }
+    if (const auto* velocity = registry.get_velocity(player)) {
+      ImGui::Text("Player Vel: %.2f %.2f %.2f",
+                  velocity->linear[0], velocity->linear[1], velocity->linear[2]);
+    }
+    if (const auto* controller = registry.get_character_controller(player)) {
+      ImGui::Text("Grounded: %s", controller->grounded ? "yes" : "no");
+    }
+  }
+  ImGui::EndChild();
   ImGui::End();
 }
 
@@ -3488,32 +3554,49 @@ void update_camera_and_draw_list(EditorState& state) {
     }
   }
 
-  rkg::ecs::Entity focus_entity = state.selected_entity;
-  if (focus_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(focus_entity)) {
-    if (player != rkg::ecs::kInvalidEntity && registry.get_transform(player)) {
-      focus_entity = player;
-    } else if (registry.get_transform(state.fallback_entity)) {
-      focus_entity = state.fallback_entity;
-    }
-  }
-
   Vec3 focus_pos{0.0f, 0.0f, 0.0f};
-  if (const auto* transform = registry.get_transform(focus_entity)) {
+  if (state.play_state == PlayState::Play &&
+      player != rkg::ecs::kInvalidEntity && registry.get_transform(player)) {
+    const auto* transform = registry.get_transform(player);
     focus_pos = {transform->position[0], transform->position[1], transform->position[2]};
+  } else if (state.lock_editor_pivot) {
+    focus_pos = {state.editor_pivot_world[0], state.editor_pivot_world[1], state.editor_pivot_world[2]};
+  } else {
+    rkg::ecs::Entity focus_entity = state.selected_entity;
+    if (focus_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(focus_entity)) {
+      if (player != rkg::ecs::kInvalidEntity && registry.get_transform(player)) {
+        focus_entity = player;
+      } else if (registry.get_transform(state.fallback_entity)) {
+        focus_entity = state.fallback_entity;
+      }
+    }
+    if (const auto* transform = registry.get_transform(focus_entity)) {
+      focus_pos = {transform->position[0], transform->position[1], transform->position[2]};
+    }
   }
+  if (state.play_state != PlayState::Play && !state.lock_editor_pivot) {
+    state.editor_pivot_world[0] = focus_pos.x;
+    state.editor_pivot_world[1] = focus_pos.y;
+    state.editor_pivot_world[2] = focus_pos.z;
+  }
+  focus_pos = vec3_add(focus_pos, {state.camera_pan[0], state.camera_pan[1], state.camera_pan[2]});
 
-  if (state.play_state == PlayState::Edit || state.play_state == PlayState::Pause) {
-    if (can_control && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-      state.camera_yaw += io.MouseDelta.x * 0.01f;
-      state.camera_pitch += io.MouseDelta.y * 0.01f;
-      if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
-      if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
-    }
-    if (can_control && std::abs(io.MouseWheel) > 0.0001f) {
-      state.camera_distance -= io.MouseWheel * 0.4f;
-      if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
-      if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
-    }
+  // Viewport camera controls:
+  // - RMB drag: orbit (yaw/pitch)
+  // - Mouse wheel: zoom (distance)
+  // - MMB drag: pan (move pivot in view plane)
+  const bool camera_input_enabled =
+      state.viewport_focused && !state.chat_active && !io.WantTextInput;
+  if (camera_input_enabled && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+    state.camera_yaw += io.MouseDelta.x * 0.01f;
+    state.camera_pitch += io.MouseDelta.y * 0.01f;
+    if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
+    if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
+  }
+  if (camera_input_enabled && std::abs(io.MouseWheel) > 0.0001f) {
+    state.camera_distance -= io.MouseWheel * 0.4f;
+    if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
+    if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
   }
 
   const float cy = std::cos(state.camera_yaw);
@@ -3525,6 +3608,14 @@ void update_camera_and_draw_list(EditorState& state) {
   const Vec3 world_up = {0.0f, 1.0f, 0.0f};
   const Vec3 right = vec3_normalize(vec3_cross(forward, world_up));
   const Vec3 up = vec3_cross(right, forward);
+  if (camera_input_enabled && ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+    const float pan_scale = state.camera_distance * 0.002f;
+    const Vec3 pan_delta =
+        vec3_add(vec3_mul(right, -io.MouseDelta.x * pan_scale), vec3_mul(up, io.MouseDelta.y * pan_scale));
+    state.camera_pan[0] += pan_delta.x;
+    state.camera_pan[1] += pan_delta.y;
+    state.camera_pan[2] += pan_delta.z;
+  }
 
   state.camera_eye[0] = eye.x;
   state.camera_eye[1] = eye.y;
@@ -3630,6 +3721,19 @@ void update_camera_and_draw_list(EditorState& state) {
         add_line({pos.x, pos.y - joint_len, pos.z}, {pos.x, pos.y + joint_len, pos.z}, skeleton_color);
         add_line({pos.x, pos.y, pos.z - joint_len}, {pos.x, pos.y, pos.z + joint_len}, skeleton_color);
       }
+    }
+  }
+
+  if (player != rkg::ecs::kInvalidEntity) {
+    const auto* transform = registry.get_transform(player);
+    const auto* velocity = registry.get_velocity(player);
+    if (transform && velocity) {
+      const Vec3 pos{transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 vel{velocity->linear[0], velocity->linear[1], velocity->linear[2]};
+      const float vel_scale = 0.35f;
+      const Vec3 tip = vec3_add(pos, vec3_mul(vel, vel_scale));
+      const float vel_color[4] = {1.0f, 0.4f, 0.9f, 1.0f};
+      add_line(pos, tip, vel_color);
     }
   }
 
