@@ -107,6 +107,11 @@ static const char* vk_result_name(VkResult result) {
 
 bool create_viewport_pipeline();
 bool create_viewport_vertex_buffer();
+bool create_swapchain();
+bool create_render_pass();
+bool create_framebuffers();
+bool create_command_buffers();
+void destroy_swapchain();
 
 static constexpr uint32_t kViewportVertexCount = 36;
 static const float kViewportCubeVertices[kViewportVertexCount * 3] = {
