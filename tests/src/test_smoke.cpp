@@ -2,6 +2,9 @@
 #include "rkg/ai_results.h"
 #include "rkg/log.h"
 #include "rkg/math.h"
+#include "rkg/host_context.h"
+#include "rkg/input.h"
+#include "rkg/plugin_api.h"
 #include "rkg/paths.h"
 #include "rkg/run_cleanup.h"
 #include "rkg/snapshot_restore.h"
@@ -24,9 +27,14 @@
 #include <sstream>
 #include <chrono>
 #include <optional>
+#include <cstring>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+#if RKG_ENABLE_PHYSICS_BASIC
+extern "C" rkg::RkgPluginApi* rkg_plugin_get_api_physics_basic(uint32_t host_api_version);
+#endif
 
 bool write_text(const fs::path& path, const std::string& contents) {
   fs::create_directories(path.parent_path());
@@ -216,6 +224,91 @@ int main(int argc, char** argv) {
       ++failures;
     }
   }
+
+#if RKG_ENABLE_PHYSICS_BASIC
+  // Test: physics_basic plugin updates character controller.
+  {
+    rkg::ecs::Registry registry;
+    const auto entity = registry.create_entity();
+    rkg::ecs::Transform transform{};
+    transform.position[1] = 1.5f;
+    registry.set_transform(entity, transform);
+    rkg::ecs::CharacterController controller{};
+    controller.grounded = true;
+    registry.set_character_controller(entity, controller);
+
+    struct ActionStub {
+      bool forward = false;
+      bool jump = false;
+      bool sprint = false;
+      rkg::input::ActionState get(const char* action) const {
+        rkg::input::ActionState state{};
+        if (std::strcmp(action, "MoveForward") == 0) {
+          state.held = forward;
+        } else if (std::strcmp(action, "Jump") == 0) {
+          state.pressed = jump;
+        } else if (std::strcmp(action, "Sprint") == 0) {
+          state.held = sprint;
+        }
+        return state;
+      }
+    };
+
+    ActionStub stub{};
+    stub.forward = true;
+    stub.jump = true;
+
+    rkg::HostContext ctx{};
+    ctx.registry = &registry;
+    ctx.get_action_state = [](void* user, const char* action) -> rkg::input::ActionState {
+      return static_cast<ActionStub*>(user)->get(action);
+    };
+    ctx.action_state_user = &stub;
+
+    auto* api = rkg_plugin_get_api_physics_basic(rkg::kRkgPluginApiVersion);
+    if (!api || !api->init || !api->shutdown || !api->update) {
+      std::cerr << "physics_basic api missing\n";
+      ++failures;
+    } else {
+      if (!api->init(&ctx)) {
+        std::cerr << "physics_basic init failed\n";
+        ++failures;
+      } else {
+        const auto* before = registry.get_transform(entity);
+        const float before_z = before ? before->position[2] : 0.0f;
+        api->update(1.0f / 60.0f);
+        const auto* after = registry.get_transform(entity);
+        if (!after || after->position[2] <= before_z) {
+          std::cerr << "physics_basic did not move forward\n";
+          ++failures;
+        }
+        const auto* vel = registry.get_velocity(entity);
+        if (!vel || vel->linear[1] <= 0.0f) {
+          std::cerr << "physics_basic jump failed\n";
+          ++failures;
+        }
+
+        rkg::ecs::Transform ground_test{};
+        ground_test.position[1] = 0.0f;
+        registry.set_transform(entity, ground_test);
+        if (auto* ctrl = registry.get_character_controller(entity)) {
+          ctrl->grounded = false;
+        }
+        if (auto* v = registry.get_velocity(entity)) {
+          v->linear[1] = -1.0f;
+        }
+        api->update(1.0f / 60.0f);
+        const auto* grounded = registry.get_transform(entity);
+        if (!grounded || grounded->position[1] < (controller.half_height + controller.radius) - 0.001f) {
+          std::cerr << "physics_basic grounding failed\n";
+          ++failures;
+        }
+
+        api->shutdown();
+      }
+    }
+  }
+#endif
 
 #if RKG_ENABLE_DATA_JSON
   // Test: plan schema file exists.

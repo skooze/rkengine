@@ -34,3 +34,7 @@ endif()
 if(TARGET rkg_plugins_debug_ui_imgui)
   target_link_libraries(rkg_editor PUBLIC rkg_plugins_debug_ui_imgui)
 endif()
+
+if(RKG_ENABLE_PHYSICS_BASIC)
+  target_link_libraries(rkg_editor PUBLIC rkg_plugins_physics_basic)
+endif()

@@ -30,6 +30,8 @@ platform::KeyCode keycode_from_string(const std::string& name) {
   if (key == "a") return platform::KeyCode::A;
   if (key == "s") return platform::KeyCode::S;
   if (key == "d") return platform::KeyCode::D;
+  if (key == "space") return platform::KeyCode::Space;
+  if (key == "leftshift" || key == "lshift" || key == "shift") return platform::KeyCode::LeftShift;
   if (key == "escape" || key == "esc") return platform::KeyCode::Escape;
   if (key == "f1") return platform::KeyCode::F1;
   if (key == "f5") return platform::KeyCode::F5;

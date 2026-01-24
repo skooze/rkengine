@@ -11,7 +11,8 @@ enum class PluginType : uint32_t {
   Data = 3,
   AI = 4,
   Cloud = 5,
-  DebugUI = 6
+  DebugUI = 6,
+  Physics = 7
 };
 
 enum class RendererCaps : uint32_t {

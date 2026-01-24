@@ -5,6 +5,7 @@ project:
     - script_lua
     - script_js
     - debug_ui_imgui
+    - physics_basic
   initial_level: content/levels/demo_level.yaml
   input_map: config/input.yaml
   dev_mode: true

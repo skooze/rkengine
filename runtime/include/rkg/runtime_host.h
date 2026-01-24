@@ -95,8 +95,10 @@ class RuntimeHost {
   void handle_reload(bool manual_requested);
   bool reload_content(bool raw_changed, const std::string& reason);
   void reset_runtime();
- void load_initial_level();
- static void sdl_event_callback(const void* event, void* user_data);
+  void load_initial_level();
+  static void sdl_event_callback(const void* event, void* user_data);
+  static rkg::input::ActionState action_state_thunk(void* user_data, const char* action);
+  rkg::input::ActionState resolve_action_state(const char* action) const;
 
   rkg::ResolvedPaths paths_{};
   std::filesystem::path executable_dir_;
@@ -147,6 +149,8 @@ class RuntimeHost {
   rkg::HostContext host_ctx_{};
   rkg::PluginHost host_{};
   rkg::platform::FileWatcher watcher_{};
+  ActionStateProvider current_action_provider_{};
+  bool physics_basic_enabled_ = false;
 };
 
 } // namespace rkg::runtime

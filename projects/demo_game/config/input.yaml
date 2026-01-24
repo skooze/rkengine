@@ -4,6 +4,8 @@ input:
     MoveBack: S
     MoveLeft: A
     MoveRight: D
+    Jump: Space
+    Sprint: LeftShift
     Quit: Escape
     Reload: F5
     ToggleDebugUI: F1

@@ -33,6 +33,10 @@ KeyCode map_sdl_scancode(SDL_Scancode scancode) {
       return KeyCode::S;
     case SDL_SCANCODE_D:
       return KeyCode::D;
+    case SDL_SCANCODE_SPACE:
+      return KeyCode::Space;
+    case SDL_SCANCODE_LSHIFT:
+      return KeyCode::LeftShift;
     case SDL_SCANCODE_ESCAPE:
       return KeyCode::Escape;
     case SDL_SCANCODE_F1:

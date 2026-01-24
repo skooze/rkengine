@@ -38,6 +38,7 @@ option(RKG_ENABLE_AI "Enable AI orchestration plugin" ON)
 option(RKG_ENABLE_CLOUD "Enable Cloud plugin" OFF)
 option(RKG_ENABLE_IMGUI "Enable ImGui debug UI plugin" ON)
 option(RKG_ENABLE_OPENAI "Enable OpenAI provider (rkgctl)" ON)
+option(RKG_ENABLE_PHYSICS_BASIC "Enable basic physics plugin" ON)
 option(RKG_BUILD_TESTS "Build tests" ON)
 
 message(STATUS "RKG_ENABLE_VULKAN=${RKG_ENABLE_VULKAN}")
@@ -64,6 +65,7 @@ add_compile_definitions(
   RKG_ENABLE_CLOUD=$<BOOL:${RKG_ENABLE_CLOUD}>
   RKG_ENABLE_IMGUI=$<BOOL:${RKG_ENABLE_IMGUI}>
   RKG_ENABLE_OPENAI=$<BOOL:${RKG_ENABLE_OPENAI}>
+  RKG_ENABLE_PHYSICS_BASIC=$<BOOL:${RKG_ENABLE_PHYSICS_BASIC}>
 )
 
 # Dependencies (prefer system, fallback to FetchContent)

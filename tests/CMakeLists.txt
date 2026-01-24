@@ -3,3 +3,7 @@ rkg_add_executable(rkg_tests
 )
 
 target_link_libraries(rkg_tests PUBLIC rkg_core rkgctl_lib)
+
+if(RKG_ENABLE_PHYSICS_BASIC)
+  target_link_libraries(rkg_tests PUBLIC rkg_plugins_physics_basic)
+endif()

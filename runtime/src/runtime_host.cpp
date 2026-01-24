@@ -49,6 +49,9 @@ extern "C" rkg::RkgPluginApi* rkg_plugin_get_api_script_python(uint32_t host_api
 #if RKG_ENABLE_IMGUI
 extern "C" rkg::RkgPluginApi* rkg_plugin_get_api_debug_ui_imgui(uint32_t host_api_version);
 #endif
+#if RKG_ENABLE_PHYSICS_BASIC
+extern "C" rkg::RkgPluginApi* rkg_plugin_get_api_physics_basic(uint32_t host_api_version);
+#endif
 
 namespace rkg::runtime {
 namespace {
@@ -678,6 +681,24 @@ void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
   }
 }
 
+rkg::input::ActionState RuntimeHost::action_state_thunk(void* user_data, const char* action) {
+  auto* self = static_cast<RuntimeHost*>(user_data);
+  if (!self || !action) {
+    return {};
+  }
+  return self->resolve_action_state(action);
+}
+
+rkg::input::ActionState RuntimeHost::resolve_action_state(const char* action) const {
+  if (!action || !*action) {
+    return {};
+  }
+  if (current_action_provider_) {
+    return current_action_provider_(action);
+  }
+  return input_.action(action);
+}
+
 bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   paths_ = rkg::resolve_paths(init.argv0, init.project_override, init.default_project);
   executable_dir_ = detect_executable_dir(init.argv0);
@@ -804,9 +825,14 @@ void RuntimeHost::setup_plugins(bool force_debug_ui, bool disable_debug_ui, std:
 #if RKG_ENABLE_IMGUI
   host_.register_plugin(rkg_plugin_get_api_debug_ui_imgui(rkg::kRkgPluginApiVersion));
 #endif
+#if RKG_ENABLE_PHYSICS_BASIC
+  host_.register_plugin(rkg_plugin_get_api_physics_basic(rkg::kRkgPluginApiVersion));
+#endif
 
   host_ctx_.platform = &platform_;
   host_ctx_.registry = &registry_;
+  host_ctx_.get_action_state = &RuntimeHost::action_state_thunk;
+  host_ctx_.action_state_user = this;
 
   const auto order = rkg::build_renderer_fallback_order(project_.renderer);
   const std::string requested_plugin = order.empty() ? "renderer_null" : order.front();
@@ -844,6 +870,7 @@ void RuntimeHost::setup_plugins(bool force_debug_ui, bool disable_debug_ui, std:
     }
   }
 
+  physics_basic_enabled_ = false;
   active_plugins_ = project_.plugins;
 #if RKG_ENABLE_IMGUI
   if (disable_debug_ui) {
@@ -876,6 +903,11 @@ void RuntimeHost::setup_plugins(bool force_debug_ui, bool disable_debug_ui, std:
         rkg::log::info("debug_ui enabled");
       }
 #endif
+#if RKG_ENABLE_PHYSICS_BASIC
+      if (name == "physics_basic") {
+        physics_basic_enabled_ = true;
+      }
+#endif
     }
   }
 }
@@ -902,6 +934,7 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
     input_.update(platform_);
   }
 
+  current_action_provider_ = action_state_provider;
   auto action_state = [&](const std::string& name) -> rkg::input::ActionState {
     if (action_state_provider) {
       return action_state_provider(name);
@@ -945,7 +978,9 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
   manual_reload_requested_ = false;
   manual_reload_reason_.clear();
 
-  if (params.run_simulation && player_ != rkg::ecs::kInvalidEntity) {
+  const bool legacy_movement = !physics_basic_enabled_ &&
+                               registry_.get_character_controller(player_) == nullptr;
+  if (params.run_simulation && legacy_movement && player_ != rkg::ecs::kInvalidEntity) {
     if (auto* transform = registry_.get_transform(player_)) {
       const float speed = 2.0f;
       if (action_state("MoveForward").held) transform->position[2] += speed * sim_dt;
@@ -1093,6 +1128,12 @@ void RuntimeHost::load_initial_level() {
   load_level(registry_, entities_by_name_, entity_override_keys_, entities_by_override_key_,
              player_, content_root, project_.initial_level, pack_ptr);
   apply_editor_overrides(registry_, entities_by_override_key_, project_root_ / "editor_overrides.yaml");
+
+  if (physics_basic_enabled_ && player_ != rkg::ecs::kInvalidEntity &&
+      registry_.get_character_controller(player_) == nullptr) {
+    rkg::ecs::CharacterController controller{};
+    registry_.set_character_controller(player_, controller);
+  }
 }
 
 std::string RuntimeHost::renderer_display_name() const {
