@@ -113,6 +113,19 @@ bool create_framebuffers();
 bool create_command_buffers();
 void destroy_swapchain();
 
+static void get_window_drawable_size(int& w, int& h) {
+  w = 0;
+  h = 0;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+  SDL_GetWindowSizeInPixels(g_state.window, &w, &h);
+#else
+  SDL_GetWindowSize(g_state.window, &w, &h);
+#endif
+  if (w == 0 || h == 0) {
+    SDL_GetWindowSize(g_state.window, &w, &h);
+  }
+}
+
 static constexpr uint32_t kViewportVertexCount = 36;
 static const float kViewportCubeVertices[kViewportVertexCount * 3] = {
     -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f,  0.5f, -0.5f,
@@ -854,7 +867,7 @@ VkExtent2D choose_extent(const VkSurfaceCapabilitiesKHR& caps) {
   }
   int w = 0;
   int h = 0;
-  SDL_GetWindowSize(g_state.window, &w, &h);
+  get_window_drawable_size(w, h);
   VkExtent2D extent{};
   extent.width = static_cast<uint32_t>(w);
   extent.height = static_cast<uint32_t>(h);
@@ -881,6 +894,10 @@ bool create_swapchain() {
   VkSurfaceFormatKHR surface_format = choose_surface_format(formats);
   VkPresentModeKHR present_mode = choose_present_mode(present_modes);
   VkExtent2D extent = choose_extent(caps);
+  if (extent.width == 0 || extent.height == 0) {
+    rkg::log::warn("renderer:vulkan swapchain extent is 0; create_swapchain skipped");
+    return false;
+  }
 
   uint32_t image_count = caps.minImageCount + 1;
   if (caps.maxImageCount > 0 && image_count > caps.maxImageCount) {
@@ -1505,7 +1522,7 @@ bool draw_frame() {
   if (g_state.swapchain_needs_rebuild) {
     int w = 0;
     int h = 0;
-    SDL_GetWindowSize(g_state.window, &w, &h);
+    get_window_drawable_size(w, h);
     if (w == 0 || h == 0) {
       if (!logged_defer) {
         rkg::log::warn("renderer:vulkan swapchain rebuild deferred (window size 0)");
@@ -1517,8 +1534,8 @@ bool draw_frame() {
     logged_defer = false;
     rkg::log::warn("renderer:vulkan swapchain rebuild requested");
     if (!recreate_swapchain()) {
-      rkg::log::error("renderer:vulkan swapchain rebuild failed");
-      return false;
+      rkg::log::warn("renderer:vulkan swapchain rebuild failed; will retry");
+      return true;
     }
     g_state.swapchain_needs_rebuild = false;
     return true;
