@@ -60,34 +60,6 @@ struct CookStatus {
   fs::path content_pack_path;
 };
 
-struct EventDispatch {
-  rkg::PluginHost* host = nullptr;
-  std::string* renderer_name = nullptr;
-  bool debug_ui_enabled = false;
-};
-
-void sdl_event_callback(const void* event, void* user_data) {
-  auto* dispatch = static_cast<EventDispatch*>(user_data);
-  if (!dispatch || !event) return;
-  const SDL_Event* sdl_event = static_cast<const SDL_Event*>(event);
-#if RKG_ENABLE_IMGUI
-  if (dispatch->debug_ui_enabled) {
-    rkg::debug_ui::process_event(sdl_event);
-  }
-#endif
-  if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED) {
-    const int width = sdl_event->window.data1;
-    const int height = sdl_event->window.data2;
-    if (dispatch->host && dispatch->renderer_name) {
-      if (auto* api = dispatch->host->find_by_name(*dispatch->renderer_name)) {
-        if (api->on_window_resized) {
-          api->on_window_resized(width, height);
-        }
-      }
-    }
-  }
-}
-
 bool load_cook_status(const fs::path& path, CookStatus& out, std::string& error) {
 #if !RKG_ENABLE_DATA_JSON
   (void)path;
@@ -668,6 +640,42 @@ fs::path detect_executable_dir(const char* argv0) {
 
 } // namespace
 
+void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
+  auto* self = static_cast<RuntimeHost*>(user_data);
+  if (!self || !event) return;
+  const SDL_Event* sdl_event = static_cast<const SDL_Event*>(event);
+#if RKG_ENABLE_IMGUI
+  if (self->debug_ui_enabled_) {
+    rkg::debug_ui::process_event(sdl_event);
+  }
+#endif
+#if RKG_DEBUG
+  static int logged_mouse_events = 0;
+  if (logged_mouse_events < 2) {
+    if (sdl_event->type == SDL_EVENT_MOUSE_MOTION ||
+        sdl_event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+        sdl_event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+      rkg::log::info("event: mouse type=%d x=%d y=%d",
+                     sdl_event->type,
+                     static_cast<int>(sdl_event->motion.x),
+                     static_cast<int>(sdl_event->motion.y));
+      logged_mouse_events++;
+    }
+  }
+#endif
+  if (sdl_event->type == SDL_EVENT_WINDOW_RESIZED) {
+    const int width = sdl_event->window.data1;
+    const int height = sdl_event->window.data2;
+    if (!self->renderer_plugin_.empty()) {
+      if (auto* api = self->host_.find_by_name(self->renderer_plugin_)) {
+        if (api->on_window_resized) {
+          api->on_window_resized(width, height);
+        }
+      }
+    }
+  }
+}
+
 bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   paths_ = rkg::resolve_paths(init.argv0, init.project_override, init.default_project);
   executable_dir_ = detect_executable_dir(init.argv0);
@@ -732,13 +740,7 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
     return false;
   }
 
-  EventDispatch dispatch;
-  dispatch.host = &host_;
-  dispatch.renderer_name = &renderer_plugin_;
-#if RKG_ENABLE_IMGUI
-  dispatch.debug_ui_enabled = debug_ui_enabled_;
-#endif
-  platform_.set_event_callback(&sdl_event_callback, &dispatch);
+  platform_.set_event_callback(&RuntimeHost::sdl_event_callback, this);
 
 #if RKG_ENABLE_IMGUI
   if (debug_ui_enabled_) {

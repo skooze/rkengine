@@ -95,7 +95,8 @@ class RuntimeHost {
   void handle_reload(bool manual_requested);
   bool reload_content(bool raw_changed, const std::string& reason);
   void reset_runtime();
-  void load_initial_level();
+ void load_initial_level();
+ static void sdl_event_callback(const void* event, void* user_data);
 
   rkg::ResolvedPaths paths_{};
   std::filesystem::path executable_dir_;
