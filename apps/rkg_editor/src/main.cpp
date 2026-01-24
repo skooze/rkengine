@@ -2429,6 +2429,8 @@ void draw_viewport(EditorState& state) {
     }
     if (const auto* controller = registry.get_character_controller(player)) {
       ImGui::Text("Grounded: %s", controller->grounded ? "yes" : "no");
+    } else {
+      ImGui::TextUnformatted("Controller: (missing)");
     }
   }
   ImGui::EndChild();
@@ -4000,7 +4002,7 @@ int main(int argc, char** argv) {
     params.run_simulation = run_sim;
     params.update_input = false;
     auto action_provider = [&](const std::string& name) -> rkg::input::ActionState {
-      if (!state.viewport_focused || state.ui_capturing) {
+      if (!state.viewport_focused || state.chat_active) {
         return {};
       }
       return runtime.input_action(name);
