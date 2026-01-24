@@ -1187,7 +1187,10 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
   log_step("vkBeginCommandBuffer");
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
+  const VkResult begin_result = vkBeginCommandBuffer(cmd, &begin_info);
+  if (begin_result != VK_SUCCESS) {
+    rkg::log::error(std::string("renderer:vulkan vkBeginCommandBuffer failed: ") +
+                    vk_result_name(begin_result) + " (" + std::to_string(begin_result) + ")");
     return false;
   }
 
@@ -1520,7 +1523,13 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 #endif
 
   log_step("vkEndCommandBuffer");
-  return vkEndCommandBuffer(cmd) == VK_SUCCESS;
+  const VkResult end_result = vkEndCommandBuffer(cmd);
+  if (end_result != VK_SUCCESS) {
+    rkg::log::error(std::string("renderer:vulkan vkEndCommandBuffer failed: ") +
+                    vk_result_name(end_result) + " (" + std::to_string(end_result) + ")");
+    return false;
+  }
+  return true;
 }
 
 bool draw_frame() {
@@ -1604,8 +1613,10 @@ bool draw_frame() {
   log_step("vkResetCommandBuffer");
   vkResetCommandBuffer(g_state.command_buffers[image_index], 0);
   if (!record_command_buffer(g_state.command_buffers[image_index], image_index)) {
+    rkg::log::warn("renderer:vulkan record_command_buffer failed");
+    g_state.swapchain_needs_rebuild = true;
     rkg::commit_vulkan_viewport_request();
-    return false;
+    return true;
   }
 
   VkSemaphore wait_semaphores[] = {g_state.image_available};
@@ -1624,7 +1635,15 @@ bool draw_frame() {
 
   log_step("vkQueueSubmit");
   vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
-  if (vkQueueSubmit(g_state.graphics_queue, 1, &submit_info, g_state.in_flight_fence) != VK_SUCCESS) {
+  const VkResult submit_result = vkQueueSubmit(g_state.graphics_queue, 1, &submit_info, g_state.in_flight_fence);
+  if (submit_result != VK_SUCCESS) {
+    rkg::log::error(std::string("renderer:vulkan vkQueueSubmit failed: ") +
+                    vk_result_name(submit_result) + " (" + std::to_string(submit_result) + ")");
+    if (submit_result != VK_ERROR_DEVICE_LOST) {
+      g_state.swapchain_needs_rebuild = true;
+      rkg::commit_vulkan_viewport_request();
+      return true;
+    }
     rkg::commit_vulkan_viewport_request();
     return false;
   }
