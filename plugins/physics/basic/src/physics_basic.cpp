@@ -67,8 +67,8 @@ void update_character(rkg::ecs::Registry& registry,
   float dir_z = 0.0f;
   if (forward.held) dir_z += 1.0f;
   if (back.held) dir_z -= 1.0f;
-  if (left.held) dir_x -= 1.0f;
-  if (right.held) dir_x += 1.0f;
+  if (left.held) dir_x += 1.0f;
+  if (right.held) dir_x -= 1.0f;
 
   const float length = std::sqrt(dir_x * dir_x + dir_z * dir_z);
   const float sprint_scale = sprint.held ? 1.75f : 1.0f;
