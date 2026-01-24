@@ -1559,7 +1559,6 @@ bool draw_frame() {
 
   log_step("draw_frame: wait fence");
   vkWaitForFences(g_state.device, 1, &g_state.in_flight_fence, VK_TRUE, UINT64_MAX);
-  vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
 
   if (!logged_state) {
     rkg::log::info(std::string("renderer:vulkan swapchain=") + std::to_string(reinterpret_cast<uintptr_t>(g_state.swapchain)));
@@ -1575,16 +1574,7 @@ bool draw_frame() {
   log_step("vkAcquireNextImageKHR");
   uint32_t image_index = 0;
   VkResult result = vkAcquireNextImageKHR(
-      g_state.device, g_state.swapchain, 0, g_state.image_available, VK_NULL_HANDLE, &image_index);
-  if (result == VK_TIMEOUT) {
-    static bool logged_timeout = false;
-    if (!logged_timeout) {
-      rkg::log::warn("renderer:vulkan vkAcquireNextImageKHR timeout; skipping frame");
-      logged_timeout = true;
-    }
-    rkg::commit_vulkan_viewport_request();
-    return true;
-  }
+      g_state.device, g_state.swapchain, UINT64_MAX, g_state.image_available, VK_NULL_HANDLE, &image_index);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     rkg::log::warn(std::string("renderer:vulkan swapchain acquire: ") + vk_result_name(result));
     g_state.swapchain_needs_rebuild = true;
@@ -1628,6 +1618,7 @@ bool draw_frame() {
   submit_info.pSignalSemaphores = signal_semaphores;
 
   log_step("vkQueueSubmit");
+  vkResetFences(g_state.device, 1, &g_state.in_flight_fence);
   if (vkQueueSubmit(g_state.graphics_queue, 1, &submit_info, g_state.in_flight_fence) != VK_SUCCESS) {
     rkg::commit_vulkan_viewport_request();
     return false;
