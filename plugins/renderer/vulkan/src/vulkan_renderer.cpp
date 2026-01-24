@@ -1582,7 +1582,6 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
 bool draw_frame() {
   static bool logged_state = false;
   static bool logged_defer = false;
-  update_offscreen_target();
 
   if (g_state.device_lost) {
     rkg::log::error("renderer:vulkan device lost; skipping frame");
@@ -1635,6 +1634,9 @@ bool draw_frame() {
     }
     return true;
   }
+
+  // Only touch (destroy/recreate) offscreen resources after the in-flight fence has completed.
+  update_offscreen_target();
 
   if (!logged_state) {
     rkg::log::info(std::string("renderer:vulkan swapchain=") + std::to_string(reinterpret_cast<uintptr_t>(g_state.swapchain)));
