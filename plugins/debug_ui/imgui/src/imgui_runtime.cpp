@@ -386,7 +386,7 @@ bool init_vulkan() {
 
   bool use_dynamic_rendering = false;
   if (!can_render_pass && can_dynamic_rendering) {
-    use_dynamic_rendering = g_state.dynamic_rendering_enabled;
+    use_dynamic_rendering = true;
   }
   g_state.render_inside_pass = !use_dynamic_rendering;
 
