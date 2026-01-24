@@ -918,8 +918,10 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
   }
 #endif
 
+  const std::string debug_ui_plugin = "debug_ui_imgui";
   for (const auto& name : active_plugins_) {
     if (name == renderer_plugin_) continue;
+    if (name == debug_ui_plugin) continue;
     float dt = frame_dt;
     if (auto* api = host_.find_by_name(name)) {
       if (api->type != rkg::PluginType::Renderer && api->type != rkg::PluginType::DebugUI) {
@@ -933,6 +935,9 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       rkg::log::info("tick: renderer update");
     }
     host_.update_plugin(renderer_plugin_, frame_dt);
+  }
+  if (debug_ui_enabled_ && !debug_ui_plugin.empty()) {
+    host_.update_plugin(debug_ui_plugin, frame_dt);
   }
 
   const bool manual_reload = manual_reload_requested_ || action_state("Reload").pressed;
