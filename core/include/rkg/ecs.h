@@ -66,6 +66,7 @@ struct CharacterController {
   bool grounded = false;
   float vertical_velocity = 0.0f;
   float ground_height = 0.0f;
+  bool jump_held = false;
 };
 
 struct Bone {

@@ -3616,8 +3616,8 @@ void update_camera_and_draw_list(EditorState& state) {
   const Vec3 forward = {cp * sy, sp, cp * cy};
   const Vec3 eye = vec3_sub(focus_pos, vec3_mul(forward, state.camera_distance));
   const Vec3 world_up = {0.0f, 1.0f, 0.0f};
-  const Vec3 right = vec3_normalize(vec3_cross(forward, world_up));
-  const Vec3 up = vec3_cross(right, forward);
+  const Vec3 right = vec3_normalize(vec3_cross(world_up, forward));
+  const Vec3 up = vec3_cross(forward, right);
   if (camera_input_enabled && ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
     const float pan_scale = state.camera_distance * 0.002f;
     const Vec3 pan_delta =

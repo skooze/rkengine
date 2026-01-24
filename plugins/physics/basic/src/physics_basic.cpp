@@ -88,10 +88,11 @@ void update_character(rkg::ecs::Registry& registry,
     velocity->linear[2] *= drop;
   }
 
-  if (controller.grounded && jump.pressed) {
+  if (controller.grounded && (jump.pressed || (jump.held && !controller.jump_held))) {
     velocity->linear[1] = controller.jump_impulse;
     controller.grounded = false;
   }
+  controller.jump_held = jump.held;
 
   velocity->linear[1] += controller.gravity * dt;
 
