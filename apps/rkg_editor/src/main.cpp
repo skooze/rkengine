@@ -2463,6 +2463,13 @@ void draw_viewport(EditorState& state) {
           m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
       };
     };
+    auto transform_dir = [&](const Mat4& m, const Vec3& v) -> Vec3 {
+      return {
+          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z,
+          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z,
+          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z,
+      };
+    };
 
     rkg::ecs::Entity label_entity = player;
     if (label_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(label_entity)) {
@@ -2470,31 +2477,39 @@ void draw_viewport(EditorState& state) {
     }
     if (label_entity != rkg::ecs::kInvalidEntity) {
       if (const auto* transform = registry.get_transform(label_entity)) {
-        const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
-        const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
-        const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
-        const Vec3 half = vec3_mul(scl, 0.5f);
-        const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(mat4_rotation_xyz(rot), mat4_scale(scl)));
-        struct FaceLabel {
-          Vec3 local;
-          const char* text;
-        };
-        const FaceLabel labels[] = {
-            {{0.0f, half.y, 0.0f}, "top"},
-            {{0.0f, -half.y, 0.0f}, "bottom"},
-            {{0.0f, 0.0f, half.z}, "front"},
-            {{0.0f, 0.0f, -half.z}, "back"},
-            {{half.x, 0.0f, 0.0f}, "right"},
-            {{-half.x, 0.0f, 0.0f}, "left"},
-        };
-        auto* draw = ImGui::GetForegroundDrawList();
-        for (const auto& label : labels) {
-          const Vec3 world = transform_point(model, label.local);
-          ImVec2 screen;
-          if (project_to_screen(world, screen)) {
-            draw->AddText(screen, IM_COL32(0, 0, 0, 255), label.text);
-          }
+      const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+      const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
+      const Vec3 half = {0.5f * scl.x, 0.5f * scl.y, 0.5f * scl.z};
+      const Mat4 rot_m = mat4_rotation_xyz(rot);
+      const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(rot_m, mat4_scale(scl)));
+      struct FaceLabel {
+        Vec3 local;
+        Vec3 normal;
+        const char* text;
+      };
+      const FaceLabel labels[] = {
+          {{0.0f, half.y, 0.0f}, {0.0f, 1.0f, 0.0f}, "top"},
+          {{0.0f, -half.y, 0.0f}, {0.0f, -1.0f, 0.0f}, "bottom"},
+          {{0.0f, 0.0f, half.z}, {0.0f, 0.0f, 1.0f}, "front"},
+          {{0.0f, 0.0f, -half.z}, {0.0f, 0.0f, -1.0f}, "back"},
+          {{half.x, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, "right"},
+          {{-half.x, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, "left"},
+      };
+      auto* draw = ImGui::GetForegroundDrawList();
+      const Vec3 cam_pos = {state.camera_eye[0], state.camera_eye[1], state.camera_eye[2]};
+      for (const auto& label : labels) {
+        const Vec3 world = transform_point(model, label.local);
+        const Vec3 world_normal = vec3_normalize(transform_dir(rot_m, label.normal));
+        const Vec3 to_camera = vec3_normalize(vec3_sub(cam_pos, world));
+        if (vec3_dot(world_normal, to_camera) <= 0.0f) {
+          continue;
         }
+        ImVec2 screen;
+        if (project_to_screen(world, screen)) {
+          draw->AddText(screen, IM_COL32(0, 0, 0, 255), label.text);
+        }
+      }
       }
     }
   }
