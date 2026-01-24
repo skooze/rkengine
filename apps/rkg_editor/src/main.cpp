@@ -335,7 +335,7 @@ struct EditorState {
   float camera_right[3]{1.0f, 0.0f, 0.0f};
   float camera_up[3]{0.0f, 1.0f, 0.0f};
   float camera_yaw = 0.0f;
-  float camera_pitch = 0.3f;
+  float camera_pitch = -0.3f;
   float camera_distance = 4.0f;
   float camera_fov = 60.0f;
   float camera_pan[3]{0.0f, 0.0f, 0.0f};
@@ -3564,6 +3564,13 @@ void update_camera_and_draw_list(EditorState& state) {
     }
   }
 
+  if (state.play_state == PlayState::Play && state.viewport_focused && !state.chat_active &&
+      player != rkg::ecs::kInvalidEntity) {
+    if (auto* transform = registry.get_transform(player)) {
+      transform->rotation[1] = state.camera_yaw;
+    }
+  }
+
   Vec3 focus_pos{0.0f, 0.0f, 0.0f};
   if (state.play_state == PlayState::Play &&
       player != rkg::ecs::kInvalidEntity && registry.get_transform(player)) {
@@ -3644,6 +3651,66 @@ void update_camera_and_draw_list(EditorState& state) {
   Mat4 proj = mat4_perspective(state.camera_fov, static_cast<float>(viewport_w) / viewport_h, 0.1f, 50.0f);
   Mat4 view_proj = mat4_mul(proj, view);
   rkg::set_vulkan_viewport_camera(view_proj.m);
+
+  auto project_to_screen = [&](const Vec3& world, ImVec2& out) -> bool {
+    const float x = world.x;
+    const float y = world.y;
+    const float z = world.z;
+    const float clip_x = view_proj.m[0] * x + view_proj.m[4] * y + view_proj.m[8] * z + view_proj.m[12];
+    const float clip_y = view_proj.m[1] * x + view_proj.m[5] * y + view_proj.m[9] * z + view_proj.m[13];
+    const float clip_w = view_proj.m[3] * x + view_proj.m[7] * y + view_proj.m[11] * z + view_proj.m[15];
+    if (clip_w <= 0.0001f) {
+      return false;
+    }
+    const float inv_w = 1.0f / clip_w;
+    const float ndc_x = clip_x * inv_w;
+    const float ndc_y = clip_y * inv_w;
+    out.x = state.viewport_pos[0] + (ndc_x * 0.5f + 0.5f) * state.viewport_size[0];
+    out.y = state.viewport_pos[1] + (-ndc_y * 0.5f + 0.5f) * state.viewport_size[1];
+    return true;
+  };
+
+  auto transform_point = [&](const Mat4& m, const Vec3& v) -> Vec3 {
+    return {
+        m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z + m.m[12],
+        m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z + m.m[13],
+        m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
+    };
+  };
+
+  rkg::ecs::Entity label_entity = player;
+  if (label_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(label_entity)) {
+    label_entity = state.selected_entity;
+  }
+  if (label_entity != rkg::ecs::kInvalidEntity) {
+    if (const auto* transform = registry.get_transform(label_entity)) {
+      const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+      const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
+      const Vec3 half = vec3_mul(scl, 0.5f);
+      const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(mat4_rotation_xyz(rot), mat4_scale(scl)));
+      struct FaceLabel {
+        Vec3 local;
+        const char* text;
+      };
+      const FaceLabel labels[] = {
+          {{0.0f, half.y, 0.0f}, "top"},
+          {{0.0f, -half.y, 0.0f}, "bottom"},
+          {{0.0f, 0.0f, half.z}, "front"},
+          {{0.0f, 0.0f, -half.z}, "back"},
+          {{half.x, 0.0f, 0.0f}, "right"},
+          {{-half.x, 0.0f, 0.0f}, "left"},
+      };
+      auto* draw = ImGui::GetForegroundDrawList();
+      for (const auto& label : labels) {
+        const Vec3 world = transform_point(model, label.local);
+        ImVec2 screen;
+        if (project_to_screen(world, screen)) {
+          draw->AddText(screen, IM_COL32(0, 0, 0, 255), label.text);
+        }
+      }
+    }
+  }
 
   float line_positions[rkg::VulkanViewportLineList::kMaxLines * 6]{};
   float line_colors[rkg::VulkanViewportLineList::kMaxLines * 4]{};

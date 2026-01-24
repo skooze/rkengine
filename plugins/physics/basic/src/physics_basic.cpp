@@ -67,8 +67,8 @@ void update_character(rkg::ecs::Registry& registry,
   float dir_z = 0.0f;
   if (forward.held) dir_z += 1.0f;
   if (back.held) dir_z -= 1.0f;
-  if (left.held) dir_x += 1.0f;
-  if (right.held) dir_x -= 1.0f;
+  if (left.held) dir_x -= 1.0f;
+  if (right.held) dir_x += 1.0f;
 
   const float length = std::sqrt(dir_x * dir_x + dir_z * dir_z);
   const float sprint_scale = sprint.held ? 1.75f : 1.0f;
@@ -77,8 +77,13 @@ void update_character(rkg::ecs::Registry& registry,
   if (length > 0.0001f) {
     dir_x /= length;
     dir_z /= length;
-    const float target_x = dir_x * max_speed;
-    const float target_z = dir_z * max_speed;
+    const float yaw = transform->rotation[1];
+    const float cos_y = std::cos(yaw);
+    const float sin_y = std::sin(yaw);
+    const float world_x = dir_x * cos_y + dir_z * sin_y;
+    const float world_z = -dir_x * sin_y + dir_z * cos_y;
+    const float target_x = world_x * max_speed;
+    const float target_z = world_z * max_speed;
     const float blend = std::min(1.0f, controller.accel * dt);
     velocity->linear[0] += (target_x - velocity->linear[0]) * blend;
     velocity->linear[2] += (target_z - velocity->linear[2]) * blend;
