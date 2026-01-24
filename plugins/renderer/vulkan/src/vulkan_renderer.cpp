@@ -47,6 +47,7 @@ struct VulkanState {
   bool swapchain_needs_rebuild = false;
   bool surface_lost = false;
   bool device_lost = false;
+  bool skip_imgui_frame = false;
 
   VkImage offscreen_image = VK_NULL_HANDLE;
   VkDeviceMemory offscreen_memory = VK_NULL_HANDLE;
@@ -644,11 +645,13 @@ void update_offscreen_target() {
   if (req_w == 0 || req_h == 0) {
     if (g_state.offscreen_image != VK_NULL_HANDLE) {
       destroy_offscreen();
+      g_state.skip_imgui_frame = true;
     }
     return;
   }
   if (g_state.offscreen_extent.width != req_w || g_state.offscreen_extent.height != req_h) {
     create_offscreen(req_w, req_h);
+    g_state.skip_imgui_frame = true;
   }
 }
 
@@ -1457,8 +1460,13 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     vkCmdClearAttachments(cmd, 1, &clear_attachment, 1, &rect);
 
 #if RKG_ENABLE_IMGUI
-    log_step("imgui: render inside pass");
-    rkg::debug_ui::render(cmd);
+    if (g_state.skip_imgui_frame) {
+      log_step("imgui: skip render (viewport resized)");
+      g_state.skip_imgui_frame = false;
+    } else {
+      log_step("imgui: render inside pass");
+      rkg::debug_ui::render(cmd);
+    }
 #endif
     log_step("swapchain: end render pass");
     vkCmdEndRenderPass(cmd);
@@ -1534,10 +1542,15 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     log_step("dynamic rendering: begin (renderer)");
 #endif
     g_state.cmd_begin_rendering(cmd, &rendering_info);
-    if (rkg::debug_ui::is_initialized()) {
-      log_step("imgui: render dynamic");
+    if (g_state.skip_imgui_frame) {
+      log_step("imgui: skip render (viewport resized)");
+      g_state.skip_imgui_frame = false;
+    } else {
+      if (rkg::debug_ui::is_initialized()) {
+        log_step("imgui: render dynamic");
+      }
+      rkg::debug_ui::render(cmd);
     }
-    rkg::debug_ui::render(cmd);
     log_step("dynamic rendering: end (renderer)");
     g_state.cmd_end_rendering(cmd);
 
