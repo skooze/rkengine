@@ -2382,15 +2382,23 @@ void draw_viewport(EditorState& state) {
 
   const ImGuiIO& io = ImGui::GetIO();
   const bool hovered = ImGui::IsWindowHovered();
-  if (hovered && ImGui::IsMouseClicked(0) && !io.WantCaptureMouse) {
+  const bool clicked_any =
+      ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+      ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+      ImGui::IsMouseClicked(ImGuiMouseButton_Middle);
+  const bool held_any =
+      ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+      ImGui::IsMouseDown(ImGuiMouseButton_Middle);
+  if (hovered && (clicked_any || held_any)) {
     state.viewport_focused = true;
-    if (state.play_state != PlayState::Play || io.KeyCtrl) {
-      state.pick_requested = true;
-      state.pick_mouse_pos[0] = io.MousePos.x;
-      state.pick_mouse_pos[1] = io.MousePos.y;
-    }
   }
-  if (!hovered && ImGui::IsMouseClicked(0) && !io.WantCaptureMouse) {
+  if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse &&
+      (state.play_state != PlayState::Play || io.KeyCtrl)) {
+    state.pick_requested = true;
+    state.pick_mouse_pos[0] = io.MousePos.x;
+    state.pick_mouse_pos[1] = io.MousePos.y;
+  }
+  if (!hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse) {
     state.viewport_focused = false;
   }
   if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
