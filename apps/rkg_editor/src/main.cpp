@@ -3835,6 +3835,10 @@ void update_camera_and_draw_list(EditorState& state) {
           static const GlyphSegment k[] = {{0,0,0,1},{1,0,1,1},{0,1,1,1},{0,0,1,0}};
           segs = k; count = 4; return true;
         }
+        case 'P': {
+          static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{1,0.5f,1,1}};
+          segs = k; count = 4; return true;
+        }
         case 'R': {
           static const GlyphSegment k[] = {{0,0,0,1},{0,1,1,1},{0,0.5f,1,0.5f},{1,0.5f,1,1},{0,0.5f,1,0}};
           segs = k; count = 5; return true;
@@ -3857,8 +3861,8 @@ void update_camera_and_draw_list(EditorState& state) {
     const Face faces[] = {
         {{0,0,1}, {1,0,0}, {0,1,0}, "FRONT"},
         {{0,0,-1}, {-1,0,0}, {0,1,0}, "BACK"},
-        {{1,0,0}, {0,0,-1}, {0,1,0}, "RIGHT"},
-        {{-1,0,0}, {0,0,1}, {0,1,0}, "LEFT"},
+        {{1,0,0}, {0,0,-1}, {0,1,0}, "LEFT"},
+        {{-1,0,0}, {0,0,1}, {0,1,0}, "RIGHT"},
         {{0,1,0}, {1,0,0}, {0,0,1}, "TOP"},
         {{0,-1,0}, {1,0,0}, {0,0,-1}, "BOTTOM"},
     };
