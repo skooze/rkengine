@@ -655,10 +655,11 @@ void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
     if (sdl_event->type == SDL_EVENT_MOUSE_MOTION ||
         sdl_event->type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
         sdl_event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
-      rkg::log::info("event: mouse type=%d x=%d y=%d",
-                     sdl_event->type,
-                     static_cast<int>(sdl_event->motion.x),
-                     static_cast<int>(sdl_event->motion.y));
+      const std::string msg = std::string("event: mouse type=") +
+                              std::to_string(sdl_event->type) +
+                              " x=" + std::to_string(static_cast<int>(sdl_event->motion.x)) +
+                              " y=" + std::to_string(static_cast<int>(sdl_event->motion.y));
+      rkg::log::info(msg);
       logged_mouse_events++;
     }
   }
