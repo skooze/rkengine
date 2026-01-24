@@ -7,6 +7,7 @@ rkg_add_library(rkg_core
   src/project.cpp
   src/paths.cpp
   src/input.cpp
+  src/math.cpp
   src/renderer_hooks.cpp
   src/renderer_select.cpp
   src/renderer_util.cpp

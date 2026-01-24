@@ -8,6 +8,12 @@ RKG is an AI-orchestrated game engine where **agents propose changes** and human
 All game code and content are plain files. The CLI (`rkgctl`) validates and stages changes as patches, prints diffs,
 and applies only after approval.
 
+## Coordinate System + Units
+- **Axes**: Y-up, Z-forward, X-right
+- **Ground plane**: XZ at y=0
+- **Units**: 1.0 = 1 meter
+- **Angles**: radians (Transform.rotation is in radians)
+
 ## Repo Layout (Key Paths)
 - `core/` — engine core (logging, ECS, plugin host, config, replay, content pack reader)
 - `platform/` — SDL3 window/input, file watcher (inotify/ReadDirectoryChangesW/poll)

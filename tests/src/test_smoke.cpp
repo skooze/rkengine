@@ -1,6 +1,7 @@
 #include "rkg/ecs.h"
 #include "rkg/ai_results.h"
 #include "rkg/log.h"
+#include "rkg/math.h"
 #include "rkg/paths.h"
 #include "rkg/run_cleanup.h"
 #include "rkg/snapshot_restore.h"
@@ -16,6 +17,7 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -934,6 +936,60 @@ int main(int argc, char** argv) {
     }
   }
 #endif
+
+  // Test: math module basics.
+  {
+    const auto identity = rkg::mat4_identity();
+    auto expected = rkg::mat4_identity();
+    expected.m[12] = 2.0f;
+    expected.m[13] = -3.0f;
+    expected.m[14] = 4.0f;
+    const auto translated = rkg::mat4_mul(rkg::mat4_translation({2.0f, -3.0f, 4.0f}), identity);
+    bool identity_ok = true;
+    for (int i = 0; i < 16; ++i) {
+      if (std::abs(identity.m[i] - rkg::mat4_identity().m[i]) > 0.0001f) {
+        identity_ok = false;
+        break;
+      }
+    }
+    if (!identity_ok) {
+      std::cerr << "math identity failed\n";
+      ++failures;
+    }
+    bool mul_ok = true;
+    for (int i = 0; i < 16; ++i) {
+      if (std::abs(translated.m[i] - expected.m[i]) > 0.0001f) {
+        mul_ok = false;
+        break;
+      }
+    }
+    if (!mul_ok) {
+      std::cerr << "math mul/translation failed\n";
+      ++failures;
+    }
+
+    const auto proj = rkg::mat4_perspective(60.0f, 16.0f / 9.0f, 0.1f, 100.0f);
+    if (!std::isfinite(proj.m[0]) || !std::isfinite(proj.m[5]) || !std::isfinite(proj.m[10]) ||
+        proj.m[11] != -1.0f) {
+      std::cerr << "math perspective invalid\n";
+      ++failures;
+    }
+    if (proj.m[5] >= 0.0f) {
+      std::cerr << "math perspective missing Vulkan Y flip\n";
+      ++failures;
+    }
+
+    const auto view = rkg::mat4_look_at({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f});
+    if (!std::isfinite(view.m[0]) || !std::isfinite(view.m[5]) || !std::isfinite(view.m[10])) {
+      std::cerr << "math look_at invalid\n";
+      ++failures;
+    }
+    if (std::abs(view.m[0] + 1.0f) > 0.0001f || std::abs(view.m[5] - 1.0f) > 0.0001f ||
+        std::abs(view.m[10] + 1.0f) > 0.0001f) {
+      std::cerr << "math look_at unexpected basis\n";
+      ++failures;
+    }
+  }
 
   rkg::log::shutdown();
   return failures == 0 ? 0 : 1;

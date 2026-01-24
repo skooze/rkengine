@@ -602,8 +602,8 @@ int main(int argc, char** argv) {
     if (runtime.player != rkg::ecs::kInvalidEntity) {
       if (auto* transform = runtime.registry.get_transform(runtime.player)) {
         const float speed = 2.0f;
-        if (input.action("MoveForward").held) transform->position[1] += speed * dt;
-        if (input.action("MoveBack").held) transform->position[1] -= speed * dt;
+        if (input.action("MoveForward").held) transform->position[2] += speed * dt;
+        if (input.action("MoveBack").held) transform->position[2] -= speed * dt;
         if (input.action("MoveLeft").held) transform->position[0] -= speed * dt;
         if (input.action("MoveRight").held) transform->position[0] += speed * dt;
       }

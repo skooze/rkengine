@@ -948,8 +948,8 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
   if (params.run_simulation && player_ != rkg::ecs::kInvalidEntity) {
     if (auto* transform = registry_.get_transform(player_)) {
       const float speed = 2.0f;
-      if (action_state("MoveForward").held) transform->position[1] += speed * sim_dt;
-      if (action_state("MoveBack").held) transform->position[1] -= speed * sim_dt;
+      if (action_state("MoveForward").held) transform->position[2] += speed * sim_dt;
+      if (action_state("MoveBack").held) transform->position[2] -= speed * sim_dt;
       if (action_state("MoveLeft").held) transform->position[0] -= speed * sim_dt;
       if (action_state("MoveRight").held) transform->position[0] += speed * sim_dt;
     }
