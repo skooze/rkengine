@@ -123,6 +123,100 @@ int main(int argc, char** argv) {
     }
   }
 
+  // Test: ECS components and iteration helpers.
+  {
+    rkg::ecs::Registry registry;
+    const auto entity = registry.create_entity();
+    rkg::ecs::Transform transform{};
+    transform.position[0] = 1.0f;
+    registry.set_transform(entity, transform);
+    if (!registry.get_transform(entity)) {
+      std::cerr << "transform set/get failed\n";
+      ++failures;
+    }
+
+    rkg::ecs::Velocity velocity{};
+    velocity.linear[2] = 3.0f;
+    registry.set_velocity(entity, velocity);
+    if (!registry.get_velocity(entity)) {
+      std::cerr << "velocity set/get failed\n";
+      ++failures;
+    }
+    registry.remove_velocity(entity);
+    if (registry.get_velocity(entity)) {
+      std::cerr << "velocity remove failed\n";
+      ++failures;
+    }
+
+    rkg::ecs::RigidBody body{};
+    body.mass = 2.0f;
+    registry.set_rigid_body(entity, body);
+    if (!registry.get_rigid_body(entity)) {
+      std::cerr << "rigid body set/get failed\n";
+      ++failures;
+    }
+    registry.remove_rigid_body(entity);
+    if (registry.get_rigid_body(entity)) {
+      std::cerr << "rigid body remove failed\n";
+      ++failures;
+    }
+
+    rkg::ecs::Collider collider{};
+    collider.type = rkg::ecs::ColliderType::Capsule;
+    registry.set_collider(entity, collider);
+    if (!registry.get_collider(entity)) {
+      std::cerr << "collider set/get failed\n";
+      ++failures;
+    }
+
+    rkg::ecs::CharacterController controller{};
+    controller.max_speed = 7.0f;
+    registry.set_character_controller(entity, controller);
+    if (!registry.get_character_controller(entity)) {
+      std::cerr << "character controller set/get failed\n";
+      ++failures;
+    }
+
+    rkg::ecs::Skeleton skeleton{};
+    rkg::ecs::Bone bone{};
+    bone.name = "root";
+    skeleton.bones.push_back(bone);
+    registry.set_skeleton(entity, skeleton);
+    if (!registry.get_skeleton(entity)) {
+      std::cerr << "skeleton set/get failed\n";
+      ++failures;
+    }
+
+    int collider_count = 0;
+    for (const auto& kv : registry.colliders()) {
+      if (kv.first == entity) {
+        collider_count += 1;
+      }
+    }
+    if (collider_count != 1) {
+      std::cerr << "collider iteration failed\n";
+      ++failures;
+    }
+
+    int controller_count = 0;
+    for (const auto& kv : registry.character_controllers()) {
+      if (kv.first == entity) {
+        controller_count += 1;
+      }
+    }
+    if (controller_count != 1) {
+      std::cerr << "character controller iteration failed\n";
+      ++failures;
+    }
+
+    registry.destroy_entity(entity);
+    if (registry.get_collider(entity) || registry.get_character_controller(entity) ||
+        registry.get_skeleton(entity)) {
+      std::cerr << "destroy_entity did not clear components\n";
+      ++failures;
+    }
+  }
+
 #if RKG_ENABLE_DATA_JSON
   // Test: plan schema file exists.
   {

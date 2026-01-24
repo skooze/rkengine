@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -26,6 +27,59 @@ struct Renderable {
   float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct Velocity {
+  float linear[3] = {0.0f, 0.0f, 0.0f};
+};
+
+struct RigidBody {
+  float mass = 1.0f;
+  bool is_kinematic = false;
+  float linear_velocity[3] = {0.0f, 0.0f, 0.0f};
+  float force_accumulator[3] = {0.0f, 0.0f, 0.0f};
+};
+
+enum class ColliderType : uint8_t {
+  Plane = 0,
+  AABB = 1,
+  Capsule = 2
+};
+
+struct Collider {
+  ColliderType type = ColliderType::Plane;
+  float center[3] = {0.0f, 0.0f, 0.0f};
+  float half_extents[3] = {0.5f, 0.5f, 0.5f}; // AABB
+  float normal[3] = {0.0f, 1.0f, 0.0f};       // Plane
+  float distance = 0.0f;                      // Plane
+  float radius = 0.5f;                        // Capsule
+  float half_height = 1.0f;                   // Capsule (half height of cylinder)
+};
+
+struct CharacterController {
+  float radius = 0.35f;
+  float half_height = 0.9f;
+  float max_speed = 4.0f;
+  float accel = 20.0f;
+  float friction = 8.0f;
+  float gravity = -9.8f;
+  float jump_impulse = 5.0f;
+  float slope_limit_deg = 45.0f;
+  bool grounded = false;
+  float vertical_velocity = 0.0f;
+  float ground_height = 0.0f;
+};
+
+struct Bone {
+  std::string name;
+  int parent_index = -1;
+  Transform bind_local;
+  Transform local_pose;
+};
+
+struct Skeleton {
+  std::vector<Bone> bones;
+  std::vector<Transform> world_pose;
+};
+
 class Registry {
  public:
   Entity create_entity();
@@ -37,13 +91,48 @@ class Registry {
   Renderable* get_renderable(Entity entity);
   const Renderable* get_renderable(Entity entity) const;
   void remove_renderable(Entity entity);
+  void set_velocity(Entity entity, const Velocity& velocity);
+  Velocity* get_velocity(Entity entity);
+  const Velocity* get_velocity(Entity entity) const;
+  void remove_velocity(Entity entity);
+  void set_rigid_body(Entity entity, const RigidBody& body);
+  RigidBody* get_rigid_body(Entity entity);
+  const RigidBody* get_rigid_body(Entity entity) const;
+  void remove_rigid_body(Entity entity);
+  void set_collider(Entity entity, const Collider& collider);
+  Collider* get_collider(Entity entity);
+  const Collider* get_collider(Entity entity) const;
+  void remove_collider(Entity entity);
+  void set_character_controller(Entity entity, const CharacterController& controller);
+  CharacterController* get_character_controller(Entity entity);
+  const CharacterController* get_character_controller(Entity entity) const;
+  void remove_character_controller(Entity entity);
+  void set_skeleton(Entity entity, const Skeleton& skeleton);
+  Skeleton* get_skeleton(Entity entity);
+  const Skeleton* get_skeleton(Entity entity) const;
+  void remove_skeleton(Entity entity);
   size_t entity_count() const;
   std::vector<Entity> entities() const;
+  std::unordered_map<Entity, Velocity>& velocities();
+  const std::unordered_map<Entity, Velocity>& velocities() const;
+  std::unordered_map<Entity, RigidBody>& rigid_bodies();
+  const std::unordered_map<Entity, RigidBody>& rigid_bodies() const;
+  std::unordered_map<Entity, Collider>& colliders();
+  const std::unordered_map<Entity, Collider>& colliders() const;
+  std::unordered_map<Entity, CharacterController>& character_controllers();
+  const std::unordered_map<Entity, CharacterController>& character_controllers() const;
+  std::unordered_map<Entity, Skeleton>& skeletons();
+  const std::unordered_map<Entity, Skeleton>& skeletons() const;
 
  private:
   Entity next_id_ = 1;
   std::unordered_map<Entity, Transform> transforms_;
   std::unordered_map<Entity, Renderable> renderables_;
+  std::unordered_map<Entity, Velocity> velocities_;
+  std::unordered_map<Entity, RigidBody> rigid_bodies_;
+  std::unordered_map<Entity, Collider> colliders_;
+  std::unordered_map<Entity, CharacterController> character_controllers_;
+  std::unordered_map<Entity, Skeleton> skeletons_;
 };
 
 } // namespace rkg::ecs

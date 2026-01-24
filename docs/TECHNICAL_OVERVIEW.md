@@ -26,7 +26,7 @@ and applies only after approval.
 ## Runtime Architecture
 ### Core (small + stable)
 - **Logging**: `rkg::log` with file + ring buffer
-- **ECS**: entity registry + `Transform`
+- **ECS**: entity registry + `Transform`, `Renderable`, `Velocity`, `RigidBody`, `Collider`, `CharacterController`, `Skeleton`
 - **Plugin host**: static plugins today, dynamic-ready API
 - **Config**: YAML/JSON project config
 - **Replay hooks**: record/replay input streams
