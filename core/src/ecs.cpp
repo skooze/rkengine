@@ -95,9 +95,15 @@ void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton) {
     world.position[0] = world_mats[i].m[12];
     world.position[1] = world_mats[i].m[13];
     world.position[2] = world_mats[i].m[14];
-    world.rotation[0] = bone.local_pose.rotation[0];
-    world.rotation[1] = bone.local_pose.rotation[1];
-    world.rotation[2] = bone.local_pose.rotation[2];
+    if (bone.parent_index < 0) {
+      world.rotation[0] = root.rotation[0];
+      world.rotation[1] = root.rotation[1];
+      world.rotation[2] = root.rotation[2];
+    } else {
+      world.rotation[0] = bone.local_pose.rotation[0];
+      world.rotation[1] = bone.local_pose.rotation[1];
+      world.rotation[2] = bone.local_pose.rotation[2];
+    }
     world.scale[0] = bone.local_pose.scale[0];
     world.scale[1] = bone.local_pose.scale[1];
     world.scale[2] = bone.local_pose.scale[2];
