@@ -3608,11 +3608,14 @@ void update_camera_and_draw_list(EditorState& state) {
   // - MMB drag: pan (move pivot in view plane)
   const bool camera_input_enabled =
       state.viewport_focused && !state.chat_active && !io.WantTextInput;
-  if (camera_input_enabled && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-    state.camera_yaw -= io.MouseDelta.x * 0.01f;
-    state.camera_pitch -= io.MouseDelta.y * 0.01f;
-    if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
-    if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
+  if (camera_input_enabled) {
+    const bool always_look = (state.play_state == PlayState::Play);
+    if (always_look || ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+      state.camera_yaw -= io.MouseDelta.x * 0.01f;
+      state.camera_pitch -= io.MouseDelta.y * 0.01f;
+      if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
+      if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
+    }
   }
   if (camera_input_enabled && std::abs(io.MouseWheel) > 0.0001f) {
     state.camera_distance -= io.MouseWheel * 0.4f;
