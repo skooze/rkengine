@@ -792,14 +792,6 @@ bool load_textured_asset() {
     rkg::log::warn("renderer:vulkan textured demo: failed to load mesh.bin");
     return false;
   }
-  // Make the demo asset visually obvious by offsetting/scaling it away from the origin.
-  const float demo_scale = 2.0f;
-  const float demo_offset[3] = {2.0f, 1.0f, 0.0f};
-  for (auto& v : vertices) {
-    v.pos[0] = v.pos[0] * demo_scale + demo_offset[0];
-    v.pos[1] = v.pos[1] * demo_scale + demo_offset[1];
-    v.pos[2] = v.pos[2] * demo_scale + demo_offset[2];
-  }
   g_state.textured_has_uv0 = has_uv;
 
   if (!create_host_buffer(vertices.data(), vertices.size() * sizeof(TexturedVertex),
@@ -1319,8 +1311,8 @@ bool create_viewport_pipeline() {
 
   VkPipelineDepthStencilStateCreateInfo depth{};
   depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depth.depthTestEnable = VK_TRUE;
-  depth.depthWriteEnable = VK_TRUE;
+  depth.depthTestEnable = VK_FALSE;
+  depth.depthWriteEnable = VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth.depthBoundsTestEnable = VK_FALSE;
   depth.stencilTestEnable = VK_FALSE;
