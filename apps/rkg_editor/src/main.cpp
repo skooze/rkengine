@@ -3615,6 +3615,14 @@ void update_camera_and_draw_list(EditorState& state) {
     state.runtime->platform().set_relative_mouse(want_relative_mouse);
     state.mouse_relative = want_relative_mouse;
   }
+
+  if (state.play_state == PlayState::Play && state.viewport_focused &&
+      !state.chat_active && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    state.stop_requested = true;
+    state.play_state = PlayState::Edit;
+    state.lock_editor_pivot = false;
+    state.viewport_focused = false;
+  }
   if (camera_input_enabled) {
     const bool always_look = (state.play_state == PlayState::Play);
     if (always_look || ImGui::IsMouseDown(ImGuiMouseButton_Right)) {

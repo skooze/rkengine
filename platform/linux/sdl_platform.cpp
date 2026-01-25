@@ -659,9 +659,6 @@ void platform_poll_events(Platform* self) {
       if (code != KeyCode::Unknown) {
         self->keys_down_.insert(code);
       }
-      if (code == KeyCode::Escape) {
-        self->quit_ = true;
-      }
     }
     if (event.type == SDL_EVENT_KEY_UP) {
       const auto code = map_sdl_scancode(event.key.scancode);
