@@ -283,6 +283,7 @@
 - Materials are limited to `baseColorFactor` + optional `baseColorTexture` filename.
 - Textures are copied/extracted as-is (bufferView/URI/data URI); no re-encode or KTX2.
 - Skin/joint/animation data is not exported in Phase 1 (counts are reported but not written).
+- The testmanny GLB imported in this environment reports **0 materials / 0 textures**.
 
 ### PHASE 2A — Runtime Asset Registry + CPU‑side Loading/Validation Logs
 **Objective**: Load imported assets into runtime cache (no rendering yet).
@@ -320,6 +321,13 @@
 - Phase 2B: Vulkan textured rendering.
 **Risks/edge cases**:
 - Asset path mismatch.
+
+**Phase 2A Notes (as-built)**:
+- Asset cache parses `asset.json` / `materials.json` via vendored/system **nlohmann_json** when `RKG_ENABLE_DATA_JSON=ON`; if JSON is disabled, asset cache load returns a clear error.
+- Mesh header/attribute counts are validated; textures are discovered by directory scan.
+- Runtime logs one line per asset (name + vert/index/material/texture counts).
+- No GPU upload or rendering; failures after logs can still occur if cooked content is missing.
+- **Environment constraint (dev server)**: SDL3/Vulkan/YAML are missing, so editor/renderer targets are disabled and `rkg_demo_game` exits after logging asset_cache (acceptable for Phase 2A).
 
 ### PHASE 2B — Vulkan Pipeline + Descriptors + Textured Rendering
 **Objective**: Render static textured meshes.

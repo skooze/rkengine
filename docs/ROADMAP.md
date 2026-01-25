@@ -24,7 +24,7 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 - **What becomes possible**: Editor/runtime can list assets from content.
 - **Not included yet**: Textured rendering pipeline.
 - **Acceptance criteria**: Runtime logs show `testmanny` asset load.
-- **Demo**: Run editor; log confirms asset cache load.
+- **Demo**: Run `rkg_demo_game`; log confirms asset cache load.
 
 ### M3 — Textured Static Mesh Rendering
 - **Outcome**: Vulkan pipeline renders textured static meshes.
