@@ -874,7 +874,11 @@ int main(int argc, char** argv) {
     root["project"]["initial_level"] = "old";
     json value = "new_level.yaml";
     update_yaml_keypath(root, "project.initial_level", value);
-    if (root["project"]["initial_level"].as<std::string>() != "new_level.yaml") {
+    const auto updated = root["project"]["initial_level"];
+    if (!updated || !updated.IsScalar()) {
+      std::cerr << "yaml update failed (non-scalar)\n";
+      ++failures;
+    } else if (updated.Scalar() != "new_level.yaml") {
       std::cerr << "yaml update failed\n";
       ++failures;
     }

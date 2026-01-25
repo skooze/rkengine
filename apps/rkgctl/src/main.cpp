@@ -380,35 +380,39 @@ YAML::Node yaml_from_json(const json& value) {
   return YAML::Node();
 }
 
-bool update_yaml_keypath(YAML::Node& root, const std::string& keypath, const json& value) {
-  auto tokens = parse_keypath(keypath);
-  YAML::Node current = root;
-  for (size_t i = 0; i < tokens.size(); ++i) {
-    const bool last = (i == tokens.size() - 1);
-    const auto& token = tokens[i];
-    if (token.type == KeyToken::Type::Key) {
-      if (last) {
-        current[token.key] = yaml_from_json(value);
-      } else {
-        if (!current[token.key]) {
-          current[token.key] = YAML::Node();
-        }
-        current = current[token.key];
-      }
-    } else {
-      if (!current.IsSequence()) {
-        current = YAML::Node(YAML::NodeType::Sequence);
-      }
-      while (current.size() <= static_cast<size_t>(token.index)) {
-        current.push_back(YAML::Node());
-      }
-      if (last) {
-        current[token.index] = yaml_from_json(value);
-      } else {
-        current = current[token.index];
-      }
-    }
+namespace {
+YAML::Node update_yaml_keypath_node(const YAML::Node& node,
+                                    const std::vector<KeyToken>& tokens,
+                                    size_t index,
+                                    const json& value) {
+  if (index >= tokens.size()) {
+    return yaml_from_json(value);
   }
+  const auto& token = tokens[index];
+  if (token.type == KeyToken::Type::Key) {
+    YAML::Node out = node;
+    if (!out || !out.IsMap()) {
+      out = YAML::Node(YAML::NodeType::Map);
+    }
+    out[token.key] = update_yaml_keypath_node(out[token.key], tokens, index + 1, value);
+    return out;
+  }
+  // Index token
+  YAML::Node out = node;
+  if (!out || !out.IsSequence()) {
+    out = YAML::Node(YAML::NodeType::Sequence);
+  }
+  while (out.size() <= static_cast<size_t>(token.index)) {
+    out.push_back(YAML::Node());
+  }
+  out[token.index] = update_yaml_keypath_node(out[token.index], tokens, index + 1, value);
+  return out;
+}
+} // namespace
+
+bool update_yaml_keypath(YAML::Node& root, const std::string& keypath, const json& value) {
+  const auto tokens = parse_keypath(keypath);
+  root = update_yaml_keypath_node(root, tokens, 0, value);
   return true;
 }
 
