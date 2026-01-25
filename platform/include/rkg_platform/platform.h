@@ -32,6 +32,8 @@ void platform_poll_events(Platform* self);
 bool platform_should_quit(const Platform* self);
 float platform_delta_seconds(Platform* self);
 void* platform_native_window(const Platform* self);
+void platform_set_relative_mouse(Platform* self, bool enabled);
+void platform_set_cursor_visible(Platform* self, bool visible);
 } // namespace detail
 
 class Platform {

@@ -694,19 +694,27 @@ void platform_set_relative_mouse(Platform* self, bool enabled) {
   auto* window = static_cast<SDL_Window*>(self->window_);
 #if SDL_VERSION_ATLEAST(3, 0, 0)
   SDL_SetWindowRelativeMouseMode(window, enabled);
-  SDL_ShowCursor(!enabled);
+  if (enabled) {
+    SDL_HideCursor();
+  } else {
+    SDL_ShowCursor();
+  }
 #else
   SDL_SetRelativeMouseMode(enabled ? SDL_TRUE : SDL_FALSE);
-  SDL_ShowCursor(enabled ? SDL_FALSE : SDL_TRUE);
+  SDL_ShowCursor(enabled ? SDL_DISABLE : SDL_ENABLE);
 #endif
 }
 
 void platform_set_cursor_visible(Platform* self, bool visible) {
   (void)self;
 #if SDL_VERSION_ATLEAST(3, 0, 0)
-  SDL_ShowCursor(visible);
+  if (visible) {
+    SDL_ShowCursor();
+  } else {
+    SDL_HideCursor();
+  }
 #else
-  SDL_ShowCursor(visible ? SDL_TRUE : SDL_FALSE);
+  SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
 #endif
 }
 
