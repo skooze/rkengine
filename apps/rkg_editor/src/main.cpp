@@ -3626,8 +3626,13 @@ void update_camera_and_draw_list(EditorState& state) {
   if (camera_input_enabled) {
     const bool always_look = (state.play_state == PlayState::Play);
     if (always_look || ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-      state.camera_yaw -= io.MouseDelta.x * 0.01f;
-      state.camera_pitch -= io.MouseDelta.y * 0.01f;
+      float look_dx = io.MouseDelta.x;
+      float look_dy = io.MouseDelta.y;
+      if (always_look) {
+        state.runtime->platform().consume_mouse_delta(&look_dx, &look_dy);
+      }
+      state.camera_yaw -= look_dx * 0.01f;
+      state.camera_pitch -= look_dy * 0.01f;
       if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
       if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
     }
@@ -4226,6 +4231,9 @@ int main(int argc, char** argv) {
     params.update_input = false;
     auto action_provider = [&](const std::string& name) -> rkg::input::ActionState {
       if (!state.viewport_focused || state.chat_active) {
+        return {};
+      }
+      if (state.play_state == PlayState::Play && name == "Quit") {
         return {};
       }
       return runtime.input_action(name);

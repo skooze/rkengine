@@ -666,6 +666,10 @@ void platform_poll_events(Platform* self) {
         self->keys_down_.erase(code);
       }
     }
+    if (event.type == SDL_EVENT_MOUSE_MOTION) {
+      self->mouse_delta_x_ += static_cast<float>(event.motion.xrel);
+      self->mouse_delta_y_ += static_cast<float>(event.motion.yrel);
+    }
   }
 }
 

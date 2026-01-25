@@ -58,4 +58,15 @@ void Platform::set_cursor_visible(bool visible) {
   detail::platform_set_cursor_visible(this, visible);
 }
 
+void Platform::consume_mouse_delta(float* dx, float* dy) {
+  if (dx) {
+    *dx = mouse_delta_x_;
+  }
+  if (dy) {
+    *dy = mouse_delta_y_;
+  }
+  mouse_delta_x_ = 0.0f;
+  mouse_delta_y_ = 0.0f;
+}
+
 } // namespace rkg::platform

@@ -51,6 +51,7 @@ class Platform {
   void set_event_callback(EventCallback callback, void* user_data);
   void set_relative_mouse(bool enabled);
   void set_cursor_visible(bool visible);
+  void consume_mouse_delta(float* dx, float* dy);
 
  private:
   friend bool detail::platform_init(Platform* self, const WindowDesc& desc);
@@ -68,6 +69,8 @@ class Platform {
   std::unordered_set<KeyCode> keys_down_;
   EventCallback event_callback_ = nullptr;
   void* event_user_data_ = nullptr;
+  float mouse_delta_x_ = 0.0f;
+  float mouse_delta_y_ = 0.0f;
 };
 
 } // namespace rkg::platform
