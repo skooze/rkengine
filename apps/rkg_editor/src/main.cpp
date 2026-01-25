@@ -3814,14 +3814,6 @@ void update_camera_and_draw_list(EditorState& state) {
           m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
       };
     };
-    auto transform_dir = [&](const Mat4& m, const Vec3& v) -> Vec3 {
-      return {
-          m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z,
-          m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z,
-          m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z,
-      };
-    };
-
     struct GlyphSegment {
       float x1;
       float y1;
@@ -3932,7 +3924,6 @@ void update_camera_and_draw_list(EditorState& state) {
 
         for (const auto& face : faces) {
           const Vec3 local_center = vec3_mul(face.normal, face_half);
-          const Vec3 world_center = transform_point(model, local_center);
           const int letter_count = static_cast<int>(std::strlen(face.word));
           if (letter_count <= 0) {
             continue;

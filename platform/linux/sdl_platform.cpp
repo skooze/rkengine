@@ -691,12 +691,23 @@ void platform_set_relative_mouse(Platform* self, bool enabled) {
   if (!self || !self->window_) {
     return;
   }
+  auto* window = static_cast<SDL_Window*>(self->window_);
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+  SDL_SetWindowRelativeMouseMode(window, enabled);
+  SDL_ShowCursor(!enabled);
+#else
   SDL_SetRelativeMouseMode(enabled ? SDL_TRUE : SDL_FALSE);
   SDL_ShowCursor(enabled ? SDL_FALSE : SDL_TRUE);
+#endif
 }
 
 void platform_set_cursor_visible(Platform* self, bool visible) {
+  (void)self;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+  SDL_ShowCursor(visible);
+#else
   SDL_ShowCursor(visible ? SDL_TRUE : SDL_FALSE);
+#endif
 }
 
 std::string format_errno() {

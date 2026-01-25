@@ -57,6 +57,8 @@ class Platform {
   friend bool detail::platform_should_quit(const Platform* self);
   friend float detail::platform_delta_seconds(Platform* self);
   friend void* detail::platform_native_window(const Platform* self);
+  friend void detail::platform_set_relative_mouse(Platform* self, bool enabled);
+  friend void detail::platform_set_cursor_visible(Platform* self, bool visible);
 
   bool quit_ = false;
   unsigned long long last_ticks_ = 0;
