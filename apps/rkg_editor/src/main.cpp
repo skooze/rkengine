@@ -3697,16 +3697,53 @@ void update_camera_and_draw_list(EditorState& state) {
   }
 
   if (state.show_character_grid) {
+    rkg::ecs::Entity rig_entity = player;
+    if (rig_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(rig_entity)) {
+      rig_entity = state.selected_entity;
+    }
+    const rkg::ecs::Transform* rig_transform = nullptr;
+    rkg::ecs::Transform rig_root{};
+    if (rig_entity != rkg::ecs::kInvalidEntity) {
+      rig_transform = registry.get_transform(rig_entity);
+      if (rig_transform) {
+        rig_root = *rig_transform;
+        if (auto* skeleton = registry.get_skeleton(rig_entity)) {
+          if (!skeleton->bones.empty()) {
+            rkg::ecs::compute_skeleton_world_pose(*rig_transform, *skeleton);
+            if (!skeleton->world_pose.empty()) {
+              rig_root = skeleton->world_pose[0];
+            }
+          }
+        }
+      }
+    }
+
     const float extent = state.grid_half_extent * 0.5f;
-    const float base_y = focus_pos.y;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
+    const Vec3 rig_pos{rig_root.position[0], rig_root.position[1], rig_root.position[2]};
+    const Vec3 rig_rot{rig_root.rotation[0], rig_root.rotation[1], rig_root.rotation[2]};
+    const Mat4 rig_rot_m = mat4_rotation_xyz(rig_rot);
+    const Vec3 rig_right = vec3_normalize(Vec3{rig_rot_m.m[0], rig_rot_m.m[1], rig_rot_m.m[2]});
+    const Vec3 rig_up = vec3_normalize(Vec3{rig_rot_m.m[4], rig_rot_m.m[5], rig_rot_m.m[6]});
+    const Vec3 rig_forward = vec3_normalize(Vec3{rig_rot_m.m[8], rig_rot_m.m[9], rig_rot_m.m[10]});
+
     for (int i = -steps; i <= steps; ++i) {
       const float coord = static_cast<float>(i) * state.grid_step;
-      add_line({focus_pos.x - extent, base_y, focus_pos.z + coord},
-               {focus_pos.x + extent, base_y, focus_pos.z + coord}, character_grid_color);
-      add_line({focus_pos.x + coord, base_y, focus_pos.z - extent},
-               {focus_pos.x + coord, base_y, focus_pos.z + extent}, character_grid_color);
+      const Vec3 offset_u = vec3_mul(rig_right, coord);
+      const Vec3 offset_v = vec3_mul(rig_forward, coord);
+      const Vec3 line_u0 = vec3_add(rig_pos, vec3_add(vec3_mul(rig_right, -extent), offset_v));
+      const Vec3 line_u1 = vec3_add(rig_pos, vec3_add(vec3_mul(rig_right, extent), offset_v));
+      const Vec3 line_v0 = vec3_add(rig_pos, vec3_add(vec3_mul(rig_forward, -extent), offset_u));
+      const Vec3 line_v1 = vec3_add(rig_pos, vec3_add(vec3_mul(rig_forward, extent), offset_u));
+      add_line(line_u0, line_u1, character_grid_color);
+      add_line(line_v0, line_v1, character_grid_color);
     }
+
+    // Draw local rig axes (north/forward) for clarity.
+    const float axis_len = std::max(0.5f, state.grid_half_extent * 0.2f);
+    add_line(rig_pos, vec3_add(rig_pos, vec3_mul(rig_right, axis_len)), axis_x_color);
+    add_line(rig_pos, vec3_add(rig_pos, vec3_mul(rig_up, axis_len)), axis_y_color);
+    add_line(rig_pos, vec3_add(rig_pos, vec3_mul(rig_forward, axis_len)), axis_z_color);
   }
 
   if (state.show_world_axes) {
