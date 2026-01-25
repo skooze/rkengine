@@ -2,7 +2,9 @@
 #include "rkg/log.h"
 #include "rkg/plugin_api.h"
 #include "rkg/renderer_hooks.h"
+#include "rkg/paths.h"
 #include "rkg_platform/platform.h"
+#include "stb_image.h"
 
 #if RKG_ENABLE_IMGUI
 #include "rkg_debug_ui/imgui_api.h"
@@ -13,9 +15,17 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <vector>
 
+#if RKG_ENABLE_DATA_JSON
+#include <nlohmann/json.hpp>
+#endif
+
 namespace {
+namespace fs = std::filesystem;
 
 struct VulkanState {
   rkg::HostContext* ctx = nullptr;
@@ -77,6 +87,26 @@ struct VulkanState {
   uint32_t viewport_cube_vertex_count = 0;
   uint32_t viewport_quad_vertex_count = 0;
   uint32_t viewport_line_vertex_capacity = 0;
+
+  // Phase 2B: textured static mesh demo resources.
+  VkPipeline textured_pipeline = VK_NULL_HANDLE;
+  VkPipelineLayout textured_pipeline_layout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout textured_desc_layout = VK_NULL_HANDLE;
+  VkDescriptorPool textured_desc_pool = VK_NULL_HANDLE;
+  VkDescriptorSet textured_desc_set = VK_NULL_HANDLE;
+  VkBuffer textured_vertex_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory textured_vertex_memory = VK_NULL_HANDLE;
+  VkBuffer textured_index_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory textured_index_memory = VK_NULL_HANDLE;
+  uint32_t textured_index_count = 0;
+  bool textured_has_uv0 = false;
+  float textured_base_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  VkImage textured_image = VK_NULL_HANDLE;
+  VkDeviceMemory textured_image_memory = VK_NULL_HANDLE;
+  VkImageView textured_image_view = VK_NULL_HANDLE;
+  VkSampler textured_sampler = VK_NULL_HANDLE;
+  std::string textured_asset_name{};
+  bool textured_ready = false;
 };
 
 VulkanState g_state{};
@@ -123,6 +153,8 @@ static const char* vk_result_name(VkResult result) {
 bool create_viewport_pipeline();
 bool create_viewport_line_pipeline();
 bool create_viewport_vertex_buffer();
+bool create_textured_pipeline();
+bool load_textured_asset();
 bool create_swapchain();
 bool create_render_pass();
 bool create_framebuffers();
@@ -379,7 +411,504 @@ uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties
   return 0;
 }
 
+struct TexturedVertex {
+  float pos[3];
+  float uv[2];
+};
+
+bool read_file_bytes(const fs::path& path, std::vector<uint8_t>& out) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return false;
+  in.seekg(0, std::ios::end);
+  const auto size = in.tellg();
+  if (size <= 0) return false;
+  out.resize(static_cast<size_t>(size));
+  in.seekg(0, std::ios::beg);
+  in.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(out.size()));
+  return true;
+}
+
+bool create_host_buffer(const void* data,
+                        size_t byte_size,
+                        VkBufferUsageFlags usage,
+                        VkBuffer& buffer,
+                        VkDeviceMemory& memory) {
+  VkBufferCreateInfo buffer_info{};
+  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  buffer_info.size = static_cast<VkDeviceSize>(byte_size);
+  buffer_info.usage = usage;
+  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  if (vkCreateBuffer(g_state.device, &buffer_info, nullptr, &buffer) != VK_SUCCESS) {
+    return false;
+  }
+  VkMemoryRequirements mem_req{};
+  vkGetBufferMemoryRequirements(g_state.device, buffer, &mem_req);
+  VkMemoryAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  alloc_info.allocationSize = mem_req.size;
+  alloc_info.memoryTypeIndex =
+      find_memory_type(mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  if (vkAllocateMemory(g_state.device, &alloc_info, nullptr, &memory) != VK_SUCCESS) {
+    vkDestroyBuffer(g_state.device, buffer, nullptr);
+    buffer = VK_NULL_HANDLE;
+    return false;
+  }
+  vkBindBufferMemory(g_state.device, buffer, memory, 0);
+  if (data && byte_size > 0) {
+    void* mapped = nullptr;
+    if (vkMapMemory(g_state.device, memory, 0, byte_size, 0, &mapped) == VK_SUCCESS) {
+      std::memcpy(mapped, data, byte_size);
+      vkUnmapMemory(g_state.device, memory);
+    }
+  }
+  return true;
+}
+
+VkCommandBuffer begin_one_time_commands() {
+  VkCommandBufferAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandPool = g_state.command_pool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandBufferCount = 1;
+  VkCommandBuffer cmd = VK_NULL_HANDLE;
+  if (vkAllocateCommandBuffers(g_state.device, &alloc_info, &cmd) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  VkCommandBufferBeginInfo begin_info{};
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmd, &begin_info);
+  return cmd;
+}
+
+void end_one_time_commands(VkCommandBuffer cmd) {
+  if (cmd == VK_NULL_HANDLE) return;
+  vkEndCommandBuffer(cmd);
+  VkSubmitInfo submit{};
+  submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit.commandBufferCount = 1;
+  submit.pCommandBuffers = &cmd;
+  vkQueueSubmit(g_state.graphics_queue, 1, &submit, VK_NULL_HANDLE);
+  vkQueueWaitIdle(g_state.graphics_queue);
+  vkFreeCommandBuffers(g_state.device, g_state.command_pool, 1, &cmd);
+}
+
+bool create_image(uint32_t width,
+                  uint32_t height,
+                  VkFormat format,
+                  VkImageUsageFlags usage,
+                  VkImage& image,
+                  VkDeviceMemory& memory) {
+  VkImageCreateInfo image_info{};
+  image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType = VK_IMAGE_TYPE_2D;
+  image_info.format = format;
+  image_info.extent = {width, height, 1};
+  image_info.mipLevels = 1;
+  image_info.arrayLayers = 1;
+  image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  image_info.usage = usage;
+  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  if (vkCreateImage(g_state.device, &image_info, nullptr, &image) != VK_SUCCESS) {
+    return false;
+  }
+  VkMemoryRequirements mem_req{};
+  vkGetImageMemoryRequirements(g_state.device, image, &mem_req);
+  VkMemoryAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  alloc_info.allocationSize = mem_req.size;
+  alloc_info.memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  if (vkAllocateMemory(g_state.device, &alloc_info, nullptr, &memory) != VK_SUCCESS) {
+    vkDestroyImage(g_state.device, image, nullptr);
+    image = VK_NULL_HANDLE;
+    return false;
+  }
+  vkBindImageMemory(g_state.device, image, memory, 0);
+  return true;
+}
+
+bool transition_image_layout(VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) {
+  VkCommandBuffer cmd = begin_one_time_commands();
+  if (cmd == VK_NULL_HANDLE) return false;
+  VkImageMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = old_layout;
+  barrier.newLayout = new_layout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+  VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  }
+  vkCmdPipelineBarrier(cmd, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  end_one_time_commands(cmd);
+  return true;
+}
+
+bool copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+  VkCommandBuffer cmd = begin_one_time_commands();
+  if (cmd == VK_NULL_HANDLE) return false;
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = {0, 0, 0};
+  region.imageExtent = {width, height, 1};
+  vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  end_one_time_commands(cmd);
+  return true;
+}
+
+bool create_texture_from_rgba(const uint8_t* rgba, uint32_t width, uint32_t height) {
+  if (!rgba || width == 0 || height == 0) return false;
+  const size_t byte_count = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+  VkBuffer staging = VK_NULL_HANDLE;
+  VkDeviceMemory staging_mem = VK_NULL_HANDLE;
+  if (!create_host_buffer(rgba, byte_count, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging, staging_mem)) {
+    return false;
+  }
+  if (!create_image(width, height, VK_FORMAT_R8G8B8A8_SRGB,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    g_state.textured_image, g_state.textured_image_memory)) {
+    vkDestroyBuffer(g_state.device, staging, nullptr);
+    vkFreeMemory(g_state.device, staging_mem, nullptr);
+    return false;
+  }
+  transition_image_layout(g_state.textured_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  copy_buffer_to_image(staging, g_state.textured_image, width, height);
+  transition_image_layout(g_state.textured_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vkDestroyBuffer(g_state.device, staging, nullptr);
+  vkFreeMemory(g_state.device, staging_mem, nullptr);
+
+  VkImageViewCreateInfo view_info{};
+  view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  view_info.image = g_state.textured_image;
+  view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
+  view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  view_info.subresourceRange.baseMipLevel = 0;
+  view_info.subresourceRange.levelCount = 1;
+  view_info.subresourceRange.baseArrayLayer = 0;
+  view_info.subresourceRange.layerCount = 1;
+  if (vkCreateImageView(g_state.device, &view_info, nullptr, &g_state.textured_image_view) != VK_SUCCESS) {
+    return false;
+  }
+
+  VkSamplerCreateInfo sampler_info{};
+  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.magFilter = VK_FILTER_LINEAR;
+  sampler_info.minFilter = VK_FILTER_LINEAR;
+  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.maxAnisotropy = 1.0f;
+  if (vkCreateSampler(g_state.device, &sampler_info, nullptr, &g_state.textured_sampler) != VK_SUCCESS) {
+    return false;
+  }
+  return true;
+}
+
+fs::path select_asset_dir(std::string& asset_name) {
+  auto paths = rkg::resolve_paths(nullptr, std::nullopt, "demo_game");
+  fs::path assets_dir = paths.content_root / "assets";
+  if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir)) {
+    return {};
+  }
+  if (const char* env = std::getenv("RKG_RENDER_ASSET")) {
+    if (env[0] != '\0') {
+      fs::path candidate = assets_dir / env;
+      if (fs::exists(candidate / "asset.json")) {
+        asset_name = env;
+        return candidate;
+      }
+    }
+  }
+  fs::path testmanny = assets_dir / "testmanny";
+  if (fs::exists(testmanny / "asset.json")) {
+    asset_name = "testmanny";
+    return testmanny;
+  }
+  std::vector<fs::path> dirs;
+  for (const auto& entry : fs::directory_iterator(assets_dir)) {
+    if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+      dirs.push_back(entry.path());
+    }
+  }
+  if (dirs.empty()) return {};
+  std::sort(dirs.begin(), dirs.end(),
+            [](const fs::path& a, const fs::path& b) { return a.filename().string() < b.filename().string(); });
+  const bool prefer_textured = std::getenv("RKG_RENDER_TEXTURED") != nullptr;
+  if (prefer_textured) {
+    for (const auto& dir : dirs) {
+      const fs::path textures = dir / "textures";
+      if (fs::exists(textures) && fs::is_directory(textures)) {
+        for (const auto& tex : fs::directory_iterator(textures)) {
+          if (tex.is_regular_file()) {
+            asset_name = dir.filename().string();
+            return dir;
+          }
+        }
+      }
+    }
+  }
+  asset_name = dirs.front().filename().string();
+  return dirs.front();
+}
+
+bool load_mesh_bin(const fs::path& path,
+                   std::vector<TexturedVertex>& vertices,
+                   std::vector<uint32_t>& indices,
+                   bool& has_uv) {
+  std::vector<uint8_t> bytes;
+  if (!read_file_bytes(path, bytes)) return false;
+  if (bytes.size() < sizeof(uint32_t) * 5) return false;
+  const uint32_t* header = reinterpret_cast<const uint32_t*>(bytes.data());
+  const uint32_t magic = header[0];
+  const uint32_t version = header[1];
+  if (magic != 0x30474B52 || version != 1) return false;
+  const uint32_t vertex_count = header[2];
+  const uint32_t index_count = header[3];
+  const uint32_t flags = header[4];
+  const bool has_normals = (flags & 1u) != 0;
+  has_uv = (flags & 2u) != 0;
+  const bool has_tangents = (flags & 4u) != 0;
+
+  size_t offset = sizeof(uint32_t) * 5;
+  const size_t pos_bytes = static_cast<size_t>(vertex_count) * 3 * sizeof(float);
+  if (bytes.size() < offset + pos_bytes) return false;
+  const float* pos_ptr = reinterpret_cast<const float*>(bytes.data() + offset);
+  offset += pos_bytes;
+
+  if (has_normals) {
+    const size_t norm_bytes = static_cast<size_t>(vertex_count) * 3 * sizeof(float);
+    if (bytes.size() < offset + norm_bytes) return false;
+    offset += norm_bytes;
+  }
+  const float* uv_ptr = nullptr;
+  if (has_uv) {
+    const size_t uv_bytes = static_cast<size_t>(vertex_count) * 2 * sizeof(float);
+    if (bytes.size() < offset + uv_bytes) return false;
+    uv_ptr = reinterpret_cast<const float*>(bytes.data() + offset);
+    offset += uv_bytes;
+  }
+  if (has_tangents) {
+    const size_t tan_bytes = static_cast<size_t>(vertex_count) * 4 * sizeof(float);
+    if (bytes.size() < offset + tan_bytes) return false;
+    offset += tan_bytes;
+  }
+  const size_t idx_bytes = static_cast<size_t>(index_count) * sizeof(uint32_t);
+  if (bytes.size() < offset + idx_bytes) return false;
+  const uint32_t* idx_ptr = reinterpret_cast<const uint32_t*>(bytes.data() + offset);
+
+  vertices.resize(vertex_count);
+  for (uint32_t i = 0; i < vertex_count; ++i) {
+    vertices[i].pos[0] = pos_ptr[i * 3 + 0];
+    vertices[i].pos[1] = pos_ptr[i * 3 + 1];
+    vertices[i].pos[2] = pos_ptr[i * 3 + 2];
+    if (uv_ptr) {
+      vertices[i].uv[0] = uv_ptr[i * 2 + 0];
+      vertices[i].uv[1] = uv_ptr[i * 2 + 1];
+    } else {
+      vertices[i].uv[0] = 0.0f;
+      vertices[i].uv[1] = 0.0f;
+    }
+  }
+  indices.assign(idx_ptr, idx_ptr + index_count);
+  return true;
+}
+
+bool load_materials_json(const fs::path& path,
+                         std::string& base_color_tex,
+                         float base_color[4]) {
+#if !RKG_ENABLE_DATA_JSON
+  (void)path;
+  (void)base_color_tex;
+  (void)base_color;
+  return false;
+#else
+  std::ifstream in(path);
+  if (!in) return false;
+  nlohmann::json doc;
+  try {
+    in >> doc;
+  } catch (...) {
+    return false;
+  }
+  const auto materials = doc.value("materials", nlohmann::json::array());
+  if (!materials.empty()) {
+    const auto& mat = materials.at(0);
+    if (mat.contains("baseColorFactor") && mat["baseColorFactor"].is_array()) {
+      const auto& arr = mat["baseColorFactor"];
+      for (size_t i = 0; i < 4 && i < arr.size(); ++i) {
+        base_color[i] = arr[i].get<float>();
+      }
+    }
+    if (mat.contains("baseColorTexture") && mat["baseColorTexture"].is_string()) {
+      base_color_tex = mat["baseColorTexture"].get<std::string>();
+    }
+  }
+  return true;
+#endif
+}
+
+bool load_textured_asset() {
+  if (g_state.textured_ready) return true;
+  if (g_state.device == VK_NULL_HANDLE) return false;
+
+  std::string asset_name;
+  const fs::path asset_dir = select_asset_dir(asset_name);
+  if (asset_dir.empty()) {
+    rkg::log::warn("renderer:vulkan textured demo: no asset directory found");
+    return false;
+  }
+  g_state.textured_asset_name = asset_name;
+
+  std::vector<TexturedVertex> vertices;
+  std::vector<uint32_t> indices;
+  bool has_uv = false;
+  if (!load_mesh_bin(asset_dir / "mesh.bin", vertices, indices, has_uv)) {
+    rkg::log::warn("renderer:vulkan textured demo: failed to load mesh.bin");
+    return false;
+  }
+  g_state.textured_has_uv0 = has_uv;
+
+  if (!create_host_buffer(vertices.data(), vertices.size() * sizeof(TexturedVertex),
+                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, g_state.textured_vertex_buffer,
+                          g_state.textured_vertex_memory)) {
+    rkg::log::warn("renderer:vulkan textured demo: vertex buffer create failed");
+    return false;
+  }
+  if (!create_host_buffer(indices.data(), indices.size() * sizeof(uint32_t),
+                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT, g_state.textured_index_buffer,
+                          g_state.textured_index_memory)) {
+    rkg::log::warn("renderer:vulkan textured demo: index buffer create failed");
+    return false;
+  }
+  g_state.textured_index_count = static_cast<uint32_t>(indices.size());
+
+  std::string base_color_tex;
+  load_materials_json(asset_dir / "materials.json", base_color_tex, g_state.textured_base_color);
+
+  std::vector<uint8_t> image_bytes;
+  int tex_w = 1;
+  int tex_h = 1;
+  std::vector<uint8_t> rgba;
+  if (!base_color_tex.empty()) {
+    const fs::path tex_path = asset_dir / base_color_tex;
+    if (read_file_bytes(tex_path, image_bytes)) {
+      int w = 0, h = 0, ch = 0;
+      stbi_uc* decoded = stbi_load_from_memory(image_bytes.data(),
+                                               static_cast<int>(image_bytes.size()),
+                                               &w, &h, &ch, 4);
+      if (decoded) {
+        tex_w = w;
+        tex_h = h;
+        rgba.assign(decoded, decoded + (w * h * 4));
+        stbi_image_free(decoded);
+      }
+    } else {
+      rkg::log::warn("renderer:vulkan textured demo: failed to read texture " + tex_path.string());
+    }
+  }
+  if (rgba.empty()) {
+    rgba.assign(4, 255);
+    tex_w = 1;
+    tex_h = 1;
+  }
+  if (!create_texture_from_rgba(rgba.data(), static_cast<uint32_t>(tex_w), static_cast<uint32_t>(tex_h))) {
+    rkg::log::warn("renderer:vulkan textured demo: texture create failed");
+    return false;
+  }
+
+  if (g_state.textured_desc_layout == VK_NULL_HANDLE) {
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &binding;
+    if (vkCreateDescriptorSetLayout(g_state.device, &layout_info, nullptr,
+                                    &g_state.textured_desc_layout) != VK_SUCCESS) {
+      rkg::log::warn("renderer:vulkan textured demo: descriptor layout create failed");
+      return false;
+    }
+  }
+
+  if (g_state.textured_desc_pool == VK_NULL_HANDLE) {
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    pool_size.descriptorCount = 1;
+    VkDescriptorPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_size;
+    pool_info.maxSets = 1;
+    if (vkCreateDescriptorPool(g_state.device, &pool_info, nullptr, &g_state.textured_desc_pool) != VK_SUCCESS) {
+      rkg::log::warn("renderer:vulkan textured demo: descriptor pool create failed");
+      return false;
+    }
+  }
+
+  if (g_state.textured_desc_set == VK_NULL_HANDLE) {
+    VkDescriptorSetAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = g_state.textured_desc_pool;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &g_state.textured_desc_layout;
+    if (vkAllocateDescriptorSets(g_state.device, &alloc_info, &g_state.textured_desc_set) != VK_SUCCESS) {
+      rkg::log::warn("renderer:vulkan textured demo: descriptor set alloc failed");
+      return false;
+    }
+  }
+
+  VkDescriptorImageInfo image_info{};
+  image_info.sampler = g_state.textured_sampler;
+  image_info.imageView = g_state.textured_image_view;
+  image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet = g_state.textured_desc_set;
+  write.dstBinding = 0;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write.pImageInfo = &image_info;
+  vkUpdateDescriptorSets(g_state.device, 1, &write, 0, nullptr);
+
+  g_state.textured_ready = true;
+  rkg::log::info("renderer:vulkan textured demo: using asset " + g_state.textured_asset_name);
+  return true;
+}
+
 void destroy_offscreen() {
+  if (g_state.textured_pipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.textured_pipeline, nullptr);
+    g_state.textured_pipeline = VK_NULL_HANDLE;
+  }
   if (g_state.viewport_pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(g_state.device, g_state.viewport_pipeline, nullptr);
     g_state.viewport_pipeline = VK_NULL_HANDLE;
@@ -656,6 +1185,11 @@ bool create_offscreen(uint32_t width, uint32_t height) {
     rkg::log::error("viewport vertex buffer setup failed");
     return false;
   }
+  if (g_state.textured_ready) {
+    if (!create_textured_pipeline()) {
+      rkg::log::warn("textured pipeline setup failed");
+    }
+  }
 
   return true;
 }
@@ -682,6 +1216,25 @@ VkShaderModule create_shader_module(const uint32_t* code, size_t word_count) {
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   create_info.codeSize = word_count * sizeof(uint32_t);
   create_info.pCode = code;
+  VkShaderModule module = VK_NULL_HANDLE;
+  if (vkCreateShaderModule(g_state.device, &create_info, nullptr, &module) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return module;
+}
+
+VkShaderModule create_shader_module_from_file(const fs::path& path) {
+  std::vector<uint8_t> bytes;
+  if (!read_file_bytes(path, bytes)) {
+    return VK_NULL_HANDLE;
+  }
+  if (bytes.empty() || (bytes.size() % 4) != 0) {
+    return VK_NULL_HANDLE;
+  }
+  VkShaderModuleCreateInfo create_info{};
+  create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  create_info.codeSize = bytes.size();
+  create_info.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
   VkShaderModule module = VK_NULL_HANDLE;
   if (vkCreateShaderModule(g_state.device, &create_info, nullptr, &module) != VK_SUCCESS) {
     return VK_NULL_HANDLE;
@@ -941,6 +1494,163 @@ bool create_viewport_line_pipeline() {
   vkDestroyShaderModule(g_state.device, frag, nullptr);
   if (result != VK_SUCCESS) {
     rkg::log::error("viewport line pipeline creation failed");
+    return false;
+  }
+  return true;
+}
+
+bool create_textured_pipeline() {
+  if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
+  if (g_state.textured_pipeline != VK_NULL_HANDLE) return true;
+
+  if (g_state.textured_desc_layout == VK_NULL_HANDLE) {
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &binding;
+    if (vkCreateDescriptorSetLayout(g_state.device, &layout_info, nullptr,
+                                    &g_state.textured_desc_layout) != VK_SUCCESS) {
+      rkg::log::error("textured pipeline descriptor layout create failed");
+      return false;
+    }
+  }
+
+  if (g_state.textured_pipeline_layout == VK_NULL_HANDLE) {
+    VkPushConstantRange push_range{};
+    push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    push_range.offset = 0;
+    push_range.size = sizeof(float) * 20;
+    VkPipelineLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &g_state.textured_desc_layout;
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &push_range;
+    if (vkCreatePipelineLayout(g_state.device, &layout_info, nullptr,
+                               &g_state.textured_pipeline_layout) != VK_SUCCESS) {
+      rkg::log::error("textured pipeline layout creation failed");
+      return false;
+    }
+  }
+
+  const fs::path shader_dir = rkg::resolve_paths(nullptr, std::nullopt, "demo_game").root /
+                              "plugins/renderer/vulkan/shaders";
+  VkShaderModule vert = create_shader_module_from_file(shader_dir / "mesh_textured.vert.spv");
+  VkShaderModule frag = create_shader_module_from_file(shader_dir / "mesh_textured.frag.spv");
+  if (vert == VK_NULL_HANDLE || frag == VK_NULL_HANDLE) {
+    rkg::log::error("textured shader module creation failed");
+    if (vert != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, vert, nullptr);
+    if (frag != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, frag, nullptr);
+    return false;
+  }
+
+  VkPipelineShaderStageCreateInfo stages[2]{};
+  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = vert;
+  stages[0].pName = "main";
+  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = frag;
+  stages[1].pName = "main";
+
+  VkVertexInputBindingDescription binding{};
+  binding.binding = 0;
+  binding.stride = sizeof(TexturedVertex);
+  binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  VkVertexInputAttributeDescription attrs[2]{};
+  attrs[0].binding = 0;
+  attrs[0].location = 0;
+  attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attrs[0].offset = 0;
+  attrs[1].binding = 0;
+  attrs[1].location = 1;
+  attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+  attrs[1].offset = sizeof(float) * 3;
+
+  VkPipelineVertexInputStateCreateInfo vertex_input{};
+  vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_input.vertexBindingDescriptionCount = 1;
+  vertex_input.pVertexBindingDescriptions = &binding;
+  vertex_input.vertexAttributeDescriptionCount = 2;
+  vertex_input.pVertexAttributeDescriptions = attrs;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+  input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly.primitiveRestartEnable = VK_FALSE;
+
+  VkPipelineViewportStateCreateInfo viewport_state{};
+  viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewport_state.viewportCount = 1;
+  viewport_state.scissorCount = 1;
+
+  VkPipelineRasterizationStateCreateInfo raster{};
+  raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  raster.depthClampEnable = VK_FALSE;
+  raster.rasterizerDiscardEnable = VK_FALSE;
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.lineWidth = 1.0f;
+  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.depthBiasEnable = VK_FALSE;
+
+  VkPipelineMultisampleStateCreateInfo multisample{};
+  multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineDepthStencilStateCreateInfo depth{};
+  depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depth.depthTestEnable = VK_TRUE;
+  depth.depthWriteEnable = VK_TRUE;
+  depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth.depthBoundsTestEnable = VK_FALSE;
+  depth.stencilTestEnable = VK_FALSE;
+
+  VkPipelineColorBlendAttachmentState color_blend_attach{};
+  color_blend_attach.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  color_blend_attach.blendEnable = VK_FALSE;
+
+  VkPipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  color_blend.attachmentCount = 1;
+  color_blend.pAttachments = &color_blend_attach;
+
+  VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{};
+  dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamics;
+
+  VkGraphicsPipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_info.stageCount = 2;
+  pipeline_info.pStages = stages;
+  pipeline_info.pVertexInputState = &vertex_input;
+  pipeline_info.pInputAssemblyState = &input_assembly;
+  pipeline_info.pViewportState = &viewport_state;
+  pipeline_info.pRasterizationState = &raster;
+  pipeline_info.pMultisampleState = &multisample;
+  pipeline_info.pDepthStencilState = &depth;
+  pipeline_info.pColorBlendState = &color_blend;
+  pipeline_info.pDynamicState = &dynamic;
+  pipeline_info.layout = g_state.textured_pipeline_layout;
+  pipeline_info.renderPass = g_state.offscreen_render_pass;
+  pipeline_info.subpass = 0;
+
+  const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+                                                    &g_state.textured_pipeline);
+  vkDestroyShaderModule(g_state.device, vert, nullptr);
+  vkDestroyShaderModule(g_state.device, frag, nullptr);
+  if (result != VK_SUCCESS) {
+    rkg::log::error("textured pipeline creation failed");
     return false;
   }
   return true;
@@ -1386,6 +2096,51 @@ void destroy_vulkan() {
 
   destroy_offscreen();
 
+  if (g_state.textured_sampler != VK_NULL_HANDLE) {
+    vkDestroySampler(g_state.device, g_state.textured_sampler, nullptr);
+    g_state.textured_sampler = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_image_view != VK_NULL_HANDLE) {
+    vkDestroyImageView(g_state.device, g_state.textured_image_view, nullptr);
+    g_state.textured_image_view = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_image != VK_NULL_HANDLE) {
+    vkDestroyImage(g_state.device, g_state.textured_image, nullptr);
+    g_state.textured_image = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_image_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.textured_image_memory, nullptr);
+    g_state.textured_image_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_vertex_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.textured_vertex_buffer, nullptr);
+    g_state.textured_vertex_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_vertex_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.textured_vertex_memory, nullptr);
+    g_state.textured_vertex_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_index_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.textured_index_buffer, nullptr);
+    g_state.textured_index_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_index_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.textured_index_memory, nullptr);
+    g_state.textured_index_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_desc_pool != VK_NULL_HANDLE) {
+    vkDestroyDescriptorPool(g_state.device, g_state.textured_desc_pool, nullptr);
+    g_state.textured_desc_pool = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_desc_layout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(g_state.device, g_state.textured_desc_layout, nullptr);
+    g_state.textured_desc_layout = VK_NULL_HANDLE;
+  }
+  if (g_state.textured_pipeline_layout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(g_state.device, g_state.textured_pipeline_layout, nullptr);
+    g_state.textured_pipeline_layout = VK_NULL_HANDLE;
+  }
+
   if (g_state.in_flight_fence != VK_NULL_HANDLE) {
     vkDestroyFence(g_state.device, g_state.in_flight_fence, nullptr);
   }
@@ -1532,6 +2287,55 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     const auto* camera = rkg::get_vulkan_viewport_camera();
+    if (g_state.textured_ready &&
+        g_state.textured_pipeline != VK_NULL_HANDLE &&
+        g_state.textured_pipeline_layout != VK_NULL_HANDLE &&
+        g_state.textured_vertex_buffer != VK_NULL_HANDLE &&
+        g_state.textured_index_buffer != VK_NULL_HANDLE &&
+        g_state.textured_index_count > 0) {
+      VkViewport viewport{};
+      viewport.x = 0.0f;
+      viewport.y = 0.0f;
+      viewport.width = static_cast<float>(g_state.offscreen_extent.width);
+      viewport.height = static_cast<float>(g_state.offscreen_extent.height);
+      viewport.minDepth = 0.0f;
+      viewport.maxDepth = 1.0f;
+      VkRect2D scissor{};
+      scissor.offset = {0, 0};
+      scissor.extent = g_state.offscreen_extent;
+      vkCmdSetViewport(cmd, 0, 1, &viewport);
+      vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.textured_pipeline);
+      VkDeviceSize offsets[] = {0};
+      vkCmdBindVertexBuffers(cmd, 0, 1, &g_state.textured_vertex_buffer, offsets);
+      vkCmdBindIndexBuffer(cmd, g_state.textured_index_buffer, 0, VK_INDEX_TYPE_UINT32);
+      if (g_state.textured_desc_set != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                g_state.textured_pipeline_layout, 0, 1,
+                                &g_state.textured_desc_set, 0, nullptr);
+      }
+
+      struct PushData {
+        float mvp[16];
+        float color[4];
+      } push{};
+      if (camera) {
+        std::memcpy(push.mvp, camera->view_proj, sizeof(push.mvp));
+      } else {
+        std::memset(push.mvp, 0, sizeof(push.mvp));
+        push.mvp[0] = 1.0f;
+        push.mvp[5] = 1.0f;
+        push.mvp[10] = 1.0f;
+        push.mvp[15] = 1.0f;
+      }
+      std::memcpy(push.color, g_state.textured_base_color, sizeof(push.color));
+      vkCmdPushConstants(cmd, g_state.textured_pipeline_layout,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                         0, sizeof(PushData), &push);
+      vkCmdDrawIndexed(cmd, g_state.textured_index_count, 1, 0, 0, 0);
+    }
+
     const auto* line_list = rkg::get_vulkan_viewport_line_list();
     if (camera && line_list && line_list->line_count > 0 &&
         g_state.viewport_line_pipeline != VK_NULL_HANDLE &&
@@ -2022,6 +2826,9 @@ bool vulkan_init(void* host) {
   if (!create_framebuffers()) return false;
   if (!create_command_pool()) return false;
   if (!create_command_buffers()) return false;
+  if (!load_textured_asset()) {
+    rkg::log::warn("renderer:vulkan textured demo asset not ready");
+  }
   if (!create_sync_objects()) return false;
 
   rkg::VulkanHooks hooks;
