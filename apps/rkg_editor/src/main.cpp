@@ -323,6 +323,7 @@ struct EditorState {
   bool dock_built = false;
   bool viewport_focused = false;
   bool ui_capturing = false;
+  bool mouse_relative = false;
   bool chat_active = false;
   bool auto_select = true;
   bool pick_requested = false;
@@ -3608,6 +3609,12 @@ void update_camera_and_draw_list(EditorState& state) {
   // - MMB drag: pan (move pivot in view plane)
   const bool camera_input_enabled =
       state.viewport_focused && !state.chat_active && !io.WantTextInput;
+  const bool want_relative_mouse = (state.play_state == PlayState::Play) &&
+                                   state.viewport_focused && !state.chat_active;
+  if (want_relative_mouse != state.mouse_relative) {
+    state.runtime->platform().set_relative_mouse(want_relative_mouse);
+    state.mouse_relative = want_relative_mouse;
+  }
   if (camera_input_enabled) {
     const bool always_look = (state.play_state == PlayState::Play);
     if (always_look || ImGui::IsMouseDown(ImGuiMouseButton_Right)) {

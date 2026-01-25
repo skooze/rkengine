@@ -7,6 +7,8 @@ void platform_poll_events(Platform* self);
 bool platform_should_quit(const Platform* self);
 float platform_delta_seconds(Platform* self);
 void* platform_native_window(const Platform* self);
+void platform_set_relative_mouse(Platform* self, bool enabled);
+void platform_set_cursor_visible(Platform* self, bool visible);
 } // namespace rkg::platform::detail
 
 namespace rkg::platform {
@@ -46,6 +48,14 @@ void Platform::request_quit() {
 void Platform::set_event_callback(EventCallback callback, void* user_data) {
   event_callback_ = callback;
   event_user_data_ = user_data;
+}
+
+void Platform::set_relative_mouse(bool enabled) {
+  detail::platform_set_relative_mouse(this, enabled);
+}
+
+void Platform::set_cursor_visible(bool visible) {
+  detail::platform_set_cursor_visible(this, visible);
 }
 
 } // namespace rkg::platform

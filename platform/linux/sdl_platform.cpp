@@ -687,6 +687,18 @@ void* platform_native_window(const Platform* self) {
   return self->window_;
 }
 
+void platform_set_relative_mouse(Platform* self, bool enabled) {
+  if (!self || !self->window_) {
+    return;
+  }
+  SDL_SetRelativeMouseMode(enabled ? SDL_TRUE : SDL_FALSE);
+  SDL_ShowCursor(enabled ? SDL_FALSE : SDL_TRUE);
+}
+
+void platform_set_cursor_visible(Platform* self, bool visible) {
+  SDL_ShowCursor(visible ? SDL_TRUE : SDL_FALSE);
+}
+
 std::string format_errno() {
   const int err = errno;
   if (err == 0) return "";

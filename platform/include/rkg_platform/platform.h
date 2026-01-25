@@ -47,6 +47,8 @@ class Platform {
   bool is_key_down(KeyCode code) const;
   void request_quit();
   void set_event_callback(EventCallback callback, void* user_data);
+  void set_relative_mouse(bool enabled);
+  void set_cursor_visible(bool visible);
 
  private:
   friend bool detail::platform_init(Platform* self, const WindowDesc& desc);
