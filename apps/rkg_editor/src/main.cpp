@@ -3609,8 +3609,8 @@ void update_camera_and_draw_list(EditorState& state) {
   const bool camera_input_enabled =
       state.viewport_focused && !state.chat_active && !io.WantTextInput;
   if (camera_input_enabled && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-    state.camera_yaw += io.MouseDelta.x * 0.01f;
-    state.camera_pitch += io.MouseDelta.y * 0.01f;
+    state.camera_yaw -= io.MouseDelta.x * 0.01f;
+    state.camera_pitch -= io.MouseDelta.y * 0.01f;
     if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
     if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
   }
