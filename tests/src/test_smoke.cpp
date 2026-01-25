@@ -1449,6 +1449,26 @@ int main(int argc, char** argv) {
     }
   }
 
+#if defined(RKG_ENABLE_VULKAN) && RKG_ENABLE_VULKAN
+  // Test: textured mesh shader assets exist (Phase 2B).
+  {
+    const fs::path shader_dir = paths.root / "plugins" / "renderer" / "vulkan" / "shaders";
+    const fs::path vert_src = shader_dir / "mesh_textured.vert";
+    const fs::path frag_src = shader_dir / "mesh_textured.frag";
+    const fs::path vert_spv = shader_dir / "mesh_textured.vert.spv";
+    const fs::path frag_spv = shader_dir / "mesh_textured.frag.spv";
+
+    if (!fs::exists(vert_src) || !fs::exists(frag_src)) {
+      std::cerr << "textured shader sources missing\n";
+      ++failures;
+    }
+    if (!fs::exists(vert_spv) || !fs::exists(frag_spv)) {
+      std::cerr << "textured shader SPIR-V missing\n";
+      ++failures;
+    }
+  }
+#endif
+
   rkg::log::shutdown();
   return failures == 0 ? 0 : 1;
 }
