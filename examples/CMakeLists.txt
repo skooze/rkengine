@@ -1,1 +1,5 @@
-add_subdirectory(minimal_app)
+if(TARGET SDL3::SDL3)
+  add_subdirectory(minimal_app)
+else()
+  message(WARNING "Skipping minimal_app example (SDL3 not available).")
+endif()

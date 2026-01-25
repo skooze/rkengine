@@ -7,7 +7,9 @@
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
 
+#if RKG_PLATFORM_SDL
 #include <SDL3/SDL.h>
+#endif
 
 #if RKG_ENABLE_IMGUI
 #include "rkg_debug_ui/imgui_api.h"
@@ -646,6 +648,7 @@ fs::path detect_executable_dir(const char* argv0) {
 void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
   auto* self = static_cast<RuntimeHost*>(user_data);
   if (!self || !event) return;
+#if RKG_PLATFORM_SDL
   const SDL_Event* sdl_event = static_cast<const SDL_Event*>(event);
 #if RKG_ENABLE_IMGUI
   if (self->debug_ui_enabled_) {
@@ -679,6 +682,10 @@ void RuntimeHost::sdl_event_callback(const void* event, void* user_data) {
       }
     }
   }
+#else
+  (void)self;
+  (void)event;
+#endif
 }
 
 rkg::input::ActionState RuntimeHost::action_state_thunk(void* user_data, const char* action) {
@@ -725,6 +732,22 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   cooked_index_ = cooked_root_ / "content.index.json";
   cook_status_path_ = cooked_root_ / "cook_status.json";
   pack_path_ = cooked_root_ / "content.pack";
+
+  {
+    std::string asset_error;
+    if (asset_cache_.load_from_content_root(raw_content_root_, asset_error)) {
+      for (const auto& kv : asset_cache_.assets()) {
+        const auto& asset = kv.second;
+        rkg::log::info("asset_cache: loaded " + asset.name +
+                       " (verts=" + std::to_string(asset.mesh.vertex_count) +
+                       " idx=" + std::to_string(asset.mesh.index_count) +
+                       " mats=" + std::to_string(asset.materials.size()) +
+                       " tex=" + std::to_string(asset.textures.size()) + ")");
+      }
+    } else {
+      rkg::log::warn(std::string("asset_cache: ") + asset_error);
+    }
+  }
 
   cooked_mtime_ = file_mtime_epoch(cooked_index_);
   cooked_available_ = cooked_mtime_ > 0;
@@ -773,8 +796,12 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
                                    rkg::renderer_display_name(renderer_plugin_) +
                                    " (Vulkan-only).";
     const auto title = init.app_name + std::string(" (") + debug_ui_unavailable_reason_ + ")";
-    if (auto* window = static_cast<SDL_Window*>(platform_.native_window())) {
-      SDL_SetWindowTitle(window, title.c_str());
+    if (auto* window = static_cast<void*>(platform_.native_window())) {
+#if RKG_PLATFORM_SDL
+      SDL_SetWindowTitle(static_cast<SDL_Window*>(window), title.c_str());
+#else
+      (void)window;
+#endif
     }
     rkg::log::warn(debug_ui_unavailable_reason_);
   }

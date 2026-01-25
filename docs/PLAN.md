@@ -278,6 +278,12 @@
 - Missing textures or unsupported GLB features.
 - Incorrect or missing pinned versions in `third_party/`.
 
+**Phase 1 Notes (as-built)**:
+- Importer exports **only the first mesh primitive** and emits a warning when more exist.
+- Materials are limited to `baseColorFactor` + optional `baseColorTexture` filename.
+- Textures are copied/extracted as-is (bufferView/URI/data URI); no re-encode or KTX2.
+- Skin/joint/animation data is not exported in Phase 1 (counts are reported but not written).
+
 ### PHASE 2A — Runtime Asset Registry + CPU‑side Loading/Validation Logs
 **Objective**: Load imported assets into runtime cache (no rendering yet).
 **Dependencies**: Phase 1 import output.
@@ -586,8 +592,8 @@
 
 **Plan Status (to be updated after each phase)**
 - Phase 0: ☑
-- Phase 1: ☐
-- Phase 2A: ☐
+- Phase 1: ☑
+- Phase 2A: ☑
 - Phase 2B: ☐
 - Phase 3: ☐
 - Phase 4: ☐

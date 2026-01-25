@@ -1,2 +1,6 @@
 add_subdirectory(rkgctl)
-add_subdirectory(rkg_editor)
+if(RKG_ENABLE_IMGUI AND RKG_ENABLE_VULKAN AND TARGET SDL3::SDL3)
+  add_subdirectory(rkg_editor)
+else()
+  message(WARNING "rkg_editor disabled (ImGui/Vulkan/SDL3 missing or disabled).")
+endif()

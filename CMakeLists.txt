@@ -40,6 +40,7 @@ option(RKG_ENABLE_IMGUI "Enable ImGui debug UI plugin" ON)
 option(RKG_ENABLE_OPENAI "Enable OpenAI provider (rkgctl)" ON)
 option(RKG_ENABLE_PHYSICS_BASIC "Enable basic physics plugin" ON)
 option(RKG_BUILD_TESTS "Build tests" ON)
+option(RKG_ALLOW_FETCHCONTENT "Allow FetchContent for optional deps" OFF)
 
 message(STATUS "RKG_ENABLE_VULKAN=${RKG_ENABLE_VULKAN}")
 message(STATUS "RKG_ENABLE_D3D12=${RKG_ENABLE_D3D12}")
@@ -52,50 +53,77 @@ if(RKG_ENABLE_OPENAI)
   endif()
 endif()
 
-add_compile_definitions(
-  RKG_ENABLE_VULKAN=$<BOOL:${RKG_ENABLE_VULKAN}>
-  RKG_ENABLE_D3D12=$<BOOL:${RKG_ENABLE_D3D12}>
-  RKG_ENABLE_SCRIPT_LUA=$<BOOL:${RKG_ENABLE_SCRIPT_LUA}>
-  RKG_ENABLE_SCRIPT_JS=$<BOOL:${RKG_ENABLE_SCRIPT_JS}>
-  RKG_ENABLE_SCRIPT_PYTHON=$<BOOL:${RKG_ENABLE_SCRIPT_PYTHON}>
-  RKG_ENABLE_DATA_SQLITE=$<BOOL:${RKG_ENABLE_DATA_SQLITE}>
-  RKG_ENABLE_DATA_YAML=$<BOOL:${RKG_ENABLE_DATA_YAML}>
-  RKG_ENABLE_DATA_JSON=$<BOOL:${RKG_ENABLE_DATA_JSON}>
-  RKG_ENABLE_AI=$<BOOL:${RKG_ENABLE_AI}>
-  RKG_ENABLE_CLOUD=$<BOOL:${RKG_ENABLE_CLOUD}>
-  RKG_ENABLE_IMGUI=$<BOOL:${RKG_ENABLE_IMGUI}>
-  RKG_ENABLE_OPENAI=$<BOOL:${RKG_ENABLE_OPENAI}>
-  RKG_ENABLE_PHYSICS_BASIC=$<BOOL:${RKG_ENABLE_PHYSICS_BASIC}>
-)
-
-# Dependencies (prefer system, fallback to FetchContent)
-include(FetchContent)
+# Dependencies (prefer system, optional FetchContent)
+if(RKG_ALLOW_FETCHCONTENT)
+  include(FetchContent)
+endif()
 
 if(RKG_ENABLE_DATA_JSON)
   find_package(nlohmann_json QUIET)
   if(NOT nlohmann_json_FOUND)
-    message(STATUS "nlohmann_json not found; fetching")
-    FetchContent_Declare(
-      nlohmann_json
-      GIT_REPOSITORY https://github.com/nlohmann/json.git
-      GIT_TAG v3.11.3
-    )
-    FetchContent_MakeAvailable(nlohmann_json)
+    set(RKG_NLOHMANN_VENDOR_DIR ${CMAKE_CURRENT_LIST_DIR}/third_party/nlohmann_json)
+    if(EXISTS ${RKG_NLOHMANN_VENDOR_DIR}/nlohmann/json.hpp AND
+       EXISTS ${RKG_NLOHMANN_VENDOR_DIR}/nlohmann/adl_serializer.hpp)
+      add_library(nlohmann_json::nlohmann_json INTERFACE IMPORTED)
+      target_include_directories(nlohmann_json::nlohmann_json INTERFACE
+        ${RKG_NLOHMANN_VENDOR_DIR}
+      )
+      set(nlohmann_json_FOUND TRUE)
+    elseif(EXISTS ${RKG_NLOHMANN_VENDOR_DIR}/single_include/nlohmann/json.hpp)
+      add_library(nlohmann_json::nlohmann_json INTERFACE IMPORTED)
+      target_include_directories(nlohmann_json::nlohmann_json INTERFACE
+        ${RKG_NLOHMANN_VENDOR_DIR}/single_include
+      )
+      set(nlohmann_json_FOUND TRUE)
+    elseif(RKG_ALLOW_FETCHCONTENT)
+      message(STATUS "nlohmann_json not found; fetching")
+      FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+      )
+      FetchContent_MakeAvailable(nlohmann_json)
+    else()
+      message(WARNING "nlohmann_json not found and FetchContent disabled; disabling JSON data plugin.")
+      set(RKG_ENABLE_DATA_JSON OFF)
+    endif()
   endif()
 endif()
 
 if(RKG_ENABLE_DATA_YAML)
   find_package(yaml-cpp QUIET)
   if(NOT yaml-cpp_FOUND)
-    message(STATUS "yaml-cpp not found; fetching")
-    FetchContent_Declare(
-      yaml-cpp
-      GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-      GIT_TAG yaml-cpp-0.8.0
-    )
-    FetchContent_MakeAvailable(yaml-cpp)
+    if(RKG_ALLOW_FETCHCONTENT)
+      message(STATUS "yaml-cpp not found; fetching")
+      FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG yaml-cpp-0.8.0
+      )
+      FetchContent_MakeAvailable(yaml-cpp)
+    else()
+      message(WARNING "yaml-cpp not found and FetchContent disabled; disabling YAML data plugin.")
+      set(RKG_ENABLE_DATA_YAML OFF)
+    endif()
   endif()
 endif()
+
+# Vendored third-party headers (offline-friendly)
+add_library(rkg_thirdparty_cgltf INTERFACE)
+target_include_directories(rkg_thirdparty_cgltf INTERFACE
+  ${CMAKE_CURRENT_LIST_DIR}/third_party/cgltf
+)
+
+add_library(rkg_thirdparty_stb INTERFACE)
+target_include_directories(rkg_thirdparty_stb INTERFACE
+  ${CMAKE_CURRENT_LIST_DIR}/third_party/stb
+)
+
+# Optional vendored nlohmann_json (fallback when system package is missing)
+add_library(rkg_thirdparty_nlohmann_json INTERFACE)
+target_include_directories(rkg_thirdparty_nlohmann_json INTERFACE
+  ${CMAKE_CURRENT_LIST_DIR}/third_party/nlohmann_json
+)
 
 if(RKG_ENABLE_DATA_SQLITE)
   find_package(SQLite3 QUIET)
@@ -115,7 +143,25 @@ else()
 endif()
 
 if(NOT APPLE)
-  find_package(SDL3 REQUIRED)
+  find_package(SDL3 QUIET)
+  if(SDL3_FOUND)
+    set(RKG_HAVE_SDL3 TRUE)
+  else()
+    set(RKG_HAVE_SDL3 FALSE)
+    message(WARNING "SDL3 not found; using platform stub and skipping editor if needed.")
+  endif()
+else()
+  set(RKG_HAVE_SDL3 FALSE)
+endif()
+
+if(RKG_ENABLE_IMGUI)
+  if(NOT RKG_HAVE_SDL3)
+    message(WARNING "SDL3 not available; disabling ImGui/editor.")
+    set(RKG_ENABLE_IMGUI OFF)
+  elseif(NOT EXISTS ${CMAKE_CURRENT_LIST_DIR}/third_party/imgui/imgui.h AND NOT RKG_ALLOW_FETCHCONTENT)
+    message(WARNING "ImGui not vendored and FetchContent disabled; disabling ImGui/editor.")
+    set(RKG_ENABLE_IMGUI OFF)
+  endif()
 endif()
 
 if(RKG_ENABLE_VULKAN)
@@ -137,6 +183,23 @@ if(RKG_ENABLE_VULKAN)
     endif()
   endif()
 endif()
+
+add_compile_definitions(
+  RKG_ENABLE_VULKAN=$<BOOL:${RKG_ENABLE_VULKAN}>
+  RKG_ENABLE_D3D12=$<BOOL:${RKG_ENABLE_D3D12}>
+  RKG_ENABLE_SCRIPT_LUA=$<BOOL:${RKG_ENABLE_SCRIPT_LUA}>
+  RKG_ENABLE_SCRIPT_JS=$<BOOL:${RKG_ENABLE_SCRIPT_JS}>
+  RKG_ENABLE_SCRIPT_PYTHON=$<BOOL:${RKG_ENABLE_SCRIPT_PYTHON}>
+  RKG_ENABLE_DATA_SQLITE=$<BOOL:${RKG_ENABLE_DATA_SQLITE}>
+  RKG_ENABLE_DATA_YAML=$<BOOL:${RKG_ENABLE_DATA_YAML}>
+  RKG_ENABLE_DATA_JSON=$<BOOL:${RKG_ENABLE_DATA_JSON}>
+  RKG_PLATFORM_SDL=$<BOOL:${RKG_HAVE_SDL3}>
+  RKG_ENABLE_AI=$<BOOL:${RKG_ENABLE_AI}>
+  RKG_ENABLE_CLOUD=$<BOOL:${RKG_ENABLE_CLOUD}>
+  RKG_ENABLE_IMGUI=$<BOOL:${RKG_ENABLE_IMGUI}>
+  RKG_ENABLE_OPENAI=$<BOOL:${RKG_ENABLE_OPENAI}>
+  RKG_ENABLE_PHYSICS_BASIC=$<BOOL:${RKG_ENABLE_PHYSICS_BASIC}>
+)
 
 add_subdirectory(core)
 add_subdirectory(platform)

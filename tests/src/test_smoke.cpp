@@ -12,6 +12,8 @@
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
 #include "rkg/renderer_hooks.h"
+#include "rkg/asset_import.h"
+#include "rkg/asset_cache.h"
 #include "rkgctl/cli_api.h"
 
 #include <nlohmann/json.hpp>
@@ -43,6 +45,100 @@ bool write_text(const fs::path& path, const std::string& contents) {
   if (!out) return false;
   out << contents;
   return true;
+}
+
+bool write_bytes(const fs::path& path, const std::vector<uint8_t>& data) {
+  fs::create_directories(path.parent_path());
+  std::ofstream out(path, std::ios::binary);
+  if (!out) return false;
+  out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+  return true;
+}
+
+uint64_t fnv1a_64_bytes(const std::vector<uint8_t>& data) {
+  uint64_t hash = 1469598103934665603ULL;
+  for (uint8_t b : data) {
+    hash ^= b;
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
+uint64_t hash_file(const fs::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return 0;
+  std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  return fnv1a_64_bytes(data);
+}
+
+std::vector<fs::path> list_files_sorted(const fs::path& root) {
+  std::vector<fs::path> out;
+  for (const auto& entry : fs::recursive_directory_iterator(root)) {
+    if (entry.is_regular_file()) {
+      out.push_back(fs::relative(entry.path(), root));
+    }
+  }
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+bool write_minimal_glb(const fs::path& path) {
+  // Minimal GLB with one triangle (positions + indices).
+  const std::string json =
+      R"({"asset":{"version":"2.0"},"buffers":[{"byteLength":42}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36,"target":34962},{"buffer":0,"byteOffset":36,"byteLength":6,"target":34963}],"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}],"meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0})";
+
+  // Positions (3 vertices) + indices (uint16)
+  std::vector<uint8_t> bin;
+  bin.resize(42);
+  auto write_f32 = [&](size_t offset, float value) {
+    std::memcpy(bin.data() + offset, &value, sizeof(float));
+  };
+  write_f32(0, 0.0f);
+  write_f32(4, 0.0f);
+  write_f32(8, 0.0f);
+  write_f32(12, 1.0f);
+  write_f32(16, 0.0f);
+  write_f32(20, 0.0f);
+  write_f32(24, 0.0f);
+  write_f32(28, 1.0f);
+  write_f32(32, 0.0f);
+  uint16_t indices[3] = {0, 1, 2};
+  std::memcpy(bin.data() + 36, indices, sizeof(indices));
+
+  auto pad4 = [](size_t size) { return (size + 3) & ~size_t(3); };
+  const size_t json_padded = pad4(json.size());
+  const size_t bin_padded = pad4(bin.size());
+  const uint32_t total_length = static_cast<uint32_t>(
+      12 + 8 + json_padded + 8 + bin_padded);
+
+  std::vector<uint8_t> glb;
+  glb.resize(total_length);
+  auto write_u32 = [&](size_t offset, uint32_t value) {
+    std::memcpy(glb.data() + offset, &value, sizeof(uint32_t));
+  };
+
+  // Header
+  write_u32(0, 0x46546C67);  // 'glTF'
+  write_u32(4, 2);
+  write_u32(8, total_length);
+
+  size_t offset = 12;
+  write_u32(offset + 0, static_cast<uint32_t>(json_padded));
+  write_u32(offset + 4, 0x4E4F534A);  // 'JSON'
+  std::memcpy(glb.data() + offset + 8, json.data(), json.size());
+  for (size_t i = json.size(); i < json_padded; ++i) {
+    glb[offset + 8 + i] = ' ';
+  }
+
+  offset += 8 + json_padded;
+  write_u32(offset + 0, static_cast<uint32_t>(bin_padded));
+  write_u32(offset + 4, 0x004E4942);  // 'BIN\0'
+  std::memcpy(glb.data() + offset + 8, bin.data(), bin.size());
+  for (size_t i = bin.size(); i < bin_padded; ++i) {
+    glb[offset + 8 + i] = 0;
+  }
+
+  return write_bytes(path, glb);
 }
 
 std::string read_text(const fs::path& path) {
@@ -154,6 +250,108 @@ int main(int argc, char** argv) {
       std::cerr << "viewport line list set/get failed\n";
       ++failures;
     }
+  }
+
+  // Test: asset import missing file.
+  {
+    rkg::asset::ImportOptions options{};
+    const auto result =
+        rkg::asset::import_glb("does_not_exist.glb", "build/test_import_missing", options);
+    if (result.ok || result.error.empty()) {
+      std::cerr << "asset import missing-file should fail\n";
+      ++failures;
+    }
+  }
+
+  // Test: asset import determinism on tiny glb fixture.
+  {
+    const fs::path temp_root = fs::temp_directory_path() / "rkg_import_test";
+    const fs::path glb_path = temp_root / "fixture.glb";
+    const fs::path out1 = temp_root / "out1";
+    const fs::path out2 = temp_root / "out2";
+    std::error_code ec;
+    fs::remove_all(temp_root, ec);
+    fs::create_directories(temp_root);
+    if (!write_minimal_glb(glb_path)) {
+      std::cerr << "failed to write minimal glb\n";
+      ++failures;
+    } else {
+      rkg::asset::ImportOptions options{};
+      options.overwrite = true;
+      const auto res1 = rkg::asset::import_glb(glb_path, out1, options);
+      const auto res2 = rkg::asset::import_glb(glb_path, out2, options);
+      if (!res1.ok || !res2.ok) {
+        std::cerr << "asset import failed on minimal glb\n";
+        ++failures;
+      } else {
+        const fs::path asset_json = out1 / "asset.json";
+        const fs::path mesh_bin = out1 / "mesh.bin";
+        const fs::path materials_json = out1 / "materials.json";
+        if (!fs::exists(asset_json) || fs::file_size(asset_json) == 0) {
+          std::cerr << "asset.json missing or empty\n";
+          ++failures;
+        }
+        if (!fs::exists(mesh_bin) || fs::file_size(mesh_bin) == 0) {
+          std::cerr << "mesh.bin missing or empty\n";
+          ++failures;
+        }
+        if (!fs::exists(materials_json) || fs::file_size(materials_json) == 0) {
+          std::cerr << "materials.json missing or empty\n";
+          ++failures;
+        }
+        const auto files1 = list_files_sorted(out1);
+        const auto files2 = list_files_sorted(out2);
+        if (files1 != files2) {
+          std::cerr << "asset import outputs differ (file list)\n";
+          ++failures;
+        } else {
+          for (const auto& rel : files1) {
+            const uint64_t h1 = hash_file(out1 / rel);
+            const uint64_t h2 = hash_file(out2 / rel);
+            if (h1 != h2) {
+              std::cerr << "asset import outputs differ (hash) for " << rel.string() << "\n";
+              ++failures;
+              break;
+            }
+          }
+        }
+      }
+    }
+    fs::remove_all(temp_root, ec);
+  }
+
+  // Test: asset cache load from minimal import output.
+  {
+    const fs::path temp_root = fs::temp_directory_path() / "rkg_asset_cache_test";
+    const fs::path content_root = temp_root / "content";
+    const fs::path glb_path = temp_root / "fixture.glb";
+    const fs::path asset_dir = content_root / "assets" / "fixture";
+    std::error_code ec;
+    fs::remove_all(temp_root, ec);
+    fs::create_directories(content_root / "assets");
+    if (!write_minimal_glb(glb_path)) {
+      std::cerr << "failed to write minimal glb for asset cache\n";
+      ++failures;
+    } else {
+      rkg::asset::ImportOptions options{};
+      options.overwrite = true;
+      const auto res = rkg::asset::import_glb(glb_path, asset_dir, options);
+      if (!res.ok) {
+        std::cerr << "asset import failed for asset cache\n";
+        ++failures;
+      } else {
+        rkg::runtime::AssetCache cache;
+        std::string error;
+        if (!cache.load_from_content_root(content_root, error)) {
+          std::cerr << "asset cache load failed: " << error << "\n";
+          ++failures;
+        } else if (!cache.find("fixture")) {
+          std::cerr << "asset cache missing fixture\n";
+          ++failures;
+        }
+      }
+    }
+    fs::remove_all(temp_root, ec);
   }
 
   // Test: ECS components and iteration helpers.
@@ -713,6 +911,7 @@ int main(int argc, char** argv) {
   }
 #endif
 
+#if RKG_ENABLE_DATA_YAML
   // Test: content validation (missing prefab ref).
   {
     const fs::path tmp_project = paths.root / "build" / "test_tmp_project";
@@ -729,6 +928,7 @@ int main(int argc, char** argv) {
       ++failures;
     }
   }
+#endif
 
   // Test: patch apply + conflict detection.
   {

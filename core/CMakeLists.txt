@@ -14,6 +14,9 @@ rkg_add_library(rkg_core
   src/replay.cpp
   src/content_pack.cpp
   src/ai_results.cpp
+  src/asset_import.cpp
+  src/json_write.cpp
+  src/stb_image_impl.cpp
   src/staged_runs.cpp
   src/run_cleanup.cpp
   src/snapshot_restore.cpp
@@ -23,6 +26,12 @@ target_include_directories(rkg_core
   PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include
     ${CMAKE_CURRENT_LIST_DIR}/../platform/include
+)
+
+target_link_libraries(rkg_core
+  PUBLIC
+    rkg_thirdparty_cgltf
+    rkg_thirdparty_stb
 )
 
 if(RKG_ENABLE_DATA_JSON)

@@ -1,4 +1,5 @@
 rkg_add_library(rkg_runtime
+  src/asset_cache.cpp
   src/runtime_host.cpp
 )
 

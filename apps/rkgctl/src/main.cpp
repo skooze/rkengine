@@ -2,6 +2,7 @@
 #include "rkg/log.h"
 #include "rkg/paths.h"
 #include "rkg/project.h"
+#include "rkg/asset_import.h"
 #include "rkg_platform/file_watcher.h"
 #include "rkg_data/database.h"
 #include "rkg_data/serialization.h"
@@ -4756,6 +4757,33 @@ int content_list(const fs::path& cooked_path) {
   return 0;
 }
 
+int asset_import_command(const fs::path& input_path,
+                         const fs::path& output_dir,
+                         bool overwrite) {
+  if (input_path.empty() || output_dir.empty()) {
+    std::cerr << "--in and --out are required\n";
+    return 1;
+  }
+  rkg::asset::ImportOptions options{};
+  options.overwrite = overwrite;
+  const auto result = rkg::asset::import_glb(input_path, output_dir, options);
+  if (!result.ok) {
+    std::cerr << "asset import failed: " << result.error << "\n";
+    return 1;
+  }
+  if (!result.warning.empty()) {
+    std::cerr << "warning: " << result.warning << "\n";
+  }
+  std::cout << "import ok\n";
+  std::cout << "  name: " << result.asset.name << "\n";
+  std::cout << "  meshes: " << result.asset.mesh_count << "\n";
+  std::cout << "  primitives: " << result.asset.primitive_count << "\n";
+  std::cout << "  materials: " << result.asset.material_count << "\n";
+  std::cout << "  textures: " << result.asset.texture_count << "\n";
+  std::cout << "  output: " << output_dir.generic_string() << "\n";
+  return 0;
+}
+
 bool is_watch_relevant(const fs::path& project_root, const fs::path& path) {
   std::error_code ec;
   auto rel = fs::relative(path, project_root, ec);
@@ -4849,6 +4877,7 @@ void print_usage() {
   std::cout << "Usage:\n"
             << "  rkgctl orchestrate --plan <path> [--apply] [--dry-run] [--no-approval]\n"
             << "  rkgctl new project <name> [--template template_game]\n"
+            << "  rkgctl asset import --in <glb> --out <dir> [--overwrite]\n"
             << "  rkgctl content validate --project <path>\n"
             << "  rkgctl content cook --project <path> [--out <dir>]\n"
             << "  rkgctl content list --cooked <dir>\n"
@@ -4928,6 +4957,28 @@ int main(int argc, char** argv) {
       }
     }
     return new_project(name, tmpl);
+  }
+
+  if (command == "asset" && argc >= 3) {
+    std::string sub = argv[2];
+    fs::path input_path;
+    fs::path output_dir;
+    bool overwrite = false;
+    for (int i = 3; i < argc; ++i) {
+      std::string arg = argv[i];
+      if (arg == "--in" && i + 1 < argc) {
+        input_path = fs::path(argv[++i]);
+      } else if (arg == "--out" && i + 1 < argc) {
+        output_dir = fs::path(argv[++i]);
+      } else if (arg == "--overwrite") {
+        overwrite = true;
+      }
+    }
+    if (sub == "import") {
+      return asset_import_command(input_path, output_dir, overwrite);
+    }
+    print_usage();
+    return 1;
   }
 
   if (command == "content" && argc >= 3) {

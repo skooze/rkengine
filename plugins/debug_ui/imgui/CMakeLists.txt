@@ -1,11 +1,25 @@
-include(FetchContent)
+set(imgui_SOURCE_DIR "")
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../../third_party/imgui/imgui.h)
+  set(imgui_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../../../third_party/imgui)
+elseif(RKG_ALLOW_FETCHCONTENT)
+  include(FetchContent)
+  FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG docking
+  )
+  FetchContent_MakeAvailable(imgui)
+endif()
 
-FetchContent_Declare(
-  imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG docking
-)
-FetchContent_MakeAvailable(imgui)
+if(NOT imgui_SOURCE_DIR)
+  message(WARNING "ImGui not found; debug UI will be disabled. Vendor under third_party/imgui or enable RKG_ALLOW_FETCHCONTENT.")
+  return()
+endif()
+
+if(NOT TARGET SDL3::SDL3)
+  message(WARNING "SDL3 not available; debug UI will be disabled.")
+  return()
+endif()
 
 set(IMGUI_SOURCES
   ${imgui_SOURCE_DIR}/imgui.cpp

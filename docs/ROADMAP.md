@@ -6,7 +6,8 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 
 ## Progress
 - Phase 0 complete (docs + policy lock‑in).
-- M1 in progress (Phase 1 pending).
+- M1 complete (Phase 1 done, offline import).
+- M2 complete (Phase 2A done, runtime CPU‑side load + logs).
 
 ## Milestones (each with outcome, acceptance criteria, demo, phases)
 ### M1 — Import Foundation (Decisions + GLB Import)

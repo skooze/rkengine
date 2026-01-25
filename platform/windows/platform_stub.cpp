@@ -33,4 +33,14 @@ void* platform_native_window(const Platform* self) {
   return nullptr;
 }
 
+void platform_set_relative_mouse(Platform* self, bool enabled) {
+  (void)self;
+  (void)enabled;
+}
+
+void platform_set_cursor_visible(Platform* self, bool visible) {
+  (void)self;
+  (void)visible;
+}
+
 } // namespace rkg::platform::detail

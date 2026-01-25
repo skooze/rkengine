@@ -7,6 +7,7 @@
 #include "rkg/paths.h"
 #include "rkg/plugin_host.h"
 #include "rkg/project.h"
+#include "rkg/asset_cache.h"
 #include "rkg_platform/platform.h"
 #include "rkg_platform/file_watcher.h"
 
@@ -126,6 +127,7 @@ class RuntimeHost {
   bool cooked_available_ = false;
   bool pack_loaded_ = false;
   rkg::content::PackReader pack_reader_{};
+  rkg::runtime::AssetCache asset_cache_{};
   uint64_t cooked_mtime_ = 0;
   uint64_t pack_mtime_ = 0;
   uint64_t cook_status_mtime_ = 0;

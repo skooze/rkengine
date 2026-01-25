@@ -18,7 +18,7 @@ target_include_directories(rkg_platform
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-if(NOT APPLE)
+if(NOT APPLE AND TARGET SDL3::SDL3)
   target_sources(rkg_platform PRIVATE linux/sdl_platform.cpp)
   target_link_libraries(rkg_platform PRIVATE SDL3::SDL3)
   target_compile_definitions(rkg_platform PRIVATE RKG_PLATFORM_SDL=1)
