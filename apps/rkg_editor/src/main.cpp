@@ -323,6 +323,7 @@ struct EditorState {
   float fixed_step = 1.0f / 60.0f;
   bool dock_built = false;
   bool viewport_focused = false;
+  bool viewport_hovered = false;
   bool ui_capturing = false;
   bool mouse_relative = false;
   bool chat_active = false;
@@ -2568,6 +2569,9 @@ void draw_viewport(EditorState& state) {
     ImGui::Checkbox("Meshes", &state.show_renderables);
     ImGui::SameLine();
     ImGui::Checkbox("Textured Demo", &state.show_textured_demo);
+    if (!state.show_renderables && state.show_textured_demo) {
+      state.show_textured_demo = false;
+    }
     ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
     ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
     if (state.grid_step < 0.25f) state.grid_step = 0.25f;
@@ -2601,7 +2605,8 @@ void draw_viewport(EditorState& state) {
 #endif
 
   const ImGuiIO& io = ImGui::GetIO();
-  const bool hovered = ImGui::IsWindowHovered();
+  const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+  state.viewport_hovered = hovered;
   const bool clicked_any =
       ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
       ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
@@ -3975,7 +3980,7 @@ void update_camera_and_draw_list(EditorState& state) {
   // - Mouse wheel: zoom (distance)
   // - MMB drag: pan (move pivot in view plane)
   const bool camera_input_enabled =
-      state.viewport_focused && !state.chat_active && !io.WantTextInput;
+      (state.viewport_focused || state.viewport_hovered) && !state.chat_active && !io.WantTextInput;
   const bool want_relative_mouse = (state.play_state == PlayState::Play) &&
                                    state.viewport_focused && !state.chat_active;
   if (want_relative_mouse != state.mouse_relative) {
@@ -4156,7 +4161,7 @@ void update_camera_and_draw_list(EditorState& state) {
       if (skeleton.world_pose.size() != skeleton.bones.size()) {
         continue;
       }
-      const float joint_len = 0.06f;
+      const float joint_len = std::max(0.06f, state.camera_distance * 0.02f);
       for (size_t i = 0; i < skeleton.bones.size(); ++i) {
         const auto& bone = skeleton.bones[i];
         const auto& world = skeleton.world_pose[i];

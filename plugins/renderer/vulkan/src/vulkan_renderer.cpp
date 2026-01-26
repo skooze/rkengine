@@ -100,7 +100,7 @@ struct VulkanState {
   VkDeviceMemory textured_index_memory = VK_NULL_HANDLE;
   uint32_t textured_index_count = 0;
   bool textured_has_uv0 = false;
-  float textured_base_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  float textured_base_color[4] = {0.65f, 0.65f, 0.65f, 1.0f};
   VkImage textured_image = VK_NULL_HANDLE;
   VkDeviceMemory textured_image_memory = VK_NULL_HANDLE;
   VkImageView textured_image_view = VK_NULL_HANDLE;
@@ -1450,7 +1450,7 @@ bool create_viewport_line_pipeline() {
 
   VkPipelineDepthStencilStateCreateInfo depth{};
   depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depth.depthTestEnable = VK_TRUE;
+  depth.depthTestEnable = VK_FALSE;
   depth.depthWriteEnable = VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth.depthBoundsTestEnable = VK_FALSE;
