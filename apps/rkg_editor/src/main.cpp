@@ -356,6 +356,7 @@ struct EditorState {
   bool show_world_axes = true;
   bool show_face_labels = true;
   bool show_skeleton_debug = true;
+  bool show_textured_demo = true;
   bool show_renderables = true;
   float grid_half_extent = 10.0f;
   float grid_step = 1.0f;
@@ -2356,6 +2357,8 @@ void draw_viewport(EditorState& state) {
     ImGui::Checkbox("Skeletons", &state.show_skeleton_debug);
     ImGui::SameLine();
     ImGui::Checkbox("Meshes", &state.show_renderables);
+    ImGui::SameLine();
+    ImGui::Checkbox("Textured Demo", &state.show_textured_demo);
     ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
     ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
     if (state.grid_step < 0.25f) state.grid_step = 0.25f;
@@ -3681,6 +3684,7 @@ void update_camera_and_draw_list(EditorState& state) {
   Mat4 proj = mat4_perspective(state.camera_fov, static_cast<float>(viewport_w) / viewport_h, 0.1f, 50.0f);
   Mat4 view_proj = mat4_mul(proj, view);
   rkg::set_vulkan_viewport_camera(view_proj.m);
+  rkg::set_vulkan_viewport_textured_demo_enabled(state.show_textured_demo);
   std::memcpy(state.camera_view_proj, view_proj.m, sizeof(state.camera_view_proj));
 
   float line_positions[rkg::VulkanViewportLineList::kMaxLines * 6]{};

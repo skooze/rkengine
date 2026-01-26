@@ -2287,7 +2287,9 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     const auto* camera = rkg::get_vulkan_viewport_camera();
-    if (g_state.textured_ready &&
+    const bool textured_enabled = rkg::get_vulkan_viewport_textured_demo_enabled();
+    if (textured_enabled &&
+        g_state.textured_ready &&
         g_state.textured_pipeline != VK_NULL_HANDLE &&
         g_state.textured_pipeline_layout != VK_NULL_HANDLE &&
         g_state.textured_vertex_buffer != VK_NULL_HANDLE &&
@@ -2826,8 +2828,10 @@ bool vulkan_init(void* host) {
   if (!create_framebuffers()) return false;
   if (!create_command_pool()) return false;
   if (!create_command_buffers()) return false;
-  if (!load_textured_asset()) {
-    rkg::log::warn("renderer:vulkan textured demo asset not ready");
+  if (rkg::get_vulkan_viewport_textured_demo_enabled()) {
+    if (!load_textured_asset()) {
+      rkg::log::warn("renderer:vulkan textured demo asset not ready");
+    }
   }
   if (!create_sync_objects()) return false;
 

@@ -70,4 +70,7 @@ void set_vulkan_viewport_line_list(const float* positions,
                                    uint32_t line_count);
 const VulkanViewportLineList* get_vulkan_viewport_line_list();
 
+void set_vulkan_viewport_textured_demo_enabled(bool enabled);
+bool get_vulkan_viewport_textured_demo_enabled();
+
 } // namespace rkg
