@@ -345,7 +345,6 @@ struct EditorState {
   float editor_pivot_world[3]{0.0f, 0.0f, 0.0f};
   bool lock_editor_pivot = false;
   float camera_view_proj[16]{};
-  float pending_zoom_delta = 0.0f;
   struct SavedEditorCamera {
     bool valid = false;
     float yaw = 0.0f;
@@ -370,6 +369,10 @@ struct EditorState {
   int selected_bone = -1;
   int selected_bone_name_index = -1;
   char selected_bone_name_buf[64]{};
+  bool bone_gizmo_active = false;
+  int bone_gizmo_axis = -1;
+  float bone_gizmo_start_mouse[2]{0.0f, 0.0f};
+  float bone_gizmo_start_local[3]{0.0f, 0.0f, 0.0f};
   bool skeleton_assets_loaded = false;
   int skeleton_asset_index = -1;
   char skeleton_asset_name[64] = "skeleton";
@@ -2618,9 +2621,6 @@ void draw_viewport(EditorState& state) {
   if (hovered && (clicked_any || held_any)) {
     state.viewport_focused = true;
   }
-  if (hovered && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
-    state.pending_zoom_delta += io.MouseWheel;
-  }
   if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse &&
       (state.play_state != PlayState::Play || io.KeyCtrl)) {
     state.pick_requested = true;
@@ -2873,6 +2873,7 @@ void draw_inspector_panel(EditorState& state) {
             *skeleton = it->second;
             state.selected_bone = skeleton->bones.empty() ? -1 : 0;
             state.selected_bone_name_index = -1;
+            state.bone_gizmo_active = false;
           }
         }
       }
@@ -2890,6 +2891,7 @@ void draw_inspector_panel(EditorState& state) {
       skeleton->bones.push_back(bone);
       state.selected_bone = static_cast<int>(skeleton->bones.size()) - 1;
       state.selected_bone_name_index = -1;
+      state.bone_gizmo_active = false;
     }
     ImGui::SameLine();
     if (ImGui::Button("Delete Bone")) {
@@ -2907,6 +2909,7 @@ void draw_inspector_panel(EditorState& state) {
         }
         state.selected_bone = skeleton->bones.empty() ? -1 : 0;
         state.selected_bone_name_index = -1;
+        state.bone_gizmo_active = false;
       }
     }
     ImGui::SameLine();
@@ -2925,6 +2928,7 @@ void draw_inspector_panel(EditorState& state) {
                       bone.name.c_str());
         state.selected_bone_name_index = state.selected_bone;
       }
+      ImGui::PushID("BoneEdit");
       if (ImGui::InputText("Bone Name", state.selected_bone_name_buf,
                            sizeof(state.selected_bone_name_buf))) {
         bone.name = state.selected_bone_name_buf;
@@ -2961,6 +2965,7 @@ void draw_inspector_panel(EditorState& state) {
         bone.local_pose.scale[2] = scl[2];
         std::memcpy(bone.bind_local.scale, bone.local_pose.scale, sizeof(bone.local_pose.scale));
       }
+      ImGui::PopID();
     }
 
     if (auto* transform = registry.get_transform(entity)) {
@@ -3002,6 +3007,7 @@ void draw_inspector_panel(EditorState& state) {
         if (ImGui::IsItemClicked()) {
           state.selected_bone = idx;
           state.selected_bone_name_index = -1;
+          state.bone_gizmo_active = false;
         }
         if (open) {
           for (const int child : children[idx]) {
@@ -4013,11 +4019,15 @@ void update_camera_and_draw_list(EditorState& state) {
       if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
     }
   }
-  if (std::abs(state.pending_zoom_delta) > 0.0001f) {
-    state.camera_distance -= state.pending_zoom_delta * 0.4f;
+  const bool mouse_in_viewport =
+      (io.MousePos.x >= state.viewport_pos[0] &&
+       io.MousePos.x <= state.viewport_pos[0] + state.viewport_size[0] &&
+       io.MousePos.y >= state.viewport_pos[1] &&
+       io.MousePos.y <= state.viewport_pos[1] + state.viewport_size[1]);
+  if (mouse_in_viewport && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
+    state.camera_distance -= io.MouseWheel * 0.4f;
     if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
     if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
-    state.pending_zoom_delta = 0.0f;
   }
 
   const float cy = std::cos(state.camera_yaw);
@@ -4078,6 +4088,51 @@ void update_camera_and_draw_list(EditorState& state) {
     line_colors[cbase + 2] = color[2];
     line_colors[cbase + 3] = color[3];
     line_count += 1;
+  };
+
+  auto project_to_screen = [&](const Vec3& world, ImVec2& out) -> bool {
+    const float* m = state.camera_view_proj;
+    const float x = world.x;
+    const float y = world.y;
+    const float z = world.z;
+    const float clip_x = m[0] * x + m[4] * y + m[8] * z + m[12];
+    const float clip_y = m[1] * x + m[5] * y + m[9] * z + m[13];
+    const float clip_w = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (clip_w <= 0.0001f) return false;
+    const float ndc_x = clip_x / clip_w;
+    const float ndc_y = clip_y / clip_w;
+    out.x = state.viewport_pos[0] + (ndc_x * 0.5f + 0.5f) * state.viewport_size[0];
+    out.y = state.viewport_pos[1] + (1.0f - (ndc_y * 0.5f + 0.5f)) * state.viewport_size[1];
+    return true;
+  };
+
+  auto distance_point_segment = [&](const ImVec2& p, const ImVec2& a, const ImVec2& b) -> float {
+    const float abx = b.x - a.x;
+    const float aby = b.y - a.y;
+    const float apx = p.x - a.x;
+    const float apy = p.y - a.y;
+    const float ab_len2 = abx * abx + aby * aby;
+    if (ab_len2 <= 1e-6f) {
+      const float dx = p.x - a.x;
+      const float dy = p.y - a.y;
+      return std::sqrt(dx * dx + dy * dy);
+    }
+    float t = (apx * abx + apy * aby) / ab_len2;
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    const float cx = a.x + abx * t;
+    const float cy = a.y + aby * t;
+    const float dx = p.x - cx;
+    const float dy = p.y - cy;
+    return std::sqrt(dx * dx + dy * dy);
+  };
+
+  auto rotate_vec_transpose = [&](const Mat4& m, const Vec3& v) -> Vec3 {
+    return {
+        v.x * m.m[0] + v.y * m.m[1] + v.z * m.m[2],
+        v.x * m.m[4] + v.y * m.m[5] + v.z * m.m[6],
+        v.x * m.m[8] + v.y * m.m[9] + v.z * m.m[10],
+    };
   };
 
   const float world_grid_color[4] = {0.22f, 0.22f, 0.26f, 1.0f};
@@ -4155,6 +4210,10 @@ void update_camera_and_draw_list(EditorState& state) {
   }
 
   if (state.show_skeleton_debug) {
+    const Vec3 cam_right{state.camera_right[0], state.camera_right[1], state.camera_right[2]};
+    const Vec3 cam_up{state.camera_up[0], state.camera_up[1], state.camera_up[2]};
+    const bool can_gizmo =
+        (state.play_state != PlayState::Play) && state.viewport_hovered && !io.WantCaptureMouse;
     for (auto& kv : registry.skeletons()) {
       const auto entity = kv.first;
       auto& skeleton = kv.second;
@@ -4180,6 +4239,90 @@ void update_camera_and_draw_list(EditorState& state) {
         add_line({pos.x - joint_len, pos.y, pos.z}, {pos.x + joint_len, pos.y, pos.z}, skeleton_color);
         add_line({pos.x, pos.y - joint_len, pos.z}, {pos.x, pos.y + joint_len, pos.z}, skeleton_color);
         add_line({pos.x, pos.y, pos.z - joint_len}, {pos.x, pos.y, pos.z + joint_len}, skeleton_color);
+      }
+
+      if (entity != state.selected_entity || state.selected_bone < 0 ||
+          static_cast<size_t>(state.selected_bone) >= skeleton.bones.size()) {
+        continue;
+      }
+
+      const auto& sel_world = skeleton.world_pose[state.selected_bone];
+      const Vec3 sel_pos{sel_world.position[0], sel_world.position[1], sel_world.position[2]};
+      const float gizmo_len = std::max(0.25f, state.camera_distance * 0.1f);
+      const Vec3 axis_dirs[3] = {{1.0f, 0.0f, 0.0f},
+                                 {0.0f, 1.0f, 0.0f},
+                                 {0.0f, 0.0f, 1.0f}};
+      const float axis_colors[3][4] = {
+          {0.95f, 0.25f, 0.25f, 1.0f},
+          {0.25f, 0.95f, 0.25f, 1.0f},
+          {0.25f, 0.45f, 0.95f, 1.0f},
+      };
+      for (int axis = 0; axis < 3; ++axis) {
+        const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
+        add_line(sel_pos, end, axis_colors[axis]);
+      }
+
+      if (can_gizmo && !state.bone_gizmo_active && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        const ImVec2 mouse{io.MousePos.x, io.MousePos.y};
+        int best_axis = -1;
+        float best_dist = 8.0f;
+        for (int axis = 0; axis < 3; ++axis) {
+          const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
+          ImVec2 a, b;
+          if (!project_to_screen(sel_pos, a) || !project_to_screen(end, b)) {
+            continue;
+          }
+          const float dist = distance_point_segment(mouse, a, b);
+          if (dist < best_dist) {
+            best_dist = dist;
+            best_axis = axis;
+          }
+        }
+        if (best_axis >= 0) {
+          state.bone_gizmo_active = true;
+          state.bone_gizmo_axis = best_axis;
+          state.bone_gizmo_start_mouse[0] = io.MousePos.x;
+          state.bone_gizmo_start_mouse[1] = io.MousePos.y;
+          const auto& bone = skeleton.bones[state.selected_bone];
+          state.bone_gizmo_start_local[0] = bone.local_pose.position[0];
+          state.bone_gizmo_start_local[1] = bone.local_pose.position[1];
+          state.bone_gizmo_start_local[2] = bone.local_pose.position[2];
+        }
+      }
+
+      if (state.bone_gizmo_active && state.bone_gizmo_axis >= 0) {
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+          state.bone_gizmo_active = false;
+        } else {
+          const float dx = io.MousePos.x - state.bone_gizmo_start_mouse[0];
+          const float dy = io.MousePos.y - state.bone_gizmo_start_mouse[1];
+          const float move_scale = state.camera_distance * 0.0025f;
+          const Vec3 world_delta =
+              vec3_add(vec3_mul(cam_right, dx * move_scale),
+                       vec3_mul(cam_up, -dy * move_scale));
+          const Vec3 axis_dir = axis_dirs[state.bone_gizmo_axis];
+          const float axis_component = vec3_dot(world_delta, axis_dir);
+          const Vec3 world_move = vec3_mul(axis_dir, axis_component);
+
+          Vec3 parent_rot{0.0f, 0.0f, 0.0f};
+          const auto& bone = skeleton.bones[state.selected_bone];
+          if (bone.parent_index >= 0 &&
+              static_cast<size_t>(bone.parent_index) < skeleton.world_pose.size()) {
+            const auto& parent_world = skeleton.world_pose[bone.parent_index];
+            parent_rot = {parent_world.rotation[0], parent_world.rotation[1], parent_world.rotation[2]};
+          } else {
+            parent_rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+          }
+          const Mat4 parent_rot_m = mat4_rotation_xyz(parent_rot);
+          const Vec3 local_move = rotate_vec_transpose(parent_rot_m, world_move);
+
+          auto& editable = skeleton.bones[state.selected_bone];
+          editable.local_pose.position[0] = state.bone_gizmo_start_local[0] + local_move.x;
+          editable.local_pose.position[1] = state.bone_gizmo_start_local[1] + local_move.y;
+          editable.local_pose.position[2] = state.bone_gizmo_start_local[2] + local_move.z;
+          std::memcpy(editable.bind_local.position, editable.local_pose.position,
+                      sizeof(editable.local_pose.position));
+        }
       }
     }
   }
