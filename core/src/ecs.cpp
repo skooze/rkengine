@@ -2,6 +2,8 @@
 
 #include "rkg/math.h"
 
+#include <functional>
+
 namespace rkg::ecs {
 
 Entity Registry::create_entity() {
@@ -74,23 +76,44 @@ void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton) {
   const Mat4 root_model = mat4_mul(mat4_translation(root_pos),
                                    mat4_mul(mat4_rotation_xyz(root_rot), mat4_scale(root_scale)));
 
-  std::vector<Mat4> world_mats;
-  world_mats.resize(bone_count);
+  std::vector<Mat4> world_mats(bone_count);
+  std::vector<uint8_t> computed(bone_count, 0);
 
-  for (size_t i = 0; i < bone_count; ++i) {
+  auto local_matrix = [&](size_t i) {
     const Bone& bone = skeleton.bones[i];
     const rkg::Vec3 local_pos{bone.local_pose.position[0], bone.local_pose.position[1], bone.local_pose.position[2]};
     const rkg::Vec3 local_rot{bone.local_pose.rotation[0], bone.local_pose.rotation[1], bone.local_pose.rotation[2]};
     const rkg::Vec3 local_scale{bone.local_pose.scale[0], bone.local_pose.scale[1], bone.local_pose.scale[2]};
-    const Mat4 local =
-        mat4_mul(mat4_translation(local_pos), mat4_mul(mat4_rotation_xyz(local_rot), mat4_scale(local_scale)));
-    if (bone.parent_index >= 0 && static_cast<size_t>(bone.parent_index) < bone_count &&
-        static_cast<size_t>(bone.parent_index) < i) {
-      world_mats[i] = mat4_mul(world_mats[bone.parent_index], local);
+    return mat4_mul(mat4_translation(local_pos),
+                    mat4_mul(mat4_rotation_xyz(local_rot), mat4_scale(local_scale)));
+  };
+
+  std::function<void(size_t)> eval = [&](size_t i) {
+    if (computed[i]) {
+      return;
+    }
+    const Bone& bone = skeleton.bones[i];
+    const Mat4 local = local_matrix(i);
+    if (bone.parent_index >= 0 && static_cast<size_t>(bone.parent_index) < bone_count) {
+      const size_t parent = static_cast<size_t>(bone.parent_index);
+      if (parent != i) {
+        eval(parent);
+        world_mats[i] = mat4_mul(world_mats[parent], local);
+      } else {
+        world_mats[i] = mat4_mul(root_model, local);
+      }
     } else {
       world_mats[i] = mat4_mul(root_model, local);
     }
+    computed[i] = 1;
+  };
 
+  for (size_t i = 0; i < bone_count; ++i) {
+    eval(i);
+  }
+
+  for (size_t i = 0; i < bone_count; ++i) {
+    const Bone& bone = skeleton.bones[i];
     Transform world{};
     world.position[0] = world_mats[i].m[12];
     world.position[1] = world_mats[i].m[13];
