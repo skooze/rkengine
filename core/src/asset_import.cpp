@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -24,6 +25,14 @@ namespace {
 struct BinaryBlob {
   std::vector<uint8_t> bytes;
   std::string mime;
+};
+
+struct BoneRecord {
+  std::string name;
+  int parent_index = -1;
+  float position[3]{0.0f, 0.0f, 0.0f};
+  float rotation[3]{0.0f, 0.0f, 0.0f};
+  float scale[3]{1.0f, 1.0f, 1.0f};
 };
 
 bool read_file_bytes(const fs::path& path, std::vector<uint8_t>& out) {
@@ -131,6 +140,92 @@ std::string format_indexed(const std::string& prefix, size_t index, const std::s
   return std::string(buffer);
 }
 
+void quat_to_euler_xyz(const float q[4], float out[3]) {
+  const float x = q[0];
+  const float y = q[1];
+  const float z = q[2];
+  const float w = q[3];
+
+  const float sinr_cosp = 2.0f * (w * x + y * z);
+  const float cosr_cosp = 1.0f - 2.0f * (x * x + y * y);
+  out[0] = std::atan2(sinr_cosp, cosr_cosp);
+
+  const float sinp = 2.0f * (w * y - z * x);
+  if (std::fabs(sinp) >= 1.0f) {
+    out[1] = std::copysign(1.57079632679f, sinp);
+  } else {
+    out[1] = std::asin(sinp);
+  }
+
+  const float siny_cosp = 2.0f * (w * z + x * y);
+  const float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
+  out[2] = std::atan2(siny_cosp, cosy_cosp);
+}
+
+void mat3_to_quat(float r00, float r01, float r02,
+                  float r10, float r11, float r12,
+                  float r20, float r21, float r22,
+                  float out[4]) {
+  float trace = r00 + r11 + r22;
+  if (trace > 0.0f) {
+    float s = std::sqrt(trace + 1.0f) * 2.0f;
+    out[3] = 0.25f * s;
+    out[0] = (r21 - r12) / s;
+    out[1] = (r02 - r20) / s;
+    out[2] = (r10 - r01) / s;
+  } else if (r00 > r11 && r00 > r22) {
+    float s = std::sqrt(1.0f + r00 - r11 - r22) * 2.0f;
+    out[3] = (r21 - r12) / s;
+    out[0] = 0.25f * s;
+    out[1] = (r01 + r10) / s;
+    out[2] = (r02 + r20) / s;
+  } else if (r11 > r22) {
+    float s = std::sqrt(1.0f + r11 - r00 - r22) * 2.0f;
+    out[3] = (r02 - r20) / s;
+    out[0] = (r01 + r10) / s;
+    out[1] = 0.25f * s;
+    out[2] = (r12 + r21) / s;
+  } else {
+    float s = std::sqrt(1.0f + r22 - r00 - r11) * 2.0f;
+    out[3] = (r10 - r01) / s;
+    out[0] = (r02 + r20) / s;
+    out[1] = (r12 + r21) / s;
+    out[2] = 0.25f * s;
+  }
+}
+
+void decompose_matrix_trs(const float m[16], float t[3], float r[3], float s[3]) {
+  t[0] = m[12];
+  t[1] = m[13];
+  t[2] = m[14];
+
+  const float col0[3] = {m[0], m[1], m[2]};
+  const float col1[3] = {m[4], m[5], m[6]};
+  const float col2[3] = {m[8], m[9], m[10]};
+
+  const float sx = std::sqrt(col0[0] * col0[0] + col0[1] * col0[1] + col0[2] * col0[2]);
+  const float sy = std::sqrt(col1[0] * col1[0] + col1[1] * col1[1] + col1[2] * col1[2]);
+  const float sz = std::sqrt(col2[0] * col2[0] + col2[1] * col2[1] + col2[2] * col2[2]);
+
+  s[0] = sx > 0.0f ? sx : 1.0f;
+  s[1] = sy > 0.0f ? sy : 1.0f;
+  s[2] = sz > 0.0f ? sz : 1.0f;
+
+  const float r00 = col0[0] / s[0];
+  const float r10 = col0[1] / s[0];
+  const float r20 = col0[2] / s[0];
+  const float r01 = col1[0] / s[1];
+  const float r11 = col1[1] / s[1];
+  const float r21 = col1[2] / s[1];
+  const float r02 = col2[0] / s[2];
+  const float r12 = col2[1] / s[2];
+  const float r22 = col2[2] / s[2];
+
+  float quat[4]{};
+  mat3_to_quat(r00, r01, r02, r10, r11, r12, r20, r21, r22, quat);
+  quat_to_euler_xyz(quat, r);
+}
+
 bool ensure_empty_or_overwrite(const fs::path& output_dir, bool overwrite, std::string& error) {
   if (fs::exists(output_dir)) {
     if (!overwrite) {
@@ -155,7 +250,8 @@ void write_asset_json(const fs::path& path,
                       size_t material_count,
                       size_t texture_count,
                       size_t exported_primitives,
-                      size_t total_primitives) {
+                      size_t total_primitives,
+                      size_t joint_count) {
   std::ofstream out(path);
   rkg::json::Writer writer(out);
   writer.begin_object();
@@ -214,6 +310,24 @@ void write_asset_json(const fs::path& path,
   writer.value(static_cast<uint64_t>(texture_count));
   writer.end_object();
 
+  if (joint_count > 0) {
+    writer.key("skeleton");
+    writer.begin_object();
+    writer.key("file");
+    writer.value("skeleton.json");
+    writer.key("joint_count");
+    writer.value(static_cast<uint64_t>(joint_count));
+    writer.end_object();
+
+    writer.key("skin");
+    writer.begin_object();
+    writer.key("file");
+    writer.value("skin.bin");
+    writer.key("joint_count");
+    writer.value(static_cast<uint64_t>(joint_count));
+    writer.end_object();
+  }
+
   writer.end_object();
   writer.finish();
 }
@@ -249,6 +363,88 @@ void write_materials_json(const fs::path& path,
   writer.end_array();
   writer.end_object();
   writer.finish();
+}
+
+void write_skeleton_json(const fs::path& path, const std::vector<BoneRecord>& bones) {
+  std::ofstream out(path);
+  rkg::json::Writer writer(out);
+  writer.begin_object();
+  writer.key("joint_count");
+  writer.value(static_cast<uint64_t>(bones.size()));
+  writer.key("bones");
+  writer.begin_array();
+  for (const auto& bone : bones) {
+    writer.begin_object();
+    writer.key("name");
+    writer.value(bone.name);
+    writer.key("parent");
+    writer.value(static_cast<int64_t>(bone.parent_index));
+    writer.key("bind_local");
+    writer.begin_object();
+    writer.key("position");
+    writer.begin_array();
+    writer.value(bone.position[0]);
+    writer.value(bone.position[1]);
+    writer.value(bone.position[2]);
+    writer.end_array();
+    writer.key("rotation");
+    writer.begin_array();
+    writer.value(bone.rotation[0]);
+    writer.value(bone.rotation[1]);
+    writer.value(bone.rotation[2]);
+    writer.end_array();
+    writer.key("scale");
+    writer.begin_array();
+    writer.value(bone.scale[0]);
+    writer.value(bone.scale[1]);
+    writer.value(bone.scale[2]);
+    writer.end_array();
+    writer.end_object();
+
+    writer.key("local_pose");
+    writer.begin_object();
+    writer.key("position");
+    writer.begin_array();
+    writer.value(bone.position[0]);
+    writer.value(bone.position[1]);
+    writer.value(bone.position[2]);
+    writer.end_array();
+    writer.key("rotation");
+    writer.begin_array();
+    writer.value(bone.rotation[0]);
+    writer.value(bone.rotation[1]);
+    writer.value(bone.rotation[2]);
+    writer.end_array();
+    writer.key("scale");
+    writer.begin_array();
+    writer.value(bone.scale[0]);
+    writer.value(bone.scale[1]);
+    writer.value(bone.scale[2]);
+    writer.end_array();
+    writer.end_object();
+    writer.end_object();
+  }
+  writer.end_array();
+  writer.end_object();
+  writer.finish();
+}
+
+bool write_skin_bin(const fs::path& path,
+                    const std::vector<std::array<float, 16>>& matrices) {
+  std::ofstream out(path, std::ios::binary);
+  if (!out) return false;
+  const uint32_t magic = 0x4E494B53; // 'SKIN'
+  const uint32_t version = 1;
+  const uint32_t joint_count = static_cast<uint32_t>(matrices.size());
+  const uint32_t reserved = 0;
+  out.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
+  out.write(reinterpret_cast<const char*>(&version), sizeof(version));
+  out.write(reinterpret_cast<const char*>(&joint_count), sizeof(joint_count));
+  out.write(reinterpret_cast<const char*>(&reserved), sizeof(reserved));
+  for (const auto& mat : matrices) {
+    out.write(reinterpret_cast<const char*>(mat.data()), sizeof(float) * 16);
+  }
+  return true;
 }
 
 }  // namespace
@@ -394,6 +590,85 @@ ImportResult import_glb(const fs::path& input_path,
     total_primitives += data->meshes[m].primitives_count;
   }
 
+  std::vector<BoneRecord> bones;
+  std::vector<std::array<float, 16>> inv_bind_mats;
+  size_t joint_count = 0;
+  if (data->skins_count > 0) {
+    const cgltf_skin& skin = data->skins[0];
+    joint_count = skin.joints_count;
+    bones.reserve(joint_count);
+    inv_bind_mats.resize(joint_count);
+
+    std::unordered_map<const cgltf_node*, int> joint_index;
+    for (size_t i = 0; i < joint_count; ++i) {
+      joint_index[skin.joints[i]] = static_cast<int>(i);
+    }
+
+    for (size_t i = 0; i < joint_count; ++i) {
+      const cgltf_node* node = skin.joints[i];
+      BoneRecord bone;
+      bone.name = make_name(node->name, format_indexed("joint", i, ""));
+      bone.parent_index = -1;
+      if (node->parent) {
+        auto it = joint_index.find(node->parent);
+        if (it != joint_index.end()) {
+          bone.parent_index = it->second;
+        }
+      }
+
+      float t[3] = {0.0f, 0.0f, 0.0f};
+      float s[3] = {1.0f, 1.0f, 1.0f};
+      float r_euler[3] = {0.0f, 0.0f, 0.0f};
+
+      if (node->has_translation) {
+        t[0] = node->translation[0];
+        t[1] = node->translation[1];
+        t[2] = node->translation[2];
+      }
+      if (node->has_scale) {
+        s[0] = node->scale[0];
+        s[1] = node->scale[1];
+        s[2] = node->scale[2];
+      }
+      if (node->has_rotation) {
+        quat_to_euler_xyz(node->rotation, r_euler);
+      }
+      if (node->has_matrix) {
+        float m[16];
+        cgltf_node_transform_local(node, m);
+        decompose_matrix_trs(m, t, r_euler, s);
+      }
+
+      bone.position[0] = t[0];
+      bone.position[1] = t[1];
+      bone.position[2] = t[2];
+      bone.rotation[0] = r_euler[0];
+      bone.rotation[1] = r_euler[1];
+      bone.rotation[2] = r_euler[2];
+      bone.scale[0] = s[0];
+      bone.scale[1] = s[1];
+      bone.scale[2] = s[2];
+      bones.push_back(bone);
+    }
+
+    if (skin.inverse_bind_matrices && skin.inverse_bind_matrices->count >= joint_count) {
+      for (size_t i = 0; i < joint_count; ++i) {
+        std::array<float, 16> mat{};
+        cgltf_accessor_read_float(skin.inverse_bind_matrices, i, mat.data(), 16);
+        inv_bind_mats[i] = mat;
+      }
+    } else {
+      for (size_t i = 0; i < joint_count; ++i) {
+        std::array<float, 16> mat{};
+        mat[0] = 1.0f;
+        mat[5] = 1.0f;
+        mat[10] = 1.0f;
+        mat[15] = 1.0f;
+        inv_bind_mats[i] = mat;
+      }
+    }
+  }
+
   // Export the first mesh primitive deterministically.
   if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0) {
     cgltf_free(data);
@@ -512,9 +787,19 @@ ImportResult import_glb(const fs::path& input_path,
                      materials.size(),
                      textures.size(),
                      1,
-                     total_primitives);
+                     total_primitives,
+                     joint_count);
 
     write_materials_json(output_dir / "materials.json", materials, textures);
+
+    if (!bones.empty()) {
+      write_skeleton_json(output_dir / "skeleton.json", bones);
+      if (!write_skin_bin(output_dir / "skin.bin", inv_bind_mats)) {
+        cgltf_free(data);
+        result.error = "failed to write skin.bin";
+        return result;
+      }
+    }
   }
 
   result.ok = true;
@@ -524,6 +809,8 @@ ImportResult import_glb(const fs::path& input_path,
   result.asset.total_primitives = static_cast<uint32_t>(total_primitives);
   result.asset.material_count = static_cast<uint32_t>(materials.size());
   result.asset.texture_count = static_cast<uint32_t>(textures.size());
+  result.asset.skin_count = static_cast<uint32_t>(data->skins_count);
+  result.asset.joint_count = static_cast<uint32_t>(joint_count);
   result.mesh = mesh_info;
   result.materials = materials;
   result.textures = textures;

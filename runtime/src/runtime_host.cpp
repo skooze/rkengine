@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -738,11 +739,13 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
     if (asset_cache_.load_from_content_root(raw_content_root_, asset_error)) {
       for (const auto& kv : asset_cache_.assets()) {
         const auto& asset = kv.second;
+        const size_t joint_count = asset.skeleton.bones.size();
         rkg::log::info("asset_cache: loaded " + asset.name +
                        " (verts=" + std::to_string(asset.mesh.vertex_count) +
                        " idx=" + std::to_string(asset.mesh.index_count) +
                        " mats=" + std::to_string(asset.materials.size()) +
-                       " tex=" + std::to_string(asset.textures.size()) + ")");
+                       " tex=" + std::to_string(asset.textures.size()) +
+                       " joints=" + std::to_string(joint_count) + ")");
       }
     } else {
       rkg::log::warn(std::string("asset_cache: ") + asset_error);
@@ -1163,32 +1166,57 @@ void RuntimeHost::load_initial_level() {
   }
 
   if (player_ != rkg::ecs::kInvalidEntity && registry_.get_skeleton(player_) == nullptr) {
-    rkg::ecs::Skeleton skeleton{};
-    rkg::ecs::Bone root{};
-    root.name = "root";
-    root.parent_index = -1;
-    root.local_pose.position[0] = 0.0f;
-    root.local_pose.position[1] = 0.0f;
-    root.local_pose.position[2] = 0.0f;
-    skeleton.bones.push_back(root);
+    const rkg::runtime::AssetRecord* rig_asset = nullptr;
+    if (const char* rig_env = std::getenv("RKG_RIG_ASSET"); rig_env && *rig_env) {
+      rig_asset = asset_cache_.find(rig_env);
+    }
+    if (!rig_asset) {
+      rig_asset = asset_cache_.find("testmanny");
+    }
+    if (!rig_asset) {
+      for (const auto& kv : asset_cache_.assets()) {
+        if (!kv.second.skeleton.bones.empty()) {
+          rig_asset = &kv.second;
+          break;
+        }
+      }
+    }
 
-    rkg::ecs::Bone spine{};
-    spine.name = "spine";
-    spine.parent_index = 0;
-    spine.local_pose.position[0] = 0.0f;
-    spine.local_pose.position[1] = 0.6f;
-    spine.local_pose.position[2] = 0.0f;
-    skeleton.bones.push_back(spine);
+    if (rig_asset && !rig_asset->skeleton.bones.empty()) {
+      rkg::ecs::Skeleton skeleton{};
+      skeleton.bones = rig_asset->skeleton.bones;
+      registry_.set_skeleton(player_, skeleton);
+      rkg::log::info("runtime: attached skeleton from asset " + rig_asset->name +
+                     " joints=" + std::to_string(skeleton.bones.size()));
+    } else {
+      rkg::ecs::Skeleton skeleton{};
+      rkg::ecs::Bone root{};
+      root.name = "root";
+      root.parent_index = -1;
+      root.local_pose.position[0] = 0.0f;
+      root.local_pose.position[1] = 0.0f;
+      root.local_pose.position[2] = 0.0f;
+      skeleton.bones.push_back(root);
 
-    rkg::ecs::Bone head{};
-    head.name = "head";
-    head.parent_index = 1;
-    head.local_pose.position[0] = 0.0f;
-    head.local_pose.position[1] = 0.4f;
-    head.local_pose.position[2] = 0.0f;
-    skeleton.bones.push_back(head);
+      rkg::ecs::Bone spine{};
+      spine.name = "spine";
+      spine.parent_index = 0;
+      spine.local_pose.position[0] = 0.0f;
+      spine.local_pose.position[1] = 0.6f;
+      spine.local_pose.position[2] = 0.0f;
+      skeleton.bones.push_back(spine);
 
-    registry_.set_skeleton(player_, skeleton);
+      rkg::ecs::Bone head{};
+      head.name = "head";
+      head.parent_index = 1;
+      head.local_pose.position[0] = 0.0f;
+      head.local_pose.position[1] = 0.4f;
+      head.local_pose.position[2] = 0.0f;
+      skeleton.bones.push_back(head);
+
+      registry_.set_skeleton(player_, skeleton);
+      rkg::log::info("runtime: attached fallback skeleton (3 bones)");
+    }
   }
 }
 

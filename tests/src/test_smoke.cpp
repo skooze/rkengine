@@ -349,6 +349,62 @@ int main(int argc, char** argv) {
           std::cerr << "asset cache missing fixture\n";
           ++failures;
         }
+#if RKG_ENABLE_DATA_JSON
+        // Inject a tiny skeleton + skin and ensure asset cache loads it.
+        const std::string skeleton_json =
+            R"({"joint_count":2,"bones":[)"
+            R"({"name":"root","parent":-1,"bind_local":{"position":[0,0,0],"rotation":[0,0,0],"scale":[1,1,1]},"local_pose":{"position":[0,0,0],"rotation":[0,0,0],"scale":[1,1,1]}},)"
+            R"({"name":"child","parent":0,"bind_local":{"position":[0,1,0],"rotation":[0,0,0],"scale":[1,1,1]},"local_pose":{"position":[0,1,0],"rotation":[0,0,0],"scale":[1,1,1]}}]})";
+        if (!write_text(asset_dir / "skeleton.json", skeleton_json)) {
+          std::cerr << "failed to write skeleton.json\n";
+          ++failures;
+        }
+
+        std::vector<uint8_t> skin_bytes;
+        auto push_u32 = [&](uint32_t value) {
+          const size_t offset = skin_bytes.size();
+          skin_bytes.resize(offset + sizeof(uint32_t));
+          std::memcpy(skin_bytes.data() + offset, &value, sizeof(uint32_t));
+        };
+        auto push_f32 = [&](float value) {
+          const size_t offset = skin_bytes.size();
+          skin_bytes.resize(offset + sizeof(float));
+          std::memcpy(skin_bytes.data() + offset, &value, sizeof(float));
+        };
+        push_u32(0x4E494B53); // 'SKIN'
+        push_u32(1);
+        push_u32(2);
+        push_u32(0);
+        const float identity[16] = {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        for (int i = 0; i < 16; ++i) push_f32(identity[i]);
+        for (int i = 0; i < 16; ++i) push_f32(identity[i]);
+        if (!write_bytes(asset_dir / "skin.bin", skin_bytes)) {
+          std::cerr << "failed to write skin.bin\n";
+          ++failures;
+        }
+
+        rkg::runtime::AssetCache cache_with_skel;
+        std::string skel_error;
+        if (!cache_with_skel.load_from_content_root(content_root, skel_error)) {
+          std::cerr << "asset cache reload failed: " << skel_error << "\n";
+          ++failures;
+        } else {
+          const auto* record = cache_with_skel.find("fixture");
+          if (!record) {
+            std::cerr << "asset cache missing fixture after skeleton\n";
+            ++failures;
+          } else if (record->skeleton.bones.size() != 2 ||
+                     record->skeleton.inverse_bind_mats.size() != 2) {
+            std::cerr << "asset cache skeleton/skin load failed\n";
+            ++failures;
+          }
+        }
+#endif
       }
     }
     fs::remove_all(temp_root, ec);

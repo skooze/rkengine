@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "rkg/ecs.h"
+
 namespace rkg::runtime {
 
 struct MeshInfo {
@@ -22,12 +24,18 @@ struct MaterialInfo {
   std::string base_color_texture;
 };
 
+struct SkeletonInfo {
+  std::vector<rkg::ecs::Bone> bones;
+  std::vector<std::array<float, 16>> inverse_bind_mats;
+};
+
 struct AssetRecord {
   std::string name;
   std::filesystem::path dir;
   MeshInfo mesh;
   std::vector<MaterialInfo> materials;
   std::vector<std::filesystem::path> textures;
+  SkeletonInfo skeleton;
 };
 
 class AssetCache {

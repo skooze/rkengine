@@ -7,6 +7,7 @@
 #endif
 
 #include <fstream>
+#include <cstring>
 
 namespace fs = std::filesystem;
 
@@ -16,6 +17,8 @@ namespace {
 
 #if RKG_ENABLE_DATA_JSON
 using json = nlohmann::json;
+
+bool load_json_file(const fs::path& path, json& out, std::string& error);
 #endif
 
 bool read_file_bytes(const fs::path& path, std::vector<uint8_t>& out) {
@@ -55,6 +58,84 @@ bool load_mesh_bin(const fs::path& path, MeshInfo& out, std::string& error) {
   out.has_tangents = (flags & 4u) != 0;
   return true;
 }
+
+#if RKG_ENABLE_DATA_JSON
+bool read_vec3(const json& arr, float out[3]) {
+  if (!arr.is_array() || arr.size() < 3) return false;
+  out[0] = arr[0].get<float>();
+  out[1] = arr[1].get<float>();
+  out[2] = arr[2].get<float>();
+  return true;
+}
+
+bool load_skeleton_json(const fs::path& path, SkeletonInfo& out, std::string& error) {
+  json doc;
+  if (!load_json_file(path, doc, error)) {
+    return false;
+  }
+  const auto bones = doc.value("bones", json::array());
+  if (!bones.is_array()) {
+    error = "skeleton.json bones missing";
+    return false;
+  }
+  out.bones.clear();
+  out.bones.reserve(bones.size());
+  for (const auto& entry : bones) {
+    if (!entry.is_object()) continue;
+    rkg::ecs::Bone bone;
+    bone.name = entry.value("name", "");
+    bone.parent_index = entry.value("parent", -1);
+    if (entry.contains("bind_local")) {
+      const auto& bind = entry["bind_local"];
+      if (bind.contains("position")) read_vec3(bind["position"], bone.bind_local.position);
+      if (bind.contains("rotation")) read_vec3(bind["rotation"], bone.bind_local.rotation);
+      if (bind.contains("scale")) read_vec3(bind["scale"], bone.bind_local.scale);
+    }
+    if (entry.contains("local_pose")) {
+      const auto& pose = entry["local_pose"];
+      if (pose.contains("position")) read_vec3(pose["position"], bone.local_pose.position);
+      if (pose.contains("rotation")) read_vec3(pose["rotation"], bone.local_pose.rotation);
+      if (pose.contains("scale")) read_vec3(pose["scale"], bone.local_pose.scale);
+    }
+    out.bones.push_back(std::move(bone));
+  }
+  return !out.bones.empty();
+}
+
+bool load_skin_bin(const fs::path& path, SkeletonInfo& out, std::string& error) {
+  std::vector<uint8_t> bytes;
+  if (!read_file_bytes(path, bytes)) {
+    error = "failed to read skin.bin";
+    return false;
+  }
+  if (bytes.size() < sizeof(uint32_t) * 4) {
+    error = "skin.bin too small";
+    return false;
+  }
+  const uint32_t* header = reinterpret_cast<const uint32_t*>(bytes.data());
+  const uint32_t magic = header[0];
+  const uint32_t version = header[1];
+  const uint32_t joint_count = header[2];
+  if (magic != 0x4E494B53 || version != 1) {
+    error = "skin.bin header invalid";
+    return false;
+  }
+  const size_t expected = sizeof(uint32_t) * 4 + static_cast<size_t>(joint_count) * sizeof(float) * 16;
+  if (bytes.size() < expected) {
+    error = "skin.bin truncated";
+    return false;
+  }
+  out.inverse_bind_mats.clear();
+  out.inverse_bind_mats.resize(joint_count);
+  const float* mats = reinterpret_cast<const float*>(bytes.data() + sizeof(uint32_t) * 4);
+  for (size_t i = 0; i < joint_count; ++i) {
+    std::array<float, 16> mat{};
+    std::memcpy(mat.data(), mats + (i * 16), sizeof(float) * 16);
+    out.inverse_bind_mats[i] = mat;
+  }
+  return true;
+}
+#endif
 
 #if RKG_ENABLE_DATA_JSON
 bool load_json_file(const fs::path& path, json& out, std::string& error) {
@@ -134,6 +215,22 @@ bool AssetCache::load_asset_dir(const fs::path& asset_dir, std::string& error) {
     for (const auto& entry : fs::directory_iterator(textures_dir)) {
       if (entry.is_regular_file()) {
         record.textures.push_back(entry.path());
+      }
+    }
+  }
+
+  const fs::path skeleton_path = asset_dir / "skeleton.json";
+  if (fs::exists(skeleton_path)) {
+    std::string skel_error;
+    if (!load_skeleton_json(skeleton_path, record.skeleton, skel_error)) {
+      rkg::log::warn(std::string("asset_cache: skeleton.json parse failed: ") + skel_error);
+    } else {
+      const fs::path skin_path = asset_dir / "skin.bin";
+      if (fs::exists(skin_path)) {
+        std::string skin_error;
+        if (!load_skin_bin(skin_path, record.skeleton, skin_error)) {
+          rkg::log::warn(std::string("asset_cache: skin.bin parse failed: ") + skin_error);
+        }
       }
     }
   }

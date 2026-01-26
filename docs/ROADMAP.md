@@ -8,6 +8,7 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 - Phase 0 complete (docs + policy lock‑in).
 - M1 complete (Phase 1 done, offline import).
 - M2 complete (Phase 2A done, runtime CPU‑side load + logs).
+- M3 complete (Phase 2B done, textured static mesh demo validated).
 
 ## Milestones (each with outcome, acceptance criteria, demo, phases)
 ### M1 — Import Foundation (Decisions + GLB Import)
@@ -29,10 +30,10 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 ### M3 — Textured Static Mesh Rendering
 - **Outcome**: Vulkan pipeline renders textured static meshes.
 - **Phases**: Phase 2B
-- **What becomes possible**: `testmanny` appears as textured static mesh.
+- **What becomes possible**: Textured static mesh appears in the editor via the demo path.
 - **Not included yet**: Skeleton import or skinning.
-- **Acceptance criteria**: Textured mesh visible in viewport.
-- **Demo**: Editor shows textured mesh without debug fallback.
+- **Acceptance criteria**: Textured mesh visible in viewport and log line confirms textured demo path.
+- **Demo**: Editor shows `textured_fixture` (2x2 colored PNG); screenshot waived by author after visual confirmation (2026‑01‑25).
 
 ### M4 — Skeleton Import + Debug Bones
 - **Outcome**: Skeleton data imported and visualized.

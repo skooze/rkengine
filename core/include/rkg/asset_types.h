@@ -37,6 +37,8 @@ struct ImportedAssetSummary {
   uint32_t total_primitives = 0;
   uint32_t material_count = 0;
   uint32_t texture_count = 0;
+  uint32_t skin_count = 0;
+  uint32_t joint_count = 0;
 };
 
 struct ImportOptions {

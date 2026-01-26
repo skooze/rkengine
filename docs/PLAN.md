@@ -355,17 +355,25 @@
 **Tests to add/update**:
 - `tests/src/test_smoke.cpp`: verify pipeline created.
 **Acceptance criteria**:
-- Textured testmanny visible in editor (no debug-only draw).
+- Textured mesh visible in editor (no debug-only draw).
+- Log line: `renderer:vulkan textured demo: using asset <name>`.
 **Verification commands**:
 - `./build/bin/rkg_editor --project projects/demo_game`
 **testmanny validation steps**:
-- Screenshot shows textured model.
+- Validation performed with a local textured fixture (`textured_fixture`) on a Vulkan machine; author waived screenshot requirement after visual confirmation (2026‑01‑25).
 **Stop point**:
-- Stop after screenshot captured.
+- Stop after visible textured mesh confirmation and log capture.
 **Next Phase Preview**:
 - Phase 3: skeleton import + debug draw.
 **Risks/edge cases**:
 - Descriptor layout mismatches.
+
+**Phase 2B Notes (as-built)**:
+- Textured demo validated with `textured_fixture` (2x2 colored PNG) rather than `testmanny` (which has 0 materials/textures).
+- Materials support: `baseColorFactor` + `baseColorTexture` only (Phase 2B scope).
+- Texture bytes are copied/extracted as‑is and decoded via stb_image for upload.
+- Demo path uses a single mesh/primitive and a single material; no multi‑material batching yet.
+- Depth test disabled for the textured demo draw to keep the fixture visible during validation.
 
 ### PHASE 3 — Skin/Skeleton Import + Debug Skeleton Draw (no deformation yet)
 **Objective**: Load skeleton + skin data, draw bone lines.
@@ -602,7 +610,7 @@
 - Phase 0: ☑
 - Phase 1: ☑
 - Phase 2A: ☑
-- Phase 2B: ☐
+- Phase 2B: ☑
 - Phase 3: ☐
 - Phase 4: ☐
 - Phase 5: ☐
