@@ -345,6 +345,7 @@ struct EditorState {
   float editor_pivot_world[3]{0.0f, 0.0f, 0.0f};
   bool lock_editor_pivot = false;
   float camera_view_proj[16]{};
+  float pending_zoom_delta = 0.0f;
   struct SavedEditorCamera {
     bool valid = false;
     float yaw = 0.0f;
@@ -2617,6 +2618,9 @@ void draw_viewport(EditorState& state) {
   if (hovered && (clicked_any || held_any)) {
     state.viewport_focused = true;
   }
+  if (hovered && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
+    state.pending_zoom_delta += io.MouseWheel;
+  }
   if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse &&
       (state.play_state != PlayState::Play || io.KeyCtrl)) {
     state.pick_requested = true;
@@ -4009,10 +4013,11 @@ void update_camera_and_draw_list(EditorState& state) {
       if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
     }
   }
-  if (camera_input_enabled && std::abs(io.MouseWheel) > 0.0001f) {
-    state.camera_distance -= io.MouseWheel * 0.4f;
+  if (std::abs(state.pending_zoom_delta) > 0.0001f) {
+    state.camera_distance -= state.pending_zoom_delta * 0.4f;
     if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
     if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
+    state.pending_zoom_delta = 0.0f;
   }
 
   const float cy = std::cos(state.camera_yaw);
