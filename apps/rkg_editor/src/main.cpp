@@ -356,6 +356,7 @@ struct EditorState {
   bool show_world_axes = true;
   bool show_face_labels = true;
   bool show_skeleton_debug = true;
+  bool show_renderables = true;
   float grid_half_extent = 10.0f;
   float grid_step = 1.0f;
 
@@ -2353,6 +2354,8 @@ void draw_viewport(EditorState& state) {
     ImGui::Checkbox("Face Labels", &state.show_face_labels);
     ImGui::SameLine();
     ImGui::Checkbox("Skeletons", &state.show_skeleton_debug);
+    ImGui::SameLine();
+    ImGui::Checkbox("Meshes", &state.show_renderables);
     ImGui::SliderFloat("Grid Half Extent", &state.grid_half_extent, 1.0f, 50.0f, "%.1f");
     ImGui::SliderFloat("Grid Step", &state.grid_step, 0.25f, 5.0f, "%.2f");
     if (state.grid_step < 0.25f) state.grid_step = 0.25f;
@@ -4030,37 +4033,39 @@ void update_camera_and_draw_list(EditorState& state) {
   float colors[rkg::VulkanViewportDrawList::kMaxInstances * 4]{};
   uint32_t mesh_ids[rkg::VulkanViewportDrawList::kMaxInstances]{};
   uint32_t instance_count = 0;
-  for (const auto entity : registry.entities()) {
-    if (instance_count >= rkg::VulkanViewportDrawList::kMaxInstances) {
-      break;
+  if (state.show_renderables) {
+    for (const auto entity : registry.entities()) {
+      if (instance_count >= rkg::VulkanViewportDrawList::kMaxInstances) {
+        break;
+      }
+      const auto* transform = registry.get_transform(entity);
+      const auto* renderable = registry.get_renderable(entity);
+      if (!transform || !renderable) {
+        continue;
+      }
+      const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+      const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
+      Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(mat4_rotation_xyz(rot), mat4_scale(scl)));
+      Mat4 mvp = mat4_mul(proj, mat4_mul(view, model));
+      std::memcpy(mvps + instance_count * 16, mvp.m, sizeof(float) * 16);
+      mesh_ids[instance_count] = static_cast<uint32_t>(renderable->mesh);
+      const size_t color_base = static_cast<size_t>(instance_count) * 4;
+      float r = renderable->color[0];
+      float g = renderable->color[1];
+      float b = renderable->color[2];
+      float a = renderable->color[3];
+      if (entity == state.selected_entity) {
+        r = std::min(1.0f, r * 0.4f + 0.6f);
+        g = std::min(1.0f, g * 0.4f + 0.6f);
+        b = b * 0.4f;
+      }
+      colors[color_base + 0] = r;
+      colors[color_base + 1] = g;
+      colors[color_base + 2] = b;
+      colors[color_base + 3] = a;
+      instance_count += 1;
     }
-    const auto* transform = registry.get_transform(entity);
-    const auto* renderable = registry.get_renderable(entity);
-    if (!transform || !renderable) {
-      continue;
-    }
-    const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
-    const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
-    const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
-    Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(mat4_rotation_xyz(rot), mat4_scale(scl)));
-    Mat4 mvp = mat4_mul(proj, mat4_mul(view, model));
-    std::memcpy(mvps + instance_count * 16, mvp.m, sizeof(float) * 16);
-    mesh_ids[instance_count] = static_cast<uint32_t>(renderable->mesh);
-    const size_t color_base = static_cast<size_t>(instance_count) * 4;
-    float r = renderable->color[0];
-    float g = renderable->color[1];
-    float b = renderable->color[2];
-    float a = renderable->color[3];
-    if (entity == state.selected_entity) {
-      r = std::min(1.0f, r * 0.4f + 0.6f);
-      g = std::min(1.0f, g * 0.4f + 0.6f);
-      b = b * 0.4f;
-    }
-    colors[color_base + 0] = r;
-    colors[color_base + 1] = g;
-    colors[color_base + 2] = b;
-    colors[color_base + 3] = a;
-    instance_count += 1;
   }
 
   if (instance_count > 0) {
