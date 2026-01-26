@@ -375,36 +375,48 @@
 - Demo path uses a single mesh/primitive and a single material; no multi‑material batching yet.
 - Depth test disabled for the textured demo draw to keep the fixture visible during validation.
 
-### PHASE 3 — Skin/Skeleton Import + Debug Skeleton Draw (no deformation yet)
-**Objective**: Load skeleton + skin data, draw bone lines.
+### PHASE 3 — Skeleton Import + Authoring + Debug Skeleton Draw (no deformation yet)
+**Objective**: Load skeleton + skin data **and** enable full in‑editor skeleton authoring with persistence, then draw bone lines.
 **Dependencies**: Phase 1 import outputs.
 **Inputs/Outputs**:
 - Input: `skeleton.json`, `skin.bin`.
-- Output: debug bone lines in editor.
+**Outputs**:
+- Debug bone lines in editor for **imported or authored** skeletons.
+- Persisted skeleton assets under project content.
 **New files expected**:
 - `core/include/rkg/skeleton_asset.h`
 - `core/src/skeleton_asset.cpp`
+- `projects/<project>/content/skeletons/*.json` (authored assets)
 **Modified files expected**:
 - `apps/rkg_editor/src/main.cpp`
 - `runtime/src/runtime_host.cpp`
+- `runtime/src/asset_cache.cpp`
 **Implementation steps**:
-1) Load skeleton + skin assets into cache.
-2) Compute world pose for debug draw.
-3) Draw bone lines via debug line list.
+1) Load skeleton + skin assets into cache (imported).
+2) **Add skeleton authoring UI**:
+   - Create/delete bones
+   - Set parent/root
+   - Edit local pose (position/rotation/scale)
+   - Rename bones
+3) **Persist authored skeletons** to `projects/<project>/content/skeletons/*.json` and load them on startup.
+4) Allow entities to reference an authored skeleton by name (or attach directly in editor).
+5) Compute world pose for debug draw.
+6) Draw bone lines via debug line list.
 **Data model changes**:
-- Skeleton asset structs.
+- Skeleton asset structs (imported + authored).
 **Editor UX changes**:
-- Toggle for skeleton debug view.
+- Full skeleton authoring panel (not minimal): create bones, set parent/root, edit local pose, save/load.
 **CLI/tooling changes**:
 - None.
 **Tests to add/update**:
-- `tests/src/test_smoke.cpp`: skeleton load + pose compute.
+ - `tests/src/test_smoke.cpp`: skeleton load + pose compute (imported or authored).
 **Acceptance criteria**:
-- Bone hierarchy visible in editor.
+ - Bone hierarchy visible in editor.
+ - Authored skeleton can be created, saved to content, and reloaded without loss.
 **Verification commands**:
 - `./build/bin/rkg_editor --project projects/demo_game`
 **testmanny validation steps**:
-- Bone lines match expected hierarchy.
+ - Bone lines match expected hierarchy **or** authored skeleton lines visible.
 **Stop point**:
 - Stop after visual verification.
 **Next Phase Preview**:

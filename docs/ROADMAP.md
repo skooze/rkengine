@@ -35,13 +35,15 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 - **Acceptance criteria**: Textured mesh visible in viewport and log line confirms textured demo path.
 - **Demo**: Editor shows `textured_fixture` (2x2 colored PNG); screenshot waived by author after visual confirmation (2026‑01‑25).
 
-### M4 — Skeleton Import + Debug Bones
-- **Outcome**: Skeleton data imported and visualized.
+### M4 — Skeleton Import + Authoring + Debug Bones
+- **Outcome**: Skeletons can be **imported or authored in-editor**, persisted to content, and visualized.
 - **Phases**: Phase 3
-- **What becomes possible**: Bone hierarchy visible; joints inspectable.
+- **What becomes possible**: Bone hierarchy visible; joints inspectable; users can create bones/root and save a skeleton asset.
 - **Not included yet**: Mesh deformation or animation playback.
-- **Acceptance criteria**: Bone lines drawn for `testmanny`.
-- **Demo**: Editor toggles skeleton debug view.
+- **Acceptance criteria**:
+  - Bone lines drawn for a rigged asset **or** an authored skeleton.
+  - Editor can create bones, set parent/root, edit local pose, and **persist** the skeleton to content.
+- **Demo**: Editor shows skeleton debug view and authored skeleton saved/loaded.
 
 ### M5 — GPU Skinning
 - **Outcome**: Skinned mesh deformation in Vulkan.

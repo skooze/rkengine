@@ -8,6 +8,7 @@
 #include "rkg/log.h"
 #include "rkg/math.h"
 #include "rkg/paths.h"
+#include "rkg/json_write.h"
 #include "rkg/renderer_hooks.h"
 
 #include <algorithm>
@@ -365,6 +366,14 @@ struct EditorState {
   std::string selected_name;
   rkg::ecs::Entity fallback_entity = rkg::ecs::kInvalidEntity;
   int selected_bone = -1;
+  int selected_bone_name_index = -1;
+  char selected_bone_name_buf[64]{};
+  bool skeleton_assets_loaded = false;
+  int skeleton_asset_index = -1;
+  char skeleton_asset_name[64] = "skeleton";
+  char new_bone_name[64] = "bone";
+  std::vector<std::string> skeleton_asset_names;
+  std::unordered_map<std::string, rkg::ecs::Skeleton> skeleton_assets;
 
   AgentPanelState agent;
   ContentPanelState content;
@@ -425,6 +434,206 @@ std::vector<std::string> split_lines(const std::string& text) {
     lines.push_back("");
   }
   return lines;
+}
+
+fs::path skeleton_assets_root(const EditorState& state) {
+  return state.runtime ? (state.runtime->project_root() / "content" / "skeletons") : fs::path{};
+}
+
+bool save_skeleton_asset_file(const fs::path& path, const rkg::ecs::Skeleton& skeleton, std::string& error) {
+  std::error_code ec;
+  fs::create_directories(path.parent_path(), ec);
+  if (ec) {
+    error = "failed to create skeleton directory";
+    return false;
+  }
+  std::ofstream out(path);
+  if (!out) {
+    error = "failed to open skeleton file for write";
+    return false;
+  }
+  rkg::json::Writer writer(out);
+  writer.begin_object();
+  writer.key("joint_count");
+  writer.value(static_cast<uint64_t>(skeleton.bones.size()));
+  writer.key("bones");
+  writer.begin_array();
+  for (const auto& bone : skeleton.bones) {
+    writer.begin_object();
+    writer.key("name");
+    writer.value(bone.name);
+    writer.key("parent");
+    writer.value(static_cast<int64_t>(bone.parent_index));
+    writer.key("bind_local");
+    writer.begin_object();
+    writer.key("position");
+    writer.begin_array();
+    writer.value(bone.bind_local.position[0]);
+    writer.value(bone.bind_local.position[1]);
+    writer.value(bone.bind_local.position[2]);
+    writer.end_array();
+    writer.key("rotation");
+    writer.begin_array();
+    writer.value(bone.bind_local.rotation[0]);
+    writer.value(bone.bind_local.rotation[1]);
+    writer.value(bone.bind_local.rotation[2]);
+    writer.end_array();
+    writer.key("scale");
+    writer.begin_array();
+    writer.value(bone.bind_local.scale[0]);
+    writer.value(bone.bind_local.scale[1]);
+    writer.value(bone.bind_local.scale[2]);
+    writer.end_array();
+    writer.end_object();
+    writer.key("local_pose");
+    writer.begin_object();
+    writer.key("position");
+    writer.begin_array();
+    writer.value(bone.local_pose.position[0]);
+    writer.value(bone.local_pose.position[1]);
+    writer.value(bone.local_pose.position[2]);
+    writer.end_array();
+    writer.key("rotation");
+    writer.begin_array();
+    writer.value(bone.local_pose.rotation[0]);
+    writer.value(bone.local_pose.rotation[1]);
+    writer.value(bone.local_pose.rotation[2]);
+    writer.end_array();
+    writer.key("scale");
+    writer.begin_array();
+    writer.value(bone.local_pose.scale[0]);
+    writer.value(bone.local_pose.scale[1]);
+    writer.value(bone.local_pose.scale[2]);
+    writer.end_array();
+    writer.end_object();
+    writer.end_object();
+  }
+  writer.end_array();
+  writer.end_object();
+  writer.finish();
+  return true;
+}
+
+#if RKG_ENABLE_DATA_JSON
+using json = nlohmann::json;
+
+bool load_skeleton_asset_file(const fs::path& path, rkg::ecs::Skeleton& out, std::string& error) {
+  std::ifstream in(path);
+  if (!in) {
+    error = "failed to open skeleton file";
+    return false;
+  }
+  json doc;
+  try {
+    in >> doc;
+  } catch (const std::exception& ex) {
+    error = ex.what();
+    return false;
+  }
+  const auto bones = doc.value("bones", json::array());
+  if (!bones.is_array()) {
+    error = "bones missing";
+    return false;
+  }
+  out.bones.clear();
+  out.bones.reserve(bones.size());
+  for (const auto& entry : bones) {
+    if (!entry.is_object()) continue;
+    rkg::ecs::Bone bone;
+    bone.name = entry.value("name", "");
+    bone.parent_index = entry.value("parent", -1);
+    if (entry.contains("bind_local")) {
+      const auto& bind = entry["bind_local"];
+      if (bind.contains("position")) {
+        const auto& arr = bind["position"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.bind_local.position[0] = arr[0].get<float>();
+          bone.bind_local.position[1] = arr[1].get<float>();
+          bone.bind_local.position[2] = arr[2].get<float>();
+        }
+      }
+      if (bind.contains("rotation")) {
+        const auto& arr = bind["rotation"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.bind_local.rotation[0] = arr[0].get<float>();
+          bone.bind_local.rotation[1] = arr[1].get<float>();
+          bone.bind_local.rotation[2] = arr[2].get<float>();
+        }
+      }
+      if (bind.contains("scale")) {
+        const auto& arr = bind["scale"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.bind_local.scale[0] = arr[0].get<float>();
+          bone.bind_local.scale[1] = arr[1].get<float>();
+          bone.bind_local.scale[2] = arr[2].get<float>();
+        }
+      }
+    }
+    if (entry.contains("local_pose")) {
+      const auto& pose = entry["local_pose"];
+      if (pose.contains("position")) {
+        const auto& arr = pose["position"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.local_pose.position[0] = arr[0].get<float>();
+          bone.local_pose.position[1] = arr[1].get<float>();
+          bone.local_pose.position[2] = arr[2].get<float>();
+        }
+      }
+      if (pose.contains("rotation")) {
+        const auto& arr = pose["rotation"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.local_pose.rotation[0] = arr[0].get<float>();
+          bone.local_pose.rotation[1] = arr[1].get<float>();
+          bone.local_pose.rotation[2] = arr[2].get<float>();
+        }
+      }
+      if (pose.contains("scale")) {
+        const auto& arr = pose["scale"];
+        if (arr.is_array() && arr.size() >= 3) {
+          bone.local_pose.scale[0] = arr[0].get<float>();
+          bone.local_pose.scale[1] = arr[1].get<float>();
+          bone.local_pose.scale[2] = arr[2].get<float>();
+        }
+      }
+    }
+    out.bones.push_back(std::move(bone));
+  }
+  return !out.bones.empty();
+}
+#endif
+
+void refresh_skeleton_assets(EditorState& state) {
+  state.skeleton_assets.clear();
+  state.skeleton_asset_names.clear();
+  state.skeleton_assets_loaded = true;
+  const fs::path root = skeleton_assets_root(state);
+  if (root.empty() || !fs::exists(root)) {
+    return;
+  }
+#if !RKG_ENABLE_DATA_JSON
+  return;
+#else
+  for (const auto& entry : fs::directory_iterator(root)) {
+    if (!entry.is_regular_file()) continue;
+    if (entry.path().extension() != ".json") continue;
+    rkg::ecs::Skeleton skeleton;
+    std::string err;
+    if (load_skeleton_asset_file(entry.path(), skeleton, err)) {
+      const std::string name = entry.path().stem().string();
+      state.skeleton_assets.emplace(name, std::move(skeleton));
+      state.skeleton_asset_names.push_back(name);
+    }
+  }
+  std::sort(state.skeleton_asset_names.begin(), state.skeleton_asset_names.end());
+  if (!state.skeleton_asset_names.empty()) {
+    if (state.skeleton_asset_index < 0 ||
+        static_cast<size_t>(state.skeleton_asset_index) >= state.skeleton_asset_names.size()) {
+      state.skeleton_asset_index = 0;
+    }
+  } else {
+    state.skeleton_asset_index = -1;
+  }
+#endif
 }
 
 std::string unified_diff_text(const std::string& old_text,
@@ -2590,10 +2799,161 @@ void draw_inspector_panel(EditorState& state) {
     }
   }
 
-  if (auto* skeleton = registry.get_skeleton(entity)) {
-    ImGui::Separator();
-    ImGui::Text("Skeleton");
+  ImGui::Separator();
+  ImGui::Text("Skeleton");
+  auto* skeleton = registry.get_skeleton(entity);
+  if (!skeleton) {
+    if (ImGui::Button("Add Skeleton")) {
+      rkg::ecs::Skeleton fresh{};
+      rkg::ecs::Bone root{};
+      root.name = "root";
+      root.parent_index = -1;
+      fresh.bones.push_back(root);
+      registry.set_skeleton(entity, fresh);
+      skeleton = registry.get_skeleton(entity);
+      state.selected_bone = 0;
+    }
+  }
+  if (skeleton) {
     ImGui::Text("Bones: %zu", skeleton->bones.size());
+
+    if (!state.skeleton_assets_loaded) {
+      refresh_skeleton_assets(state);
+    }
+    const fs::path skel_root = skeleton_assets_root(state);
+#if !RKG_ENABLE_DATA_JSON
+    ImGui::TextUnformatted("Skeleton assets require JSON enabled.");
+#else
+    if (ImGui::Button("Reload Skeleton Assets")) {
+      refresh_skeleton_assets(state);
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(180.0f);
+    ImGui::InputText("Asset Name", state.skeleton_asset_name, sizeof(state.skeleton_asset_name));
+    ImGui::SameLine();
+    if (ImGui::Button("Save Asset")) {
+      if (state.skeleton_asset_name[0] == '\0') {
+        rkg::log::warn("skeleton save: empty name");
+      } else {
+        std::string err;
+        const fs::path out_path = skel_root / (std::string(state.skeleton_asset_name) + ".json");
+        if (!save_skeleton_asset_file(out_path, *skeleton, err)) {
+          rkg::log::warn(std::string("skeleton save failed: ") + err);
+        } else {
+          refresh_skeleton_assets(state);
+        }
+      }
+    }
+
+    if (!state.skeleton_asset_names.empty()) {
+      std::vector<const char*> labels;
+      labels.reserve(state.skeleton_asset_names.size());
+      for (const auto& name : state.skeleton_asset_names) {
+        labels.push_back(name.c_str());
+      }
+      ImGui::SetNextItemWidth(180.0f);
+      ImGui::Combo("Assets", &state.skeleton_asset_index, labels.data(),
+                   static_cast<int>(labels.size()));
+      ImGui::SameLine();
+      if (ImGui::Button("Load Asset")) {
+        if (state.skeleton_asset_index >= 0 &&
+            static_cast<size_t>(state.skeleton_asset_index) < state.skeleton_asset_names.size()) {
+          const auto& name = state.skeleton_asset_names[state.skeleton_asset_index];
+          const auto it = state.skeleton_assets.find(name);
+          if (it != state.skeleton_assets.end()) {
+            *skeleton = it->second;
+            state.selected_bone = skeleton->bones.empty() ? -1 : 0;
+            state.selected_bone_name_index = -1;
+          }
+        }
+      }
+    }
+#endif
+
+    ImGui::Separator();
+    ImGui::InputText("New Bone Name", state.new_bone_name, sizeof(state.new_bone_name));
+    const int new_parent = state.selected_bone;
+    ImGui::Text("New Bone Parent: %d", new_parent);
+    if (ImGui::Button("Add Bone")) {
+      rkg::ecs::Bone bone{};
+      bone.name = state.new_bone_name[0] != '\0' ? state.new_bone_name : "bone";
+      bone.parent_index = new_parent;
+      skeleton->bones.push_back(bone);
+      state.selected_bone = static_cast<int>(skeleton->bones.size()) - 1;
+      state.selected_bone_name_index = -1;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Delete Bone")) {
+      if (state.selected_bone >= 0 &&
+          static_cast<size_t>(state.selected_bone) < skeleton->bones.size()) {
+        const int removed = state.selected_bone;
+        const int parent = skeleton->bones[removed].parent_index;
+        skeleton->bones.erase(skeleton->bones.begin() + removed);
+        for (auto& bone : skeleton->bones) {
+          if (bone.parent_index == removed) {
+            bone.parent_index = parent;
+          } else if (bone.parent_index > removed) {
+            bone.parent_index -= 1;
+          }
+        }
+        state.selected_bone = skeleton->bones.empty() ? -1 : 0;
+        state.selected_bone_name_index = -1;
+      }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Set Root")) {
+      if (state.selected_bone >= 0 &&
+          static_cast<size_t>(state.selected_bone) < skeleton->bones.size()) {
+        skeleton->bones[state.selected_bone].parent_index = -1;
+      }
+    }
+
+    if (state.selected_bone >= 0 &&
+        static_cast<size_t>(state.selected_bone) < skeleton->bones.size()) {
+      auto& bone = skeleton->bones[state.selected_bone];
+      if (state.selected_bone != state.selected_bone_name_index) {
+        std::snprintf(state.selected_bone_name_buf, sizeof(state.selected_bone_name_buf), "%s",
+                      bone.name.c_str());
+        state.selected_bone_name_index = state.selected_bone;
+      }
+      if (ImGui::InputText("Bone Name", state.selected_bone_name_buf,
+                           sizeof(state.selected_bone_name_buf))) {
+        bone.name = state.selected_bone_name_buf;
+      }
+      int parent_index = bone.parent_index;
+      if (ImGui::InputInt("Parent Index", &parent_index)) {
+        if (parent_index < -1) parent_index = -1;
+        if (parent_index >= static_cast<int>(skeleton->bones.size())) {
+          parent_index = static_cast<int>(skeleton->bones.size()) - 1;
+        }
+        if (parent_index == state.selected_bone) {
+          parent_index = -1;
+        }
+        bone.parent_index = parent_index;
+      }
+      float pos[3] = {bone.local_pose.position[0], bone.local_pose.position[1], bone.local_pose.position[2]};
+      float rot[3] = {bone.local_pose.rotation[0], bone.local_pose.rotation[1], bone.local_pose.rotation[2]};
+      float scl[3] = {bone.local_pose.scale[0], bone.local_pose.scale[1], bone.local_pose.scale[2]};
+      if (ImGui::DragFloat3("Local Position", pos, 0.05f)) {
+        bone.local_pose.position[0] = pos[0];
+        bone.local_pose.position[1] = pos[1];
+        bone.local_pose.position[2] = pos[2];
+        std::memcpy(bone.bind_local.position, bone.local_pose.position, sizeof(bone.local_pose.position));
+      }
+      if (ImGui::DragFloat3("Local Rotation", rot, 0.05f)) {
+        bone.local_pose.rotation[0] = rot[0];
+        bone.local_pose.rotation[1] = rot[1];
+        bone.local_pose.rotation[2] = rot[2];
+        std::memcpy(bone.bind_local.rotation, bone.local_pose.rotation, sizeof(bone.local_pose.rotation));
+      }
+      if (ImGui::DragFloat3("Local Scale", scl, 0.05f)) {
+        bone.local_pose.scale[0] = scl[0];
+        bone.local_pose.scale[1] = scl[1];
+        bone.local_pose.scale[2] = scl[2];
+        std::memcpy(bone.bind_local.scale, bone.local_pose.scale, sizeof(bone.local_pose.scale));
+      }
+    }
+
     if (auto* transform = registry.get_transform(entity)) {
       rkg::ecs::compute_skeleton_world_pose(*transform, *skeleton);
       if (state.selected_bone >= 0 &&
@@ -2632,6 +2992,7 @@ void draw_inspector_panel(EditorState& state) {
                                             flags, "%s", label.c_str());
         if (ImGui::IsItemClicked()) {
           state.selected_bone = idx;
+          state.selected_bone_name_index = -1;
         }
         if (open) {
           for (const int child : children[idx]) {
