@@ -373,6 +373,8 @@ struct EditorState {
   int bone_gizmo_axis = -1;
   float bone_gizmo_start_mouse[2]{0.0f, 0.0f};
   float bone_gizmo_start_local[3]{0.0f, 0.0f, 0.0f};
+  bool skeleton_auto_scale = true;
+  float skeleton_draw_scale = 1.0f;
   bool skeleton_assets_loaded = false;
   int skeleton_asset_index = -1;
   char skeleton_asset_name[64] = "skeleton";
@@ -2621,6 +2623,11 @@ void draw_viewport(EditorState& state) {
   if (hovered && (clicked_any || held_any)) {
     state.viewport_focused = true;
   }
+  if (hovered && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
+    state.camera_distance -= io.MouseWheel * 0.4f;
+    if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
+    if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
+  }
   if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse &&
       (state.play_state != PlayState::Play || io.KeyCtrl)) {
     state.pick_requested = true;
@@ -2881,6 +2888,11 @@ void draw_inspector_panel(EditorState& state) {
 #endif
 
     ImGui::Separator();
+    ImGui::Checkbox("Auto Scale Draw", &state.skeleton_auto_scale);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::DragFloat("Draw Scale", &state.skeleton_draw_scale, 0.01f, 0.001f, 10.0f, "%.3f");
+    if (state.skeleton_draw_scale < 0.0001f) state.skeleton_draw_scale = 0.0001f;
     ImGui::InputText("New Bone Name", state.new_bone_name, sizeof(state.new_bone_name));
     const int new_parent = state.selected_bone;
     ImGui::Text("New Bone Parent: %d", new_parent);
@@ -2978,6 +2990,34 @@ void draw_inspector_panel(EditorState& state) {
                     bone.name.empty() ? "(unnamed)" : bone.name.c_str());
         ImGui::Text("World Pos: %.2f %.2f %.2f",
                     world.position[0], world.position[1], world.position[2]);
+        if (ImGui::Button("Focus Bone")) {
+          float auto_scale = 1.0f;
+          if (state.skeleton_auto_scale && !skeleton->world_pose.empty()) {
+            Vec3 minp{std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max(),
+                      std::numeric_limits<float>::max()};
+            Vec3 maxp{-std::numeric_limits<float>::max(),
+                      -std::numeric_limits<float>::max(),
+                      -std::numeric_limits<float>::max()};
+            for (const auto& pose : skeleton->world_pose) {
+              minp.x = std::min(minp.x, pose.position[0]);
+              minp.y = std::min(minp.y, pose.position[1]);
+              minp.z = std::min(minp.z, pose.position[2]);
+              maxp.x = std::max(maxp.x, pose.position[0]);
+              maxp.y = std::max(maxp.y, pose.position[1]);
+              maxp.z = std::max(maxp.z, pose.position[2]);
+            }
+            const float extent = std::max({maxp.x - minp.x, maxp.y - minp.y, maxp.z - minp.z});
+            if (extent > 10.0f) {
+              auto_scale = 0.01f;
+            }
+          }
+          const float draw_scale = auto_scale * state.skeleton_draw_scale;
+          state.editor_pivot_world[0] = world.position[0] * draw_scale;
+          state.editor_pivot_world[1] = world.position[1] * draw_scale;
+          state.editor_pivot_world[2] = world.position[2] * draw_scale;
+          state.lock_editor_pivot = true;
+        }
       }
 
       std::vector<std::vector<int>> children;
@@ -4019,16 +4059,7 @@ void update_camera_and_draw_list(EditorState& state) {
       if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
     }
   }
-  const bool mouse_in_viewport =
-      (io.MousePos.x >= state.viewport_pos[0] &&
-       io.MousePos.x <= state.viewport_pos[0] + state.viewport_size[0] &&
-       io.MousePos.y >= state.viewport_pos[1] &&
-       io.MousePos.y <= state.viewport_pos[1] + state.viewport_size[1]);
-  if (mouse_in_viewport && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
-    state.camera_distance -= io.MouseWheel * 0.4f;
-    if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
-    if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
-  }
+  // Mouse wheel zoom handled in draw_viewport() where ImGui receives wheel events.
 
   const float cy = std::cos(state.camera_yaw);
   const float sy = std::sin(state.camera_yaw);
@@ -4225,15 +4256,41 @@ void update_camera_and_draw_list(EditorState& state) {
       if (skeleton.world_pose.size() != skeleton.bones.size()) {
         continue;
       }
+      float auto_scale = 1.0f;
+      if (state.skeleton_auto_scale && !skeleton.world_pose.empty()) {
+        Vec3 minp{std::numeric_limits<float>::max(),
+                  std::numeric_limits<float>::max(),
+                  std::numeric_limits<float>::max()};
+        Vec3 maxp{-std::numeric_limits<float>::max(),
+                  -std::numeric_limits<float>::max(),
+                  -std::numeric_limits<float>::max()};
+        for (const auto& pose : skeleton.world_pose) {
+          minp.x = std::min(minp.x, pose.position[0]);
+          minp.y = std::min(minp.y, pose.position[1]);
+          minp.z = std::min(minp.z, pose.position[2]);
+          maxp.x = std::max(maxp.x, pose.position[0]);
+          maxp.y = std::max(maxp.y, pose.position[1]);
+          maxp.z = std::max(maxp.z, pose.position[2]);
+        }
+        const float extent = std::max({maxp.x - minp.x, maxp.y - minp.y, maxp.z - minp.z});
+        if (extent > 10.0f) {
+          auto_scale = 0.01f;
+        }
+      }
+      const float draw_scale = auto_scale * state.skeleton_draw_scale;
       const float joint_len = std::max(0.06f, state.camera_distance * 0.02f);
       for (size_t i = 0; i < skeleton.bones.size(); ++i) {
         const auto& bone = skeleton.bones[i];
         const auto& world = skeleton.world_pose[i];
-        const Vec3 pos{world.position[0], world.position[1], world.position[2]};
+        const Vec3 pos{world.position[0] * draw_scale,
+                       world.position[1] * draw_scale,
+                       world.position[2] * draw_scale};
         if (bone.parent_index >= 0 &&
             static_cast<size_t>(bone.parent_index) < skeleton.world_pose.size()) {
           const auto& parent_world = skeleton.world_pose[bone.parent_index];
-          const Vec3 parent_pos{parent_world.position[0], parent_world.position[1], parent_world.position[2]};
+          const Vec3 parent_pos{parent_world.position[0] * draw_scale,
+                                parent_world.position[1] * draw_scale,
+                                parent_world.position[2] * draw_scale};
           add_line(parent_pos, pos, skeleton_color);
         }
         add_line({pos.x - joint_len, pos.y, pos.z}, {pos.x + joint_len, pos.y, pos.z}, skeleton_color);
@@ -4247,7 +4304,9 @@ void update_camera_and_draw_list(EditorState& state) {
       }
 
       const auto& sel_world = skeleton.world_pose[state.selected_bone];
-      const Vec3 sel_pos{sel_world.position[0], sel_world.position[1], sel_world.position[2]};
+      const Vec3 sel_pos{sel_world.position[0] * draw_scale,
+                         sel_world.position[1] * draw_scale,
+                         sel_world.position[2] * draw_scale};
       const float gizmo_len = std::max(0.25f, state.camera_distance * 0.1f);
       const Vec3 axis_dirs[3] = {{1.0f, 0.0f, 0.0f},
                                  {0.0f, 1.0f, 0.0f},
@@ -4258,8 +4317,8 @@ void update_camera_and_draw_list(EditorState& state) {
           {0.25f, 0.45f, 0.95f, 1.0f},
       };
       for (int axis = 0; axis < 3; ++axis) {
-        const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
-        add_line(sel_pos, end, axis_colors[axis]);
+          const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
+          add_line(sel_pos, end, axis_colors[axis]);
       }
 
       if (can_gizmo && !state.bone_gizmo_active && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -4302,7 +4361,10 @@ void update_camera_and_draw_list(EditorState& state) {
                        vec3_mul(cam_up, -dy * move_scale));
           const Vec3 axis_dir = axis_dirs[state.bone_gizmo_axis];
           const float axis_component = vec3_dot(world_delta, axis_dir);
-          const Vec3 world_move = vec3_mul(axis_dir, axis_component);
+          Vec3 world_move = vec3_mul(axis_dir, axis_component);
+          if (draw_scale > 0.0001f) {
+            world_move = vec3_mul(world_move, 1.0f / draw_scale);
+          }
 
           Vec3 parent_rot{0.0f, 0.0f, 0.0f};
           const auto& bone = skeleton.bones[state.selected_bone];
