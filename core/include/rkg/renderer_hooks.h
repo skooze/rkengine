@@ -70,6 +70,15 @@ void set_vulkan_viewport_line_list(const float* positions,
                                    uint32_t line_count);
 const VulkanViewportLineList* get_vulkan_viewport_line_list();
 
+struct VulkanViewportTexturedDemo {
+  float mvp[16]{};
+  bool has_mvp = false;
+  uint64_t version = 0;
+};
+
+void set_vulkan_viewport_textured_demo_mvp(const float* mvp);
+const VulkanViewportTexturedDemo* get_vulkan_viewport_textured_demo();
+
 void set_vulkan_viewport_textured_demo_enabled(bool enabled);
 bool get_vulkan_viewport_textured_demo_enabled();
 

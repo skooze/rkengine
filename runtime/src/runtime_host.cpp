@@ -1171,6 +1171,9 @@ void RuntimeHost::load_initial_level() {
       rig_asset = asset_cache_.find(rig_env);
     }
     if (!rig_asset) {
+      rig_asset = asset_cache_.find("manny");
+    }
+    if (!rig_asset) {
       rig_asset = asset_cache_.find("testmanny");
     }
     if (!rig_asset) {

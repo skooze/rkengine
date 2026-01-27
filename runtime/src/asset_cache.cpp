@@ -1,6 +1,7 @@
 #include "rkg/asset_cache.h"
 
 #include "rkg/log.h"
+#include "rkg/asset_import.h"
 
 #if RKG_ENABLE_DATA_JSON
 #include <nlohmann/json.hpp>
@@ -245,6 +246,22 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
   if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir)) {
     error = "assets directory not found";
     return false;
+  }
+  const fs::path manny_source = content_root / "source_assets" / "manny" / "manny.glb";
+  const fs::path manny_asset_dir = assets_dir / "manny";
+  if (fs::exists(manny_source)) {
+    const fs::path manny_asset_json = manny_asset_dir / "asset.json";
+    if (!fs::exists(manny_asset_json)) {
+      rkg::asset::ImportOptions options{};
+      options.overwrite = true;
+      options.write_textures = true;
+      const auto result = rkg::asset::import_glb(manny_source, manny_asset_dir, options);
+      if (!result.ok) {
+        rkg::log::warn(std::string("asset_cache: auto-import manny failed: ") + result.error);
+      } else {
+        rkg::log::info("asset_cache: auto-imported manny.glb into content/assets/manny");
+      }
+    }
   }
   for (const auto& entry : fs::directory_iterator(assets_dir)) {
     if (!entry.is_directory()) continue;

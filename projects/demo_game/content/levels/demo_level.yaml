@@ -1,8 +1,7 @@
 name: demo_level
 entities:
-  - name: demo_cube_1
-    id: demo_cube_1
-    prefab: demo_cube
+  - name: player_spawn
+    id: player_spawn
     transform:
       position: [0.0, 0.0, 0.0]
       rotation: [0.0, 0.0, 0.0]

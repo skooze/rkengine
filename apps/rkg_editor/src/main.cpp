@@ -4099,6 +4099,79 @@ void update_camera_and_draw_list(EditorState& state) {
   rkg::set_vulkan_viewport_textured_demo_enabled(state.show_textured_demo);
   std::memcpy(state.camera_view_proj, view_proj.m, sizeof(state.camera_view_proj));
 
+  fs::path textured_asset_dir;
+  if (state.show_textured_demo && state.runtime) {
+    const fs::path assets_dir = state.runtime->raw_content_root() / "assets";
+    if (fs::exists(assets_dir) && fs::is_directory(assets_dir)) {
+      if (const char* env = std::getenv("RKG_RENDER_ASSET")) {
+        if (env[0] != '\0') {
+          const fs::path candidate = assets_dir / env;
+          if (fs::exists(candidate / "asset.json")) {
+            textured_asset_dir = candidate;
+          }
+        }
+      }
+      if (textured_asset_dir.empty()) {
+        const fs::path manny = assets_dir / "manny";
+        if (fs::exists(manny / "asset.json")) {
+          textured_asset_dir = manny;
+        }
+      }
+      if (textured_asset_dir.empty()) {
+        const fs::path testmanny = assets_dir / "testmanny";
+        if (fs::exists(testmanny / "asset.json")) {
+          textured_asset_dir = testmanny;
+        }
+      }
+      if (textured_asset_dir.empty()) {
+        std::vector<fs::path> dirs;
+        for (const auto& entry : fs::directory_iterator(assets_dir)) {
+          if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+            dirs.push_back(entry.path());
+          }
+        }
+        if (!dirs.empty()) {
+          std::sort(dirs.begin(), dirs.end(),
+                    [](const fs::path& a, const fs::path& b) { return a.filename().string() < b.filename().string(); });
+          const bool prefer_textured = std::getenv("RKG_RENDER_TEXTURED") != nullptr;
+          if (prefer_textured) {
+            for (const auto& dir : dirs) {
+              const fs::path textures = dir / "textures";
+              if (fs::exists(textures) && fs::is_directory(textures)) {
+                for (const auto& tex : fs::directory_iterator(textures)) {
+                  if (tex.is_regular_file()) {
+                    textured_asset_dir = dir;
+                    break;
+                  }
+                }
+              }
+              if (!textured_asset_dir.empty()) break;
+            }
+          }
+          if (textured_asset_dir.empty()) {
+            textured_asset_dir = dirs.front();
+          }
+        }
+      }
+    }
+  }
+  const bool textured_asset_ready = !textured_asset_dir.empty();
+  if (state.show_textured_demo && textured_asset_ready) {
+    const auto textured_target = (player != rkg::ecs::kInvalidEntity) ? player : state.selected_entity;
+    if (const auto* transform = registry.get_transform(textured_target)) {
+      const Vec3 pos = {transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+      const Vec3 scl = {transform->scale[0], transform->scale[1], transform->scale[2]};
+      const Mat4 model = mat4_mul(mat4_translation(pos), mat4_mul(mat4_rotation_xyz(rot), mat4_scale(scl)));
+      const Mat4 mvp = mat4_mul(view_proj, model);
+      rkg::set_vulkan_viewport_textured_demo_mvp(mvp.m);
+    } else {
+      rkg::set_vulkan_viewport_textured_demo_mvp(view_proj.m);
+    }
+  } else {
+    rkg::set_vulkan_viewport_textured_demo_mvp(nullptr);
+  }
+
   float line_positions[rkg::VulkanViewportLineList::kMaxLines * 6]{};
   float line_colors[rkg::VulkanViewportLineList::kMaxLines * 4]{};
   uint32_t line_count = 0;
@@ -4617,6 +4690,9 @@ void update_camera_and_draw_list(EditorState& state) {
     for (const auto entity : registry.entities()) {
       if (instance_count >= rkg::VulkanViewportDrawList::kMaxInstances) {
         break;
+      }
+      if (textured_asset_ready && state.show_textured_demo && entity == player) {
+        continue;
       }
       const auto* transform = registry.get_transform(entity);
       const auto* renderable = registry.get_renderable(entity);

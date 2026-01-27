@@ -645,6 +645,11 @@ fs::path select_asset_dir(std::string& asset_name) {
       }
     }
   }
+  fs::path manny = assets_dir / "manny";
+  if (fs::exists(manny / "asset.json")) {
+    asset_name = "manny";
+    return manny;
+  }
   fs::path testmanny = assets_dir / "testmanny";
   if (fs::exists(testmanny / "asset.json")) {
     asset_name = "testmanny";
@@ -2287,6 +2292,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     const auto* camera = rkg::get_vulkan_viewport_camera();
+    const auto* textured_demo = rkg::get_vulkan_viewport_textured_demo();
     const bool textured_enabled = rkg::get_vulkan_viewport_textured_demo_enabled();
     if (textured_enabled &&
         g_state.textured_ready &&
@@ -2322,7 +2328,9 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
         float mvp[16];
         float color[4];
       } push{};
-      if (camera) {
+      if (textured_demo && textured_demo->has_mvp) {
+        std::memcpy(push.mvp, textured_demo->mvp, sizeof(push.mvp));
+      } else if (camera) {
         std::memcpy(push.mvp, camera->view_proj, sizeof(push.mvp));
       } else {
         std::memset(push.mvp, 0, sizeof(push.mvp));
