@@ -18,6 +18,7 @@ void Registry::destroy_entity(Entity entity) {
   colliders_.erase(entity);
   character_controllers_.erase(entity);
   skeletons_.erase(entity);
+  skeleton_refs_.erase(entity);
 }
 
 void Registry::set_transform(Entity entity, const Transform& transform) {
@@ -136,6 +137,26 @@ void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton) {
 
 void Registry::remove_renderable(Entity entity) {
   renderables_.erase(entity);
+}
+
+void Registry::set_skeleton_ref(Entity entity, const SkeletonRef& ref) {
+  skeleton_refs_[entity] = ref;
+}
+
+SkeletonRef* Registry::get_skeleton_ref(Entity entity) {
+  auto it = skeleton_refs_.find(entity);
+  if (it == skeleton_refs_.end()) return nullptr;
+  return &it->second;
+}
+
+const SkeletonRef* Registry::get_skeleton_ref(Entity entity) const {
+  auto it = skeleton_refs_.find(entity);
+  if (it == skeleton_refs_.end()) return nullptr;
+  return &it->second;
+}
+
+void Registry::remove_skeleton_ref(Entity entity) {
+  skeleton_refs_.erase(entity);
 }
 
 void Registry::set_velocity(Entity entity, const Velocity& velocity) {
@@ -309,6 +330,14 @@ std::unordered_map<Entity, Skeleton>& Registry::skeletons() {
 
 const std::unordered_map<Entity, Skeleton>& Registry::skeletons() const {
   return skeletons_;
+}
+
+std::unordered_map<Entity, SkeletonRef>& Registry::skeleton_refs() {
+  return skeleton_refs_;
+}
+
+const std::unordered_map<Entity, SkeletonRef>& Registry::skeleton_refs() const {
+  return skeleton_refs_;
 }
 
 } // namespace rkg::ecs

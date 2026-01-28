@@ -81,6 +81,10 @@ struct Skeleton {
   std::vector<Transform> world_pose;
 };
 
+struct SkeletonRef {
+  std::string asset;
+};
+
 void compute_skeleton_world_pose(const Transform& root, Skeleton& skeleton);
 
 class Registry {
@@ -114,6 +118,10 @@ class Registry {
   Skeleton* get_skeleton(Entity entity);
   const Skeleton* get_skeleton(Entity entity) const;
   void remove_skeleton(Entity entity);
+  void set_skeleton_ref(Entity entity, const SkeletonRef& ref);
+  SkeletonRef* get_skeleton_ref(Entity entity);
+  const SkeletonRef* get_skeleton_ref(Entity entity) const;
+  void remove_skeleton_ref(Entity entity);
   size_t entity_count() const;
   std::vector<Entity> entities() const;
   std::unordered_map<Entity, Velocity>& velocities();
@@ -126,6 +134,8 @@ class Registry {
   const std::unordered_map<Entity, CharacterController>& character_controllers() const;
   std::unordered_map<Entity, Skeleton>& skeletons();
   const std::unordered_map<Entity, Skeleton>& skeletons() const;
+  std::unordered_map<Entity, SkeletonRef>& skeleton_refs();
+  const std::unordered_map<Entity, SkeletonRef>& skeleton_refs() const;
 
  private:
   Entity next_id_ = 1;
@@ -136,6 +146,7 @@ class Registry {
   std::unordered_map<Entity, Collider> colliders_;
   std::unordered_map<Entity, CharacterController> character_controllers_;
   std::unordered_map<Entity, Skeleton> skeletons_;
+  std::unordered_map<Entity, SkeletonRef> skeleton_refs_;
 };
 
 } // namespace rkg::ecs

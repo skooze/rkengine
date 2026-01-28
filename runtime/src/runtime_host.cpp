@@ -622,6 +622,14 @@ void apply_editor_overrides(rkg::ecs::Registry& registry,
         registry.set_renderable(entity, renderable);
       }
     }
+    if (node["skeleton_ref"] && node["skeleton_ref"].IsScalar()) {
+      const std::string ref = node["skeleton_ref"].as<std::string>();
+      if (!ref.empty()) {
+        registry.set_skeleton_ref(entity, rkg::ecs::SkeletonRef{ref});
+      } else {
+        registry.remove_skeleton_ref(entity);
+      }
+    }
   }
 #else
   (void)registry;

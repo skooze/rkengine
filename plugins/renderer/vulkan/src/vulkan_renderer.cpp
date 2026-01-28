@@ -813,6 +813,12 @@ bool load_textured_asset() {
   }
   g_state.textured_index_count = static_cast<uint32_t>(indices.size());
 
+  // Reset to a matte grey each load so assets without materials don't inherit prior state.
+  g_state.textured_base_color[0] = 0.65f;
+  g_state.textured_base_color[1] = 0.65f;
+  g_state.textured_base_color[2] = 0.65f;
+  g_state.textured_base_color[3] = 1.0f;
+
   std::string base_color_tex;
   load_materials_json(asset_dir / "materials.json", base_color_tex, g_state.textured_base_color);
 

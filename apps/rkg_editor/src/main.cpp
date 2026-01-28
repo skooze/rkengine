@@ -290,6 +290,8 @@ struct EntitySnapshot {
   rkg::ecs::Transform transform{};
   bool has_renderable = false;
   rkg::ecs::Renderable renderable{};
+  bool has_skeleton_ref = false;
+  std::string skeleton_ref;
 };
 
 struct OverridesState {
@@ -372,6 +374,9 @@ struct EditorState {
   int bone_gizmo_axis = -1;
   float bone_gizmo_start_mouse[2]{0.0f, 0.0f};
   float bone_gizmo_start_local[3]{0.0f, 0.0f, 0.0f};
+  int bone_gizmo_mode = 0; // 0=move, 1=rotate, 2=scale
+  float bone_gizmo_start_rot[3]{0.0f, 0.0f, 0.0f};
+  float bone_gizmo_start_scale[3]{1.0f, 1.0f, 1.0f};
   bool skeleton_auto_scale = true;
   float skeleton_draw_scale = 1.0f;
   bool skeleton_assets_loaded = false;
@@ -640,6 +645,25 @@ void refresh_skeleton_assets(EditorState& state) {
     state.skeleton_asset_index = -1;
   }
 #endif
+}
+
+void resolve_skeleton_asset_refs(EditorState& state) {
+  if (!state.runtime) return;
+  if (!state.skeleton_assets_loaded) {
+    refresh_skeleton_assets(state);
+  }
+  auto& registry = registry_mutable(state);
+  for (const auto& kv : registry.skeleton_refs()) {
+    const auto entity = kv.first;
+    const std::string& asset_name = kv.second.asset;
+    if (asset_name.empty()) continue;
+    const auto it = state.skeleton_assets.find(asset_name);
+    if (it == state.skeleton_assets.end()) continue;
+    const auto* current = registry.get_skeleton(entity);
+    if (!current || current->bones.size() != it->second.bones.size()) {
+      registry.set_skeleton(entity, it->second);
+    }
+  }
 }
 
 std::string unified_diff_text(const std::string& old_text,
@@ -1420,12 +1444,19 @@ EntitySnapshot snapshot_entity(const rkg::ecs::Registry& registry, rkg::ecs::Ent
     out.has_renderable = true;
     out.renderable = *renderable;
   }
+  if (const auto* skeleton_ref = registry.get_skeleton_ref(entity)) {
+    if (!skeleton_ref->asset.empty()) {
+      out.has_skeleton_ref = true;
+      out.skeleton_ref = skeleton_ref->asset;
+    }
+  }
   return out;
 }
 
 bool snapshot_equal(const EntitySnapshot& a, const EntitySnapshot& b, float eps = 0.0005f) {
   if (a.has_transform != b.has_transform) return false;
   if (a.has_renderable != b.has_renderable) return false;
+  if (a.has_skeleton_ref != b.has_skeleton_ref) return false;
   if (a.has_transform) {
     for (int i = 0; i < 3; ++i) {
       if (std::abs(a.transform.position[i] - b.transform.position[i]) > eps) return false;
@@ -1439,6 +1470,9 @@ bool snapshot_equal(const EntitySnapshot& a, const EntitySnapshot& b, float eps 
       if (std::abs(a.renderable.color[i] - b.renderable.color[i]) > eps) return false;
     }
   }
+  if (a.has_skeleton_ref) {
+    if (a.skeleton_ref != b.skeleton_ref) return false;
+  }
   return true;
 }
 
@@ -1450,6 +1484,11 @@ void apply_snapshot(rkg::ecs::Registry& registry, rkg::ecs::Entity entity, const
     registry.set_renderable(entity, snapshot.renderable);
   } else {
     registry.remove_renderable(entity);
+  }
+  if (snapshot.has_skeleton_ref) {
+    registry.set_skeleton_ref(entity, rkg::ecs::SkeletonRef{snapshot.skeleton_ref});
+  } else {
+    registry.remove_skeleton_ref(entity);
   }
 }
 
@@ -1577,6 +1616,10 @@ bool load_overrides_file(const fs::path& path,
         snapshot.renderable.color[3] = c.size() > 3 ? c[3].as<float>() : snapshot.renderable.color[3];
       }
     }
+    if (node["skeleton_ref"] && node["skeleton_ref"].IsScalar()) {
+      snapshot.has_skeleton_ref = true;
+      snapshot.skeleton_ref = node["skeleton_ref"].as<std::string>();
+    }
     out.emplace(key, snapshot);
   }
   return true;
@@ -1615,6 +1658,9 @@ bool write_overrides_file(const fs::path& path,
       out << YAML::Key << "color" << YAML::Value << YAML::Flow
           << YAML::BeginSeq << r.color[0] << r.color[1] << r.color[2] << r.color[3] << YAML::EndSeq;
       out << YAML::EndMap;
+    }
+    if (entry.second.has_skeleton_ref) {
+      out << YAML::Key << "skeleton_ref" << YAML::Value << entry.second.skeleton_ref;
     }
     out << YAML::EndMap;
   }
@@ -2816,6 +2862,7 @@ void draw_inspector_panel(EditorState& state) {
   ImGui::Separator();
   ImGui::Text("Skeleton");
   auto* skeleton = registry.get_skeleton(entity);
+  auto* skeleton_ref = registry.get_skeleton_ref(entity);
   if (!skeleton) {
     if (ImGui::Button("Add Skeleton")) {
       rkg::ecs::Skeleton fresh{};
@@ -2824,12 +2871,23 @@ void draw_inspector_panel(EditorState& state) {
       root.parent_index = -1;
       fresh.bones.push_back(root);
       registry.set_skeleton(entity, fresh);
+      registry.remove_skeleton_ref(entity);
+      skeleton_ref = nullptr;
       skeleton = registry.get_skeleton(entity);
       state.selected_bone = 0;
     }
   }
   if (skeleton) {
     ImGui::Text("Bones: %zu", skeleton->bones.size());
+    if (skeleton_ref && !skeleton_ref->asset.empty()) {
+      ImGui::Text("Skeleton Asset: %s", skeleton_ref->asset.c_str());
+      ImGui::SameLine();
+      if (ImGui::Button("Detach Asset")) {
+        registry.remove_skeleton_ref(entity);
+        skeleton_ref = nullptr;
+        mark_overrides_dirty(state);
+      }
+    }
 
     if (!state.skeleton_assets_loaded) {
       refresh_skeleton_assets(state);
@@ -2840,6 +2898,7 @@ void draw_inspector_panel(EditorState& state) {
 #else
     if (ImGui::Button("Reload Skeleton Assets")) {
       refresh_skeleton_assets(state);
+      resolve_skeleton_asset_refs(state);
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(180.0f);
@@ -2855,6 +2914,7 @@ void draw_inspector_panel(EditorState& state) {
           rkg::log::warn(std::string("skeleton save failed: ") + err);
         } else {
           refresh_skeleton_assets(state);
+          resolve_skeleton_asset_refs(state);
         }
       }
     }
@@ -2876,9 +2936,12 @@ void draw_inspector_panel(EditorState& state) {
           const auto it = state.skeleton_assets.find(name);
           if (it != state.skeleton_assets.end()) {
             *skeleton = it->second;
+            registry.set_skeleton_ref(entity, rkg::ecs::SkeletonRef{name});
+            skeleton_ref = registry.get_skeleton_ref(entity);
             state.selected_bone = skeleton->bones.empty() ? -1 : 0;
             state.selected_bone_name_index = -1;
             state.bone_gizmo_active = false;
+            mark_overrides_dirty(state);
           }
         }
       }
@@ -2886,6 +2949,12 @@ void draw_inspector_panel(EditorState& state) {
 #endif
 
     ImGui::Separator();
+    ImGui::TextUnformatted("Gizmo Mode");
+    ImGui::RadioButton("Move", &state.bone_gizmo_mode, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Rotate", &state.bone_gizmo_mode, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Scale", &state.bone_gizmo_mode, 2);
     ImGui::Checkbox("Auto Scale Draw", &state.skeleton_auto_scale);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0f);
@@ -2957,19 +3026,22 @@ void draw_inspector_panel(EditorState& state) {
       float pos[3] = {bone.local_pose.position[0], bone.local_pose.position[1], bone.local_pose.position[2]};
       float rot[3] = {bone.local_pose.rotation[0], bone.local_pose.rotation[1], bone.local_pose.rotation[2]};
       float scl[3] = {bone.local_pose.scale[0], bone.local_pose.scale[1], bone.local_pose.scale[2]};
-      if (ImGui::DragFloat3("Local Position", pos, 0.05f)) {
+      if (ImGui::InputFloat3("Local Position", pos, "%.3f",
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
         bone.local_pose.position[0] = pos[0];
         bone.local_pose.position[1] = pos[1];
         bone.local_pose.position[2] = pos[2];
         std::memcpy(bone.bind_local.position, bone.local_pose.position, sizeof(bone.local_pose.position));
       }
-      if (ImGui::DragFloat3("Local Rotation", rot, 0.05f)) {
+      if (ImGui::InputFloat3("Local Rotation", rot, "%.3f",
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
         bone.local_pose.rotation[0] = rot[0];
         bone.local_pose.rotation[1] = rot[1];
         bone.local_pose.rotation[2] = rot[2];
         std::memcpy(bone.bind_local.rotation, bone.local_pose.rotation, sizeof(bone.local_pose.rotation));
       }
-      if (ImGui::DragFloat3("Local Scale", scl, 0.05f)) {
+      if (ImGui::InputFloat3("Local Scale", scl, "%.3f",
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
         bone.local_pose.scale[0] = scl[0];
         bone.local_pose.scale[1] = scl[1];
         bone.local_pose.scale[2] = scl[2];
@@ -4244,6 +4316,7 @@ void update_camera_and_draw_list(EditorState& state) {
   const float axis_z_color[4] = {0.2f, 0.35f, 0.9f, 1.0f};
   const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
 
+  // Draw skeletons first so bones remain visible even when line capacity is limited.
   if (state.show_world_grid) {
     const float extent = state.grid_half_extent;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
@@ -4379,6 +4452,7 @@ void update_camera_and_draw_list(EditorState& state) {
                          sel_world.position[1] * draw_scale,
                          sel_world.position[2] * draw_scale};
       const float gizmo_len = std::max(0.25f, state.camera_distance * 0.1f);
+      const float handle_len = std::max(0.05f, gizmo_len * 0.15f);
       const Vec3 axis_dirs[3] = {{1.0f, 0.0f, 0.0f},
                                  {0.0f, 1.0f, 0.0f},
                                  {0.0f, 0.0f, 1.0f}};
@@ -4390,12 +4464,19 @@ void update_camera_and_draw_list(EditorState& state) {
       for (int axis = 0; axis < 3; ++axis) {
           const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
           add_line(sel_pos, end, axis_colors[axis]);
+          // Draw a small cross handle at the axis end so it is visible/clickable.
+          add_line(vec3_add(end, vec3_mul(cam_right, handle_len)),
+                   vec3_add(end, vec3_mul(cam_right, -handle_len)),
+                   axis_colors[axis]);
+          add_line(vec3_add(end, vec3_mul(cam_up, handle_len)),
+                   vec3_add(end, vec3_mul(cam_up, -handle_len)),
+                   axis_colors[axis]);
       }
 
       if (can_gizmo && !state.bone_gizmo_active && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 mouse{io.MousePos.x, io.MousePos.y};
         int best_axis = -1;
-        float best_dist = 8.0f;
+        float best_dist = 14.0f;
         for (int axis = 0; axis < 3; ++axis) {
           const Vec3 end = vec3_add(sel_pos, vec3_mul(axis_dirs[axis], gizmo_len));
           ImVec2 a, b;
@@ -4417,6 +4498,12 @@ void update_camera_and_draw_list(EditorState& state) {
           state.bone_gizmo_start_local[0] = bone.local_pose.position[0];
           state.bone_gizmo_start_local[1] = bone.local_pose.position[1];
           state.bone_gizmo_start_local[2] = bone.local_pose.position[2];
+          state.bone_gizmo_start_rot[0] = bone.local_pose.rotation[0];
+          state.bone_gizmo_start_rot[1] = bone.local_pose.rotation[1];
+          state.bone_gizmo_start_rot[2] = bone.local_pose.rotation[2];
+          state.bone_gizmo_start_scale[0] = bone.local_pose.scale[0];
+          state.bone_gizmo_start_scale[1] = bone.local_pose.scale[1];
+          state.bone_gizmo_start_scale[2] = bone.local_pose.scale[2];
         }
       }
 
@@ -4426,35 +4513,51 @@ void update_camera_and_draw_list(EditorState& state) {
         } else {
           const float dx = io.MousePos.x - state.bone_gizmo_start_mouse[0];
           const float dy = io.MousePos.y - state.bone_gizmo_start_mouse[1];
-          const float move_scale = state.camera_distance * 0.0025f;
-          const Vec3 world_delta =
-              vec3_add(vec3_mul(cam_right, dx * move_scale),
-                       vec3_mul(cam_up, -dy * move_scale));
-          const Vec3 axis_dir = axis_dirs[state.bone_gizmo_axis];
-          const float axis_component = vec3_dot(world_delta, axis_dir);
-          Vec3 world_move = vec3_mul(axis_dir, axis_component);
-          if (draw_scale > 0.0001f) {
-            world_move = vec3_mul(world_move, 1.0f / draw_scale);
-          }
-
-          Vec3 parent_rot{0.0f, 0.0f, 0.0f};
-          const auto& bone = skeleton.bones[state.selected_bone];
-          if (bone.parent_index >= 0 &&
-              static_cast<size_t>(bone.parent_index) < skeleton.world_pose.size()) {
-            const auto& parent_world = skeleton.world_pose[bone.parent_index];
-            parent_rot = {parent_world.rotation[0], parent_world.rotation[1], parent_world.rotation[2]};
-          } else {
-            parent_rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
-          }
-          const Mat4 parent_rot_m = mat4_rotation_xyz(parent_rot);
-          const Vec3 local_move = rotate_vec_transpose(parent_rot_m, world_move);
-
           auto& editable = skeleton.bones[state.selected_bone];
-          editable.local_pose.position[0] = state.bone_gizmo_start_local[0] + local_move.x;
-          editable.local_pose.position[1] = state.bone_gizmo_start_local[1] + local_move.y;
-          editable.local_pose.position[2] = state.bone_gizmo_start_local[2] + local_move.z;
-          std::memcpy(editable.bind_local.position, editable.local_pose.position,
-                      sizeof(editable.local_pose.position));
+          const int axis = state.bone_gizmo_axis;
+          if (state.bone_gizmo_mode == 0) {
+            const float move_scale = state.camera_distance * 0.0025f;
+            const Vec3 world_delta =
+                vec3_add(vec3_mul(cam_right, dx * move_scale),
+                         vec3_mul(cam_up, -dy * move_scale));
+            const Vec3 axis_dir = axis_dirs[axis];
+            const float axis_component = vec3_dot(world_delta, axis_dir);
+            Vec3 world_move = vec3_mul(axis_dir, axis_component);
+            if (draw_scale > 0.0001f) {
+              world_move = vec3_mul(world_move, 1.0f / draw_scale);
+            }
+
+            Vec3 parent_rot{0.0f, 0.0f, 0.0f};
+            if (editable.parent_index >= 0 &&
+                static_cast<size_t>(editable.parent_index) < skeleton.world_pose.size()) {
+              const auto& parent_world = skeleton.world_pose[editable.parent_index];
+              parent_rot = {parent_world.rotation[0], parent_world.rotation[1], parent_world.rotation[2]};
+            } else {
+              parent_rot = {transform->rotation[0], transform->rotation[1], transform->rotation[2]};
+            }
+            const Mat4 parent_rot_m = mat4_rotation_xyz(parent_rot);
+            const Vec3 local_move = rotate_vec_transpose(parent_rot_m, world_move);
+
+            editable.local_pose.position[0] = state.bone_gizmo_start_local[0] + local_move.x;
+            editable.local_pose.position[1] = state.bone_gizmo_start_local[1] + local_move.y;
+            editable.local_pose.position[2] = state.bone_gizmo_start_local[2] + local_move.z;
+            std::memcpy(editable.bind_local.position, editable.local_pose.position,
+                        sizeof(editable.local_pose.position));
+          } else if (state.bone_gizmo_mode == 1) {
+            const float rotate_scale = 0.01f;
+            const float delta = (dx - dy) * rotate_scale;
+            editable.local_pose.rotation[axis] = state.bone_gizmo_start_rot[axis] + delta;
+            std::memcpy(editable.bind_local.rotation, editable.local_pose.rotation,
+                        sizeof(editable.local_pose.rotation));
+          } else {
+            const float scale_scale = 0.01f;
+            const float delta = (dx - dy) * scale_scale;
+            float next = state.bone_gizmo_start_scale[axis] * (1.0f + delta);
+            if (next < 0.01f) next = 0.01f;
+            editable.local_pose.scale[axis] = next;
+            std::memcpy(editable.bind_local.scale, editable.local_pose.scale,
+                        sizeof(editable.local_pose.scale));
+          }
         }
       }
     }
@@ -4681,6 +4784,8 @@ int main(int argc, char** argv) {
     state.agent.openai_available = openai_available(state.agent.openai_error);
     state.overrides.path = runtime.project_root() / "editor_overrides.yaml";
     sync_overrides_state(state);
+    refresh_skeleton_assets(state);
+    resolve_skeleton_asset_refs(state);
 
     rkg::debug_ui::set_draw_callback(&draw_editor_ui, &state);
   } else {
@@ -4703,6 +4808,7 @@ int main(int argc, char** argv) {
       update_content_state(state);
       update_runs_browser_state(state);
       sync_overrides_state(state);
+      resolve_skeleton_asset_refs(state);
       update_camera_and_draw_list(state);
 
       if (state.stop_requested) {
