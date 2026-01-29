@@ -9,6 +9,7 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 - M1 complete (Phase 1 done, offline import).
 - M2 complete (Phase 2A done, runtime CPU‑side load + logs).
 - M3 complete (Phase 2B done, textured static mesh demo validated).
+- M4 complete (Phase 3 done, skeleton authoring + reload verified).
 
 ## Milestones (each with outcome, acceptance criteria, demo, phases)
 ### M1 — Import Foundation (Decisions + GLB Import)
@@ -43,7 +44,7 @@ This roadmap is the story from **AI‑first game creation** to fully rigged, tex
 - **Acceptance criteria**:
   - Bone lines drawn for a rigged asset **or** an authored skeleton.
   - Editor can create bones, set parent/root, edit local pose, and **persist** the skeleton to content.
-- **Demo**: Editor shows skeleton debug view and authored skeleton saved/loaded.
+- **Demo**: Editor shows skeleton debug view and authored skeleton saved/loaded; runtime log confirms Manny skeleton attached.
 
 ### M5 — GPU Skinning
 - **Outcome**: Skinned mesh deformation in Vulkan.

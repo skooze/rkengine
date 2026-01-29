@@ -287,6 +287,8 @@ void write_asset_json(const fs::path& path,
   if (mesh.has_normals) writer.value("NORMAL");
   if (mesh.has_uv0) writer.value("TEXCOORD_0");
   if (mesh.has_tangents) writer.value("TANGENT");
+  if (mesh.has_joints) writer.value("JOINTS_0");
+  if (mesh.has_weights) writer.value("WEIGHTS_0");
   writer.end_array();
   writer.key("exported_primitives");
   writer.value(static_cast<uint64_t>(exported_primitives));

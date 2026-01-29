@@ -418,7 +418,10 @@
 **testmanny validation steps**:
  - Bone lines match expected hierarchy **or** authored skeleton lines visible.
 **Stop point**:
-- Stop after visual verification.
+- Stop after visual verification and reload confirmation.
+**Phase 3 Notes (as-built)**:
+- Manny skeleton saved and reloaded successfully; runtime log shows `attached skeleton from asset manny joints=24`.
+- Author confirms bones are visible in editor on GPU machine.
 **Next Phase Preview**:
 - Phase 4: GPU skinning.
 **Risks/edge cases**:
@@ -623,7 +626,7 @@
 - Phase 1: ☑
 - Phase 2A: ☑
 - Phase 2B: ☑
-- Phase 3: ☐
+- Phase 3: ☑
 - Phase 4: ☐
 - Phase 5: ☐
 - Phase 6: ☐
