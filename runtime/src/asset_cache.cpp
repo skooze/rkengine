@@ -252,7 +252,12 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
   }
   fs::path manny_source;
   if (const char* home = std::getenv("HOME")) {
-    manny_source = fs::path(home) / "rkg" / "NECESSARY TRANSFERS" / "manny mesh glb" / "testmanny.glb";
+    manny_source = fs::path(home) / "rkg" / "NecTr" / "AI_GUARD_1" / "AI_GUARD_1_Character_output.glb";
+  }
+  if (manny_source.empty() || !fs::exists(manny_source)) {
+    if (const char* home = std::getenv("HOME")) {
+      manny_source = fs::path(home) / "rkg" / "NECESSARY TRANSFERS" / "manny mesh glb" / "testmanny.glb";
+    }
   }
   if (manny_source.empty() || !fs::exists(manny_source)) {
     manny_source = content_root / "source_assets" / "manny" / "manny.glb";
