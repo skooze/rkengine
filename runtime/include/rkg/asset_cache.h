@@ -16,6 +16,8 @@ struct MeshInfo {
   bool has_normals = false;
   bool has_uv0 = false;
   bool has_tangents = false;
+  bool has_joints = false;
+  bool has_weights = false;
 };
 
 struct MaterialInfo {

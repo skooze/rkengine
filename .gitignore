@@ -18,5 +18,6 @@ compile_commands.json
 *.pyc
 __pycache__/
 test_sandbox/
+NECESSARY TRANSFERS/
 projects/demo_game/content/assets/fixture/
 projects/demo_game/content/assets/testmanny/

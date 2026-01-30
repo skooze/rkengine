@@ -9,6 +9,7 @@
 
 #include <fstream>
 #include <cstring>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 
@@ -47,7 +48,7 @@ bool load_mesh_bin(const fs::path& path, MeshInfo& out, std::string& error) {
   const uint32_t* header = reinterpret_cast<const uint32_t*>(bytes.data());
   const uint32_t magic = header[0];
   const uint32_t version = header[1];
-  if (magic != 0x30474B52 || version != 1) {
+  if (magic != 0x30474B52 || (version != 1 && version != 2)) {
     error = "mesh.bin header invalid";
     return false;
   }
@@ -57,6 +58,8 @@ bool load_mesh_bin(const fs::path& path, MeshInfo& out, std::string& error) {
   out.has_normals = (flags & 1u) != 0;
   out.has_uv0 = (flags & 2u) != 0;
   out.has_tangents = (flags & 4u) != 0;
+  out.has_joints = (flags & 8u) != 0;
+  out.has_weights = (flags & 16u) != 0;
   return true;
 }
 
@@ -247,7 +250,13 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
     error = "assets directory not found";
     return false;
   }
-  const fs::path manny_source = content_root / "source_assets" / "manny" / "manny.glb";
+  fs::path manny_source;
+  if (const char* home = std::getenv("HOME")) {
+    manny_source = fs::path(home) / "rkg" / "NECESSARY TRANSFERS" / "manny mesh glb" / "testmanny.glb";
+  }
+  if (manny_source.empty() || !fs::exists(manny_source)) {
+    manny_source = content_root / "source_assets" / "manny" / "manny.glb";
+  }
   const fs::path manny_asset_dir = assets_dir / "manny";
   if (fs::exists(manny_source)) {
     const fs::path manny_asset_json = manny_asset_dir / "asset.json";

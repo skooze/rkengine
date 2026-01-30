@@ -1523,6 +1523,24 @@ int main(int argc, char** argv) {
       ++failures;
     }
   }
+
+  // Test: skinned mesh shader assets exist (Phase 4).
+  {
+    const fs::path shader_dir = paths.root / "plugins" / "renderer" / "vulkan" / "shaders";
+    const fs::path vert_src = shader_dir / "mesh_skinned.vert";
+    const fs::path frag_src = shader_dir / "mesh_skinned.frag";
+    const fs::path vert_spv = shader_dir / "mesh_skinned.vert.spv";
+    const fs::path frag_spv = shader_dir / "mesh_skinned.frag.spv";
+
+    if (!fs::exists(vert_src) || !fs::exists(frag_src)) {
+      std::cerr << "skinned shader sources missing\n";
+      ++failures;
+    }
+    if (!fs::exists(vert_spv) || !fs::exists(frag_spv)) {
+      std::cerr << "skinned shader SPIR-V missing\n";
+      ++failures;
+    }
+  }
 #endif
 
   rkg::log::shutdown();

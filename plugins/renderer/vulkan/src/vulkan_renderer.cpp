@@ -3,6 +3,7 @@
 #include "rkg/plugin_api.h"
 #include "rkg/renderer_hooks.h"
 #include "rkg/paths.h"
+#include "rkg/math.h"
 #include "rkg_platform/platform.h"
 #include "stb_image.h"
 
@@ -14,9 +15,11 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -107,6 +110,22 @@ struct VulkanState {
   VkSampler textured_sampler = VK_NULL_HANDLE;
   std::string textured_asset_name{};
   bool textured_ready = false;
+
+  // Phase 4: skinned mesh demo resources.
+  VkPipeline skinned_pipeline = VK_NULL_HANDLE;
+  VkPipelineLayout skinned_pipeline_layout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout skinned_desc_layout = VK_NULL_HANDLE;
+  VkDescriptorPool skinned_desc_pool = VK_NULL_HANDLE;
+  VkDescriptorSet skinned_desc_set = VK_NULL_HANDLE;
+  VkBuffer skinned_vertex_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory skinned_vertex_memory = VK_NULL_HANDLE;
+  VkBuffer skinned_index_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory skinned_index_memory = VK_NULL_HANDLE;
+  VkBuffer skinned_joint_buffer = VK_NULL_HANDLE;
+  VkDeviceMemory skinned_joint_memory = VK_NULL_HANDLE;
+  uint32_t skinned_index_count = 0;
+  uint32_t skinned_joint_count = 0;
+  bool skinned_ready = false;
 };
 
 VulkanState g_state{};
@@ -154,6 +173,7 @@ bool create_viewport_pipeline();
 bool create_viewport_line_pipeline();
 bool create_viewport_vertex_buffer();
 bool create_textured_pipeline();
+bool create_skinned_pipeline();
 bool load_textured_asset();
 bool create_swapchain();
 bool create_render_pass();
@@ -414,6 +434,13 @@ uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties
 struct TexturedVertex {
   float pos[3];
   float uv[2];
+};
+
+struct SkinnedVertex {
+  float pos[3];
+  float uv[2];
+  uint16_t joints[4];
+  float weights[4];
 };
 
 bool read_file_bytes(const fs::path& path, std::vector<uint8_t>& out) {
@@ -682,66 +709,258 @@ fs::path select_asset_dir(std::string& asset_name) {
   return dirs.front();
 }
 
-bool load_mesh_bin(const fs::path& path,
-                   std::vector<TexturedVertex>& vertices,
-                   std::vector<uint32_t>& indices,
-                   bool& has_uv) {
+struct MeshBinRaw {
+  uint32_t vertex_count = 0;
+  uint32_t index_count = 0;
+  bool has_normals = false;
+  bool has_uv0 = false;
+  bool has_tangents = false;
+  bool has_joints = false;
+  bool has_weights = false;
+  std::vector<float> positions;
+  std::vector<float> uvs;
+  std::vector<uint16_t> joints;
+  std::vector<float> weights;
+  std::vector<uint32_t> indices;
+};
+
+bool load_mesh_bin_raw(const fs::path& path, MeshBinRaw& out) {
   std::vector<uint8_t> bytes;
   if (!read_file_bytes(path, bytes)) return false;
   if (bytes.size() < sizeof(uint32_t) * 5) return false;
   const uint32_t* header = reinterpret_cast<const uint32_t*>(bytes.data());
   const uint32_t magic = header[0];
   const uint32_t version = header[1];
-  if (magic != 0x30474B52 || version != 1) return false;
-  const uint32_t vertex_count = header[2];
-  const uint32_t index_count = header[3];
+  if (magic != 0x30474B52 || (version != 1 && version != 2)) return false;
+  out.vertex_count = header[2];
+  out.index_count = header[3];
   const uint32_t flags = header[4];
-  const bool has_normals = (flags & 1u) != 0;
-  has_uv = (flags & 2u) != 0;
-  const bool has_tangents = (flags & 4u) != 0;
+  out.has_normals = (flags & 1u) != 0;
+  out.has_uv0 = (flags & 2u) != 0;
+  out.has_tangents = (flags & 4u) != 0;
+  out.has_joints = (flags & 8u) != 0;
+  out.has_weights = (flags & 16u) != 0;
 
   size_t offset = sizeof(uint32_t) * 5;
-  const size_t pos_bytes = static_cast<size_t>(vertex_count) * 3 * sizeof(float);
+  const size_t pos_bytes = static_cast<size_t>(out.vertex_count) * 3 * sizeof(float);
   if (bytes.size() < offset + pos_bytes) return false;
-  const float* pos_ptr = reinterpret_cast<const float*>(bytes.data() + offset);
+  out.positions.resize(out.vertex_count * 3);
+  std::memcpy(out.positions.data(), bytes.data() + offset, pos_bytes);
   offset += pos_bytes;
 
-  if (has_normals) {
-    const size_t norm_bytes = static_cast<size_t>(vertex_count) * 3 * sizeof(float);
+  if (out.has_normals) {
+    const size_t norm_bytes = static_cast<size_t>(out.vertex_count) * 3 * sizeof(float);
     if (bytes.size() < offset + norm_bytes) return false;
     offset += norm_bytes;
   }
-  const float* uv_ptr = nullptr;
-  if (has_uv) {
-    const size_t uv_bytes = static_cast<size_t>(vertex_count) * 2 * sizeof(float);
+  if (out.has_uv0) {
+    const size_t uv_bytes = static_cast<size_t>(out.vertex_count) * 2 * sizeof(float);
     if (bytes.size() < offset + uv_bytes) return false;
-    uv_ptr = reinterpret_cast<const float*>(bytes.data() + offset);
+    out.uvs.resize(out.vertex_count * 2);
+    std::memcpy(out.uvs.data(), bytes.data() + offset, uv_bytes);
     offset += uv_bytes;
   }
-  if (has_tangents) {
-    const size_t tan_bytes = static_cast<size_t>(vertex_count) * 4 * sizeof(float);
+  if (out.has_tangents) {
+    const size_t tan_bytes = static_cast<size_t>(out.vertex_count) * 4 * sizeof(float);
     if (bytes.size() < offset + tan_bytes) return false;
     offset += tan_bytes;
   }
-  const size_t idx_bytes = static_cast<size_t>(index_count) * sizeof(uint32_t);
-  if (bytes.size() < offset + idx_bytes) return false;
-  const uint32_t* idx_ptr = reinterpret_cast<const uint32_t*>(bytes.data() + offset);
+  if (out.has_joints) {
+    const size_t joint_bytes = static_cast<size_t>(out.vertex_count) * 4 * sizeof(uint16_t);
+    if (bytes.size() < offset + joint_bytes) return false;
+    out.joints.resize(out.vertex_count * 4);
+    std::memcpy(out.joints.data(), bytes.data() + offset, joint_bytes);
+    offset += joint_bytes;
+  }
+  if (out.has_weights) {
+    const size_t weight_bytes = static_cast<size_t>(out.vertex_count) * 4 * sizeof(float);
+    if (bytes.size() < offset + weight_bytes) return false;
+    out.weights.resize(out.vertex_count * 4);
+    std::memcpy(out.weights.data(), bytes.data() + offset, weight_bytes);
+    offset += weight_bytes;
+  }
 
-  vertices.resize(vertex_count);
-  for (uint32_t i = 0; i < vertex_count; ++i) {
-    vertices[i].pos[0] = pos_ptr[i * 3 + 0];
-    vertices[i].pos[1] = pos_ptr[i * 3 + 1];
-    vertices[i].pos[2] = pos_ptr[i * 3 + 2];
-    if (uv_ptr) {
-      vertices[i].uv[0] = uv_ptr[i * 2 + 0];
-      vertices[i].uv[1] = uv_ptr[i * 2 + 1];
+  const size_t idx_bytes = static_cast<size_t>(out.index_count) * sizeof(uint32_t);
+  if (bytes.size() < offset + idx_bytes) return false;
+  out.indices.resize(out.index_count);
+  std::memcpy(out.indices.data(), bytes.data() + offset, idx_bytes);
+  return true;
+}
+
+bool load_mesh_bin_textured(const fs::path& path,
+                            std::vector<TexturedVertex>& vertices,
+                            std::vector<uint32_t>& indices,
+                            bool& has_uv) {
+  MeshBinRaw raw;
+  if (!load_mesh_bin_raw(path, raw)) return false;
+  has_uv = raw.has_uv0;
+  vertices.resize(raw.vertex_count);
+  for (uint32_t i = 0; i < raw.vertex_count; ++i) {
+    vertices[i].pos[0] = raw.positions[i * 3 + 0];
+    vertices[i].pos[1] = raw.positions[i * 3 + 1];
+    vertices[i].pos[2] = raw.positions[i * 3 + 2];
+    if (raw.has_uv0 && raw.uvs.size() >= (i * 2 + 2)) {
+      vertices[i].uv[0] = raw.uvs[i * 2 + 0];
+      vertices[i].uv[1] = raw.uvs[i * 2 + 1];
     } else {
       vertices[i].uv[0] = 0.0f;
       vertices[i].uv[1] = 0.0f;
     }
   }
-  indices.assign(idx_ptr, idx_ptr + index_count);
+  indices = std::move(raw.indices);
   return true;
+}
+
+bool load_mesh_bin_skinned(const fs::path& path,
+                           std::vector<SkinnedVertex>& vertices,
+                           std::vector<uint32_t>& indices,
+                           bool& has_uv) {
+  MeshBinRaw raw;
+  if (!load_mesh_bin_raw(path, raw)) return false;
+  if (!raw.has_joints || !raw.has_weights) return false;
+  has_uv = raw.has_uv0;
+  vertices.resize(raw.vertex_count);
+  for (uint32_t i = 0; i < raw.vertex_count; ++i) {
+    vertices[i].pos[0] = raw.positions[i * 3 + 0];
+    vertices[i].pos[1] = raw.positions[i * 3 + 1];
+    vertices[i].pos[2] = raw.positions[i * 3 + 2];
+    if (raw.has_uv0 && raw.uvs.size() >= (i * 2 + 2)) {
+      vertices[i].uv[0] = raw.uvs[i * 2 + 0];
+      vertices[i].uv[1] = raw.uvs[i * 2 + 1];
+    } else {
+      vertices[i].uv[0] = 0.0f;
+      vertices[i].uv[1] = 0.0f;
+    }
+    vertices[i].joints[0] = raw.joints[i * 4 + 0];
+    vertices[i].joints[1] = raw.joints[i * 4 + 1];
+    vertices[i].joints[2] = raw.joints[i * 4 + 2];
+    vertices[i].joints[3] = raw.joints[i * 4 + 3];
+    vertices[i].weights[0] = raw.weights[i * 4 + 0];
+    vertices[i].weights[1] = raw.weights[i * 4 + 1];
+    vertices[i].weights[2] = raw.weights[i * 4 + 2];
+    vertices[i].weights[3] = raw.weights[i * 4 + 3];
+  }
+  indices = std::move(raw.indices);
+  return true;
+}
+
+struct BonePose {
+  int parent = -1;
+  float pos[3]{0.0f, 0.0f, 0.0f};
+  float rot[3]{0.0f, 0.0f, 0.0f};
+  float scale[3]{1.0f, 1.0f, 1.0f};
+};
+
+struct SkeletonAsset {
+  std::vector<BonePose> bones;
+  std::vector<rkg::Mat4> inverse_bind;
+};
+
+#if RKG_ENABLE_DATA_JSON
+using json = nlohmann::json;
+
+bool read_vec3(const json& arr, float out[3]) {
+  if (!arr.is_array() || arr.size() < 3) return false;
+  out[0] = arr[0].get<float>();
+  out[1] = arr[1].get<float>();
+  out[2] = arr[2].get<float>();
+  return true;
+}
+
+bool load_skeleton_json(const fs::path& path, SkeletonAsset& out) {
+  std::ifstream in(path);
+  if (!in) return false;
+  json doc;
+  try {
+    in >> doc;
+  } catch (...) {
+    return false;
+  }
+  const auto bones = doc.value("bones", json::array());
+  if (!bones.is_array()) return false;
+  out.bones.clear();
+  out.bones.reserve(bones.size());
+  for (const auto& entry : bones) {
+    if (!entry.is_object()) continue;
+    BonePose bone{};
+    bone.parent = entry.value("parent", -1);
+    if (entry.contains("local_pose")) {
+      const auto& pose = entry["local_pose"];
+      if (pose.contains("position")) read_vec3(pose["position"], bone.pos);
+      if (pose.contains("rotation")) read_vec3(pose["rotation"], bone.rot);
+      if (pose.contains("scale")) read_vec3(pose["scale"], bone.scale);
+    } else if (entry.contains("bind_local")) {
+      const auto& bind = entry["bind_local"];
+      if (bind.contains("position")) read_vec3(bind["position"], bone.pos);
+      if (bind.contains("rotation")) read_vec3(bind["rotation"], bone.rot);
+      if (bind.contains("scale")) read_vec3(bind["scale"], bone.scale);
+    }
+    out.bones.push_back(bone);
+  }
+  return !out.bones.empty();
+}
+#endif
+
+bool load_skin_bin(const fs::path& path, SkeletonAsset& out) {
+  std::vector<uint8_t> bytes;
+  if (!read_file_bytes(path, bytes)) return false;
+  if (bytes.size() < sizeof(uint32_t) * 4) return false;
+  const uint32_t* header = reinterpret_cast<const uint32_t*>(bytes.data());
+  const uint32_t magic = header[0];
+  const uint32_t version = header[1];
+  const uint32_t joint_count = header[2];
+  if (magic != 0x4E494B53 || version != 1) return false;
+  const size_t matrix_bytes = static_cast<size_t>(joint_count) * 16 * sizeof(float);
+  const size_t offset = sizeof(uint32_t) * 4;
+  if (bytes.size() < offset + matrix_bytes) return false;
+  out.inverse_bind.resize(joint_count);
+  const float* mats = reinterpret_cast<const float*>(bytes.data() + offset);
+  for (uint32_t i = 0; i < joint_count; ++i) {
+    rkg::Mat4 m{};
+    std::memcpy(m.m, mats + i * 16, sizeof(float) * 16);
+    out.inverse_bind[i] = m;
+  }
+  return true;
+}
+
+void compute_skin_matrices(const SkeletonAsset& skel, std::vector<rkg::Mat4>& out) {
+  const size_t joint_count = skel.bones.size();
+  out.resize(joint_count);
+  std::vector<rkg::Mat4> world(joint_count, rkg::mat4_identity());
+  std::vector<uint8_t> visited(joint_count, 0);
+
+  auto build_local = [](const BonePose& bone) {
+    const rkg::Vec3 t{bone.pos[0], bone.pos[1], bone.pos[2]};
+    const rkg::Vec3 r{bone.rot[0], bone.rot[1], bone.rot[2]};
+    const rkg::Vec3 s{bone.scale[0], bone.scale[1], bone.scale[2]};
+    return rkg::mat4_mul(rkg::mat4_translation(t),
+                         rkg::mat4_mul(rkg::mat4_rotation_xyz(r), rkg::mat4_scale(s)));
+  };
+
+  std::function<rkg::Mat4(size_t)> compute_world = [&](size_t idx) -> rkg::Mat4 {
+    if (idx >= joint_count) return rkg::mat4_identity();
+    if (visited[idx]) return world[idx];
+    visited[idx] = 1;
+    const BonePose& bone = skel.bones[idx];
+    rkg::Mat4 local = build_local(bone);
+    if (bone.parent >= 0 && static_cast<size_t>(bone.parent) < joint_count) {
+      rkg::Mat4 parent_world = compute_world(static_cast<size_t>(bone.parent));
+      world[idx] = rkg::mat4_mul(parent_world, local);
+    } else {
+      world[idx] = local;
+    }
+    return world[idx];
+  };
+
+  for (size_t i = 0; i < joint_count; ++i) {
+    compute_world(i);
+  }
+
+  for (size_t i = 0; i < joint_count; ++i) {
+    rkg::Mat4 inv = rkg::mat4_identity();
+    if (i < skel.inverse_bind.size()) inv = skel.inverse_bind[i];
+    out[i] = rkg::mat4_mul(world[i], inv);
+  }
 }
 
 bool load_materials_json(const fs::path& path,
@@ -793,7 +1012,7 @@ bool load_textured_asset() {
   std::vector<TexturedVertex> vertices;
   std::vector<uint32_t> indices;
   bool has_uv = false;
-  if (!load_mesh_bin(asset_dir / "mesh.bin", vertices, indices, has_uv)) {
+  if (!load_mesh_bin_textured(asset_dir / "mesh.bin", vertices, indices, has_uv)) {
     rkg::log::warn("renderer:vulkan textured demo: failed to load mesh.bin");
     return false;
   }
@@ -910,6 +1129,127 @@ bool load_textured_asset() {
   write.pImageInfo = &image_info;
   vkUpdateDescriptorSets(g_state.device, 1, &write, 0, nullptr);
 
+  g_state.skinned_ready = false;
+  g_state.skinned_index_count = 0;
+  g_state.skinned_joint_count = 0;
+
+  std::vector<SkinnedVertex> skinned_vertices;
+  std::vector<uint32_t> skinned_indices;
+  bool skinned_has_uv = false;
+  if (load_mesh_bin_skinned(asset_dir / "mesh.bin", skinned_vertices, skinned_indices, skinned_has_uv)) {
+    SkeletonAsset skeleton{};
+#if RKG_ENABLE_DATA_JSON
+    const bool skel_ok = load_skeleton_json(asset_dir / "skeleton.json", skeleton);
+#else
+    const bool skel_ok = false;
+#endif
+    const bool skin_ok = load_skin_bin(asset_dir / "skin.bin", skeleton);
+    if (skel_ok && skin_ok && !skeleton.bones.empty()) {
+      std::vector<rkg::Mat4> joint_mats;
+      compute_skin_matrices(skeleton, joint_mats);
+      if (!joint_mats.empty()) {
+        if (!create_host_buffer(skinned_vertices.data(), skinned_vertices.size() * sizeof(SkinnedVertex),
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, g_state.skinned_vertex_buffer,
+                                g_state.skinned_vertex_memory)) {
+          rkg::log::warn("renderer:vulkan skinned demo: vertex buffer create failed");
+          return false;
+        }
+        if (!create_host_buffer(skinned_indices.data(), skinned_indices.size() * sizeof(uint32_t),
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT, g_state.skinned_index_buffer,
+                                g_state.skinned_index_memory)) {
+          rkg::log::warn("renderer:vulkan skinned demo: index buffer create failed");
+          return false;
+        }
+        if (!create_host_buffer(joint_mats.data(), joint_mats.size() * sizeof(rkg::Mat4),
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, g_state.skinned_joint_buffer,
+                                g_state.skinned_joint_memory)) {
+          rkg::log::warn("renderer:vulkan skinned demo: joint buffer create failed");
+          return false;
+        }
+        g_state.skinned_index_count = static_cast<uint32_t>(skinned_indices.size());
+        g_state.skinned_joint_count = static_cast<uint32_t>(joint_mats.size());
+
+        if (g_state.skinned_desc_layout == VK_NULL_HANDLE) {
+          VkDescriptorSetLayoutBinding bindings[2]{};
+          bindings[0].binding = 0;
+          bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+          bindings[0].descriptorCount = 1;
+          bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+          bindings[1].binding = 1;
+          bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+          bindings[1].descriptorCount = 1;
+          bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+          VkDescriptorSetLayoutCreateInfo layout_info{};
+          layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+          layout_info.bindingCount = 2;
+          layout_info.pBindings = bindings;
+          if (vkCreateDescriptorSetLayout(g_state.device, &layout_info, nullptr,
+                                          &g_state.skinned_desc_layout) != VK_SUCCESS) {
+            rkg::log::warn("renderer:vulkan skinned demo: descriptor layout create failed");
+            return false;
+          }
+        }
+
+        if (g_state.skinned_desc_pool == VK_NULL_HANDLE) {
+          VkDescriptorPoolSize pool_sizes[2]{};
+          pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+          pool_sizes[0].descriptorCount = 1;
+          pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+          pool_sizes[1].descriptorCount = 1;
+          VkDescriptorPoolCreateInfo pool_info{};
+          pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+          pool_info.poolSizeCount = 2;
+          pool_info.pPoolSizes = pool_sizes;
+          pool_info.maxSets = 1;
+          if (vkCreateDescriptorPool(g_state.device, &pool_info, nullptr, &g_state.skinned_desc_pool) != VK_SUCCESS) {
+            rkg::log::warn("renderer:vulkan skinned demo: descriptor pool create failed");
+            return false;
+          }
+        }
+
+        if (g_state.skinned_desc_set == VK_NULL_HANDLE) {
+          VkDescriptorSetAllocateInfo alloc_info{};
+          alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+          alloc_info.descriptorPool = g_state.skinned_desc_pool;
+          alloc_info.descriptorSetCount = 1;
+          alloc_info.pSetLayouts = &g_state.skinned_desc_layout;
+          if (vkAllocateDescriptorSets(g_state.device, &alloc_info, &g_state.skinned_desc_set) != VK_SUCCESS) {
+            rkg::log::warn("renderer:vulkan skinned demo: descriptor set alloc failed");
+            return false;
+          }
+        }
+
+        VkDescriptorImageInfo image_info{};
+        image_info.sampler = g_state.textured_sampler;
+        image_info.imageView = g_state.textured_image_view;
+        image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        VkDescriptorBufferInfo buffer_info{};
+        buffer_info.buffer = g_state.skinned_joint_buffer;
+        buffer_info.offset = 0;
+        buffer_info.range = joint_mats.size() * sizeof(rkg::Mat4);
+
+        VkWriteDescriptorSet writes[2]{};
+        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet = g_state.skinned_desc_set;
+        writes[0].dstBinding = 0;
+        writes[0].descriptorCount = 1;
+        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[0].pImageInfo = &image_info;
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[1].dstSet = g_state.skinned_desc_set;
+        writes[1].dstBinding = 1;
+        writes[1].descriptorCount = 1;
+        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[1].pBufferInfo = &buffer_info;
+        vkUpdateDescriptorSets(g_state.device, 2, writes, 0, nullptr);
+
+        g_state.skinned_ready = true;
+        rkg::log::info("renderer:vulkan skinned demo: joints=" +
+                       std::to_string(g_state.skinned_joint_count));
+      }
+    }
+  }
+
   g_state.textured_ready = true;
   rkg::log::info("renderer:vulkan textured demo: using asset " + g_state.textured_asset_name);
   return true;
@@ -919,6 +1259,10 @@ void destroy_offscreen() {
   if (g_state.textured_pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(g_state.device, g_state.textured_pipeline, nullptr);
     g_state.textured_pipeline = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_pipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.skinned_pipeline, nullptr);
+    g_state.skinned_pipeline = VK_NULL_HANDLE;
   }
   if (g_state.viewport_pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(g_state.device, g_state.viewport_pipeline, nullptr);
@@ -1199,6 +1543,11 @@ bool create_offscreen(uint32_t width, uint32_t height) {
   if (g_state.textured_ready) {
     if (!create_textured_pipeline()) {
       rkg::log::warn("textured pipeline setup failed");
+    }
+  }
+  if (g_state.skinned_ready) {
+    if (!create_skinned_pipeline()) {
+      rkg::log::warn("skinned pipeline setup failed");
     }
   }
 
@@ -1662,6 +2011,159 @@ bool create_textured_pipeline() {
   vkDestroyShaderModule(g_state.device, frag, nullptr);
   if (result != VK_SUCCESS) {
     rkg::log::error("textured pipeline creation failed");
+    return false;
+  }
+  return true;
+}
+
+bool create_skinned_pipeline() {
+  if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
+  if (g_state.skinned_pipeline != VK_NULL_HANDLE) return true;
+
+  if (g_state.skinned_desc_layout == VK_NULL_HANDLE) {
+    rkg::log::error("skinned pipeline descriptor layout missing");
+    return false;
+  }
+
+  if (g_state.skinned_pipeline_layout == VK_NULL_HANDLE) {
+    VkPushConstantRange push_range{};
+    push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    push_range.offset = 0;
+    push_range.size = sizeof(float) * 20;
+    VkPipelineLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &g_state.skinned_desc_layout;
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &push_range;
+    if (vkCreatePipelineLayout(g_state.device, &layout_info, nullptr,
+                               &g_state.skinned_pipeline_layout) != VK_SUCCESS) {
+      rkg::log::error("skinned pipeline layout creation failed");
+      return false;
+    }
+  }
+
+  const fs::path shader_dir = rkg::resolve_paths(nullptr, std::nullopt, "demo_game").root /
+                              "plugins/renderer/vulkan/shaders";
+  VkShaderModule vert = create_shader_module_from_file(shader_dir / "mesh_skinned.vert.spv");
+  VkShaderModule frag = create_shader_module_from_file(shader_dir / "mesh_skinned.frag.spv");
+  if (vert == VK_NULL_HANDLE || frag == VK_NULL_HANDLE) {
+    rkg::log::error("skinned shader module creation failed");
+    if (vert != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, vert, nullptr);
+    if (frag != VK_NULL_HANDLE) vkDestroyShaderModule(g_state.device, frag, nullptr);
+    return false;
+  }
+
+  VkPipelineShaderStageCreateInfo stages[2]{};
+  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = vert;
+  stages[0].pName = "main";
+  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = frag;
+  stages[1].pName = "main";
+
+  VkVertexInputBindingDescription binding{};
+  binding.binding = 0;
+  binding.stride = sizeof(SkinnedVertex);
+  binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  VkVertexInputAttributeDescription attrs[4]{};
+  attrs[0].binding = 0;
+  attrs[0].location = 0;
+  attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attrs[0].offset = offsetof(SkinnedVertex, pos);
+  attrs[1].binding = 0;
+  attrs[1].location = 1;
+  attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+  attrs[1].offset = offsetof(SkinnedVertex, uv);
+  attrs[2].binding = 0;
+  attrs[2].location = 2;
+  attrs[2].format = VK_FORMAT_R16G16B16A16_UINT;
+  attrs[2].offset = offsetof(SkinnedVertex, joints);
+  attrs[3].binding = 0;
+  attrs[3].location = 3;
+  attrs[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  attrs[3].offset = offsetof(SkinnedVertex, weights);
+
+  VkPipelineVertexInputStateCreateInfo vertex_input{};
+  vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_input.vertexBindingDescriptionCount = 1;
+  vertex_input.pVertexBindingDescriptions = &binding;
+  vertex_input.vertexAttributeDescriptionCount = 4;
+  vertex_input.pVertexAttributeDescriptions = attrs;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+  input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly.primitiveRestartEnable = VK_FALSE;
+
+  VkPipelineViewportStateCreateInfo viewport_state{};
+  viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewport_state.viewportCount = 1;
+  viewport_state.scissorCount = 1;
+
+  VkPipelineRasterizationStateCreateInfo raster{};
+  raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  raster.depthClampEnable = VK_FALSE;
+  raster.rasterizerDiscardEnable = VK_FALSE;
+  raster.polygonMode = VK_POLYGON_MODE_FILL;
+  raster.lineWidth = 1.0f;
+  raster.cullMode = VK_CULL_MODE_NONE;
+  raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  raster.depthBiasEnable = VK_FALSE;
+
+  VkPipelineMultisampleStateCreateInfo multisample{};
+  multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineDepthStencilStateCreateInfo depth{};
+  depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depth.depthTestEnable = VK_TRUE;
+  depth.depthWriteEnable = VK_TRUE;
+  depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth.depthBoundsTestEnable = VK_FALSE;
+  depth.stencilTestEnable = VK_FALSE;
+
+  VkPipelineColorBlendAttachmentState color_blend_attach{};
+  color_blend_attach.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  color_blend_attach.blendEnable = VK_FALSE;
+
+  VkPipelineColorBlendStateCreateInfo color_blend{};
+  color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  color_blend.attachmentCount = 1;
+  color_blend.pAttachments = &color_blend_attach;
+
+  VkDynamicState dynamics[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynamic{};
+  dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamic.dynamicStateCount = 2;
+  dynamic.pDynamicStates = dynamics;
+
+  VkGraphicsPipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_info.stageCount = 2;
+  pipeline_info.pStages = stages;
+  pipeline_info.pVertexInputState = &vertex_input;
+  pipeline_info.pInputAssemblyState = &input_assembly;
+  pipeline_info.pViewportState = &viewport_state;
+  pipeline_info.pRasterizationState = &raster;
+  pipeline_info.pMultisampleState = &multisample;
+  pipeline_info.pDepthStencilState = &depth;
+  pipeline_info.pColorBlendState = &color_blend;
+  pipeline_info.pDynamicState = &dynamic;
+  pipeline_info.layout = g_state.skinned_pipeline_layout;
+  pipeline_info.renderPass = g_state.offscreen_render_pass;
+  pipeline_info.subpass = 0;
+
+  const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+                                                    &g_state.skinned_pipeline);
+  vkDestroyShaderModule(g_state.device, vert, nullptr);
+  vkDestroyShaderModule(g_state.device, frag, nullptr);
+  if (result != VK_SUCCESS) {
+    rkg::log::error("skinned pipeline creation failed");
     return false;
   }
   return true;
@@ -2151,6 +2653,42 @@ void destroy_vulkan() {
     vkDestroyPipelineLayout(g_state.device, g_state.textured_pipeline_layout, nullptr);
     g_state.textured_pipeline_layout = VK_NULL_HANDLE;
   }
+  if (g_state.skinned_joint_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.skinned_joint_buffer, nullptr);
+    g_state.skinned_joint_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_joint_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.skinned_joint_memory, nullptr);
+    g_state.skinned_joint_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_vertex_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.skinned_vertex_buffer, nullptr);
+    g_state.skinned_vertex_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_vertex_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.skinned_vertex_memory, nullptr);
+    g_state.skinned_vertex_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_index_buffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(g_state.device, g_state.skinned_index_buffer, nullptr);
+    g_state.skinned_index_buffer = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_index_memory != VK_NULL_HANDLE) {
+    vkFreeMemory(g_state.device, g_state.skinned_index_memory, nullptr);
+    g_state.skinned_index_memory = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_desc_pool != VK_NULL_HANDLE) {
+    vkDestroyDescriptorPool(g_state.device, g_state.skinned_desc_pool, nullptr);
+    g_state.skinned_desc_pool = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_desc_layout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(g_state.device, g_state.skinned_desc_layout, nullptr);
+    g_state.skinned_desc_layout = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_pipeline_layout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(g_state.device, g_state.skinned_pipeline_layout, nullptr);
+    g_state.skinned_pipeline_layout = VK_NULL_HANDLE;
+  }
 
   if (g_state.in_flight_fence != VK_NULL_HANDLE) {
     vkDestroyFence(g_state.device, g_state.in_flight_fence, nullptr);
@@ -2300,13 +2838,20 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
     const auto* camera = rkg::get_vulkan_viewport_camera();
     const auto* textured_demo = rkg::get_vulkan_viewport_textured_demo();
     const bool textured_enabled = rkg::get_vulkan_viewport_textured_demo_enabled();
+    const bool use_skinned = g_state.skinned_ready &&
+                             g_state.skinned_pipeline != VK_NULL_HANDLE &&
+                             g_state.skinned_pipeline_layout != VK_NULL_HANDLE &&
+                             g_state.skinned_vertex_buffer != VK_NULL_HANDLE &&
+                             g_state.skinned_index_buffer != VK_NULL_HANDLE &&
+                             g_state.skinned_index_count > 0;
     if (textured_enabled &&
         g_state.textured_ready &&
-        g_state.textured_pipeline != VK_NULL_HANDLE &&
-        g_state.textured_pipeline_layout != VK_NULL_HANDLE &&
-        g_state.textured_vertex_buffer != VK_NULL_HANDLE &&
-        g_state.textured_index_buffer != VK_NULL_HANDLE &&
-        g_state.textured_index_count > 0) {
+        ((use_skinned) ||
+         (g_state.textured_pipeline != VK_NULL_HANDLE &&
+          g_state.textured_pipeline_layout != VK_NULL_HANDLE &&
+          g_state.textured_vertex_buffer != VK_NULL_HANDLE &&
+          g_state.textured_index_buffer != VK_NULL_HANDLE &&
+          g_state.textured_index_count > 0))) {
       VkViewport viewport{};
       viewport.x = 0.0f;
       viewport.y = 0.0f;
@@ -2320,14 +2865,28 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       vkCmdSetViewport(cmd, 0, 1, &viewport);
       vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.textured_pipeline);
+      if (use_skinned) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.skinned_pipeline);
+      } else {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.textured_pipeline);
+      }
       VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(cmd, 0, 1, &g_state.textured_vertex_buffer, offsets);
-      vkCmdBindIndexBuffer(cmd, g_state.textured_index_buffer, 0, VK_INDEX_TYPE_UINT32);
-      if (g_state.textured_desc_set != VK_NULL_HANDLE) {
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                g_state.textured_pipeline_layout, 0, 1,
-                                &g_state.textured_desc_set, 0, nullptr);
+      if (use_skinned) {
+        vkCmdBindVertexBuffers(cmd, 0, 1, &g_state.skinned_vertex_buffer, offsets);
+        vkCmdBindIndexBuffer(cmd, g_state.skinned_index_buffer, 0, VK_INDEX_TYPE_UINT32);
+        if (g_state.skinned_desc_set != VK_NULL_HANDLE) {
+          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  g_state.skinned_pipeline_layout, 0, 1,
+                                  &g_state.skinned_desc_set, 0, nullptr);
+        }
+      } else {
+        vkCmdBindVertexBuffers(cmd, 0, 1, &g_state.textured_vertex_buffer, offsets);
+        vkCmdBindIndexBuffer(cmd, g_state.textured_index_buffer, 0, VK_INDEX_TYPE_UINT32);
+        if (g_state.textured_desc_set != VK_NULL_HANDLE) {
+          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  g_state.textured_pipeline_layout, 0, 1,
+                                  &g_state.textured_desc_set, 0, nullptr);
+        }
       }
 
       struct PushData {
@@ -2346,10 +2905,17 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
         push.mvp[15] = 1.0f;
       }
       std::memcpy(push.color, g_state.textured_base_color, sizeof(push.color));
-      vkCmdPushConstants(cmd, g_state.textured_pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                         0, sizeof(PushData), &push);
-      vkCmdDrawIndexed(cmd, g_state.textured_index_count, 1, 0, 0, 0);
+      if (use_skinned) {
+        vkCmdPushConstants(cmd, g_state.skinned_pipeline_layout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(PushData), &push);
+        vkCmdDrawIndexed(cmd, g_state.skinned_index_count, 1, 0, 0, 0);
+      } else {
+        vkCmdPushConstants(cmd, g_state.textured_pipeline_layout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(PushData), &push);
+        vkCmdDrawIndexed(cmd, g_state.textured_index_count, 1, 0, 0, 0);
+      }
     }
 
     const auto* line_list = rkg::get_vulkan_viewport_line_list();

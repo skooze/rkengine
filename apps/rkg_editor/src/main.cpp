@@ -69,6 +69,8 @@ using rkg::vec3_mul;
 using rkg::vec3_normalize;
 using rkg::vec3_sub;
 
+rkg::ecs::Registry& registry_mutable(struct EditorState& state);
+
 enum class PlayState {
   Edit,
   Play,

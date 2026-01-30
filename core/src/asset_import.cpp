@@ -249,6 +249,7 @@ void write_asset_json(const fs::path& path,
                       const MeshPrimitiveInfo& mesh,
                       size_t material_count,
                       size_t texture_count,
+                      uint32_t mesh_bin_version,
                       size_t exported_primitives,
                       size_t total_primitives,
                       size_t joint_count) {
@@ -276,7 +277,7 @@ void write_asset_json(const fs::path& path,
   writer.key("file");
   writer.value("mesh.bin");
   writer.key("format");
-  writer.value("rkg_mesh_bin_v1");
+  writer.value(mesh_bin_version == 2 ? "rkg_mesh_bin_v2" : "rkg_mesh_bin_v1");
   writer.key("vertex_count");
   writer.value(static_cast<uint64_t>(mesh.vertex_count));
   writer.key("index_count");
@@ -685,12 +686,16 @@ ImportResult import_glb(const fs::path& input_path,
   cgltf_accessor* norm_accessor = nullptr;
   cgltf_accessor* uv_accessor = nullptr;
   cgltf_accessor* tan_accessor = nullptr;
+  cgltf_accessor* joints_accessor = nullptr;
+  cgltf_accessor* weights_accessor = nullptr;
   for (size_t i = 0; i < prim.attributes_count; ++i) {
     const cgltf_attribute& attr = prim.attributes[i];
     if (attr.type == cgltf_attribute_type_position) pos_accessor = attr.data;
     if (attr.type == cgltf_attribute_type_normal) norm_accessor = attr.data;
     if (attr.type == cgltf_attribute_type_texcoord && attr.index == 0) uv_accessor = attr.data;
     if (attr.type == cgltf_attribute_type_tangent) tan_accessor = attr.data;
+    if (attr.type == cgltf_attribute_type_joints && attr.index == 0) joints_accessor = attr.data;
+    if (attr.type == cgltf_attribute_type_weights && attr.index == 0) weights_accessor = attr.data;
   }
   if (!pos_accessor) {
     cgltf_free(data);
@@ -703,6 +708,8 @@ ImportResult import_glb(const fs::path& input_path,
   std::vector<float> normals(vertex_count * 3, 0.0f);
   std::vector<float> uvs(vertex_count * 2, 0.0f);
   std::vector<float> tangents(vertex_count * 4, 0.0f);
+  std::vector<uint16_t> joints(vertex_count * 4, 0);
+  std::vector<float> weights(vertex_count * 4, 0.0f);
 
   for (size_t i = 0; i < vertex_count; ++i) {
     cgltf_accessor_read_float(pos_accessor, i, &positions[i * 3], 3);
@@ -720,6 +727,21 @@ ImportResult import_glb(const fs::path& input_path,
   if (tan_accessor) {
     for (size_t i = 0; i < vertex_count; ++i) {
       cgltf_accessor_read_float(tan_accessor, i, &tangents[i * 4], 4);
+    }
+  }
+  if (joints_accessor) {
+    uint32_t tmp[4]{0, 0, 0, 0};
+    for (size_t i = 0; i < vertex_count; ++i) {
+      cgltf_accessor_read_uint(joints_accessor, i, tmp, 4);
+      joints[i * 4 + 0] = static_cast<uint16_t>(tmp[0]);
+      joints[i * 4 + 1] = static_cast<uint16_t>(tmp[1]);
+      joints[i * 4 + 2] = static_cast<uint16_t>(tmp[2]);
+      joints[i * 4 + 3] = static_cast<uint16_t>(tmp[3]);
+    }
+  }
+  if (weights_accessor) {
+    for (size_t i = 0; i < vertex_count; ++i) {
+      cgltf_accessor_read_float(weights_accessor, i, &weights[i * 4], 4);
     }
   }
 
@@ -742,6 +764,8 @@ ImportResult import_glb(const fs::path& input_path,
   mesh_info.has_normals = norm_accessor != nullptr;
   mesh_info.has_uv0 = uv_accessor != nullptr;
   mesh_info.has_tangents = tan_accessor != nullptr;
+  mesh_info.has_joints = joints_accessor != nullptr;
+  mesh_info.has_weights = weights_accessor != nullptr;
 
   if (!options.validate_only) {
     fs::create_directories(output_dir);
@@ -753,11 +777,13 @@ ImportResult import_glb(const fs::path& input_path,
     }
 
     const uint32_t magic = 0x30474B52; // 'RKG0'
-    const uint32_t version = 1;
+    const uint32_t version = (mesh_info.has_joints || mesh_info.has_weights) ? 2u : 1u;
     uint32_t flags = 0;
     if (mesh_info.has_normals) flags |= 1;
     if (mesh_info.has_uv0) flags |= 2;
     if (mesh_info.has_tangents) flags |= 4;
+    if (mesh_info.has_joints) flags |= 8;
+    if (mesh_info.has_weights) flags |= 16;
 
     mesh_out.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
     mesh_out.write(reinterpret_cast<const char*>(&version), sizeof(version));
@@ -779,6 +805,14 @@ ImportResult import_glb(const fs::path& input_path,
       mesh_out.write(reinterpret_cast<const char*>(tangents.data()),
                      static_cast<std::streamsize>(tangents.size() * sizeof(float)));
     }
+    if (mesh_info.has_joints) {
+      mesh_out.write(reinterpret_cast<const char*>(joints.data()),
+                     static_cast<std::streamsize>(joints.size() * sizeof(uint16_t)));
+    }
+    if (mesh_info.has_weights) {
+      mesh_out.write(reinterpret_cast<const char*>(weights.data()),
+                     static_cast<std::streamsize>(weights.size() * sizeof(float)));
+    }
     mesh_out.write(reinterpret_cast<const char*>(indices.data()),
                    static_cast<std::streamsize>(indices.size() * sizeof(uint32_t)));
 
@@ -788,6 +822,7 @@ ImportResult import_glb(const fs::path& input_path,
                      mesh_info,
                      materials.size(),
                      textures.size(),
+                     version,
                      1,
                      total_primitives,
                      joint_count);
