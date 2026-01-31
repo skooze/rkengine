@@ -32,6 +32,19 @@
 namespace {
 namespace fs = std::filesystem;
 
+struct BonePose {
+  int parent = -1;
+  std::string name;
+  float pos[3]{0.0f, 0.0f, 0.0f};
+  float rot[3]{0.0f, 0.0f, 0.0f};
+  float scale[3]{1.0f, 1.0f, 1.0f};
+};
+
+struct SkeletonAsset {
+  std::vector<BonePose> bones;
+  std::vector<rkg::Mat4> inverse_bind;
+};
+
 struct VulkanState {
   rkg::HostContext* ctx = nullptr;
   SDL_Window* window = nullptr;
@@ -896,19 +909,6 @@ bool load_mesh_bin_skinned(const fs::path& path,
   indices = std::move(raw.indices);
   return true;
 }
-
-struct BonePose {
-  int parent = -1;
-  std::string name;
-  float pos[3]{0.0f, 0.0f, 0.0f};
-  float rot[3]{0.0f, 0.0f, 0.0f};
-  float scale[3]{1.0f, 1.0f, 1.0f};
-};
-
-struct SkeletonAsset {
-  std::vector<BonePose> bones;
-  std::vector<rkg::Mat4> inverse_bind;
-};
 
 static bool env_flag_enabled(const char* name) {
   const char* val = std::getenv(name);
