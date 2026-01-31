@@ -45,6 +45,10 @@ struct SkeletonAsset {
   std::vector<rkg::Mat4> inverse_bind;
 };
 
+void compute_skin_matrices_from_bones(const std::vector<BonePose>& bones,
+                                      const std::vector<rkg::Mat4>& inverse_bind,
+                                      std::vector<rkg::Mat4>& out);
+
 struct VulkanState {
   rkg::HostContext* ctx = nullptr;
   SDL_Window* window = nullptr;
