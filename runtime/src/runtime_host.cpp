@@ -1101,6 +1101,14 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       const float local_z = vx * sin_y + vz * cos_y;
       forward_speed = local_z;
       strafe_speed = local_x;
+
+      const float max_speed = controller ? controller->max_speed : 2.0f;
+      const float speed_mag = std::sqrt(forward_speed * forward_speed + strafe_speed * strafe_speed);
+      if (speed_mag > max_speed && speed_mag > 0.0001f) {
+        const float scale = max_speed / speed_mag;
+        forward_speed *= scale;
+        strafe_speed *= scale;
+      }
     }
     // Smooth the drive signals so procedural rigs don't jitter at high FPS.
     static float smooth_fwd = 0.0f;
