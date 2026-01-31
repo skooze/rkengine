@@ -1141,7 +1141,8 @@ static void update_skinned_live_pose() {
                    " r_thigh=" + name_or_idx(g_state.bone_r_thigh));
     g_state.skinned_live_logged = true;
   }
-  if (!g_state.skinned_live_dump_logged && env_flag_enabled("RKG_LOG_SKELETON_NAMES")) {
+  // TEMP: dump skeleton names once to validate bone mapping. Remove after mapping is confirmed.
+  if (!g_state.skinned_live_dump_logged) {
     const size_t max_names = 64;
     std::string line = "renderer:vulkan skeleton names (first " + std::to_string(max_names) + "): ";
     for (size_t i = 0; i < g_state.skinned_skeleton.bones.size() && i < max_names; ++i) {
