@@ -1279,7 +1279,7 @@ static void apply_leg_ik(const SkeletonAsset& skel,
       g_state.bone_r_thigh == UINT32_MAX || g_state.bone_r_calf == UINT32_MAX || g_state.bone_r_foot == UINT32_MAX) {
     return;
   }
-  const float ik_strength = grounded ? (0.20f + 0.80f * speed_ease) : 0.0f;
+  const float ik_strength = grounded ? (0.65f + 0.35f * speed_ease) : 0.0f;
   const float ik_weight_l = ik_strength * (1.0f - lift_l);
   const float ik_weight_r = ik_strength * (1.0f - lift_r);
   if (ik_weight_l <= 0.001f && ik_weight_r <= 0.001f) {
@@ -1299,8 +1299,8 @@ static void apply_leg_ik(const SkeletonAsset& skel,
 
   auto update_lock = [&](bool& locked, rkg::Vec3& target, const rkg::Vec3& foot,
                          float lift, float weight) {
-    const float lock_in = 0.22f;
-    const float lock_out = 0.60f;
+    const float lock_in = 0.35f;
+    const float lock_out = 0.70f;
     if (grounded && weight > 0.05f && lift < lock_in) {
       if (!locked) {
         locked = true;
@@ -1417,8 +1417,8 @@ static void apply_live_pose(const SkeletonAsset& skel,
   add_rot(g_state.bone_l_foot, -foot_amp * knee_l, 0.0f, 0.0f);
   add_rot(g_state.bone_r_foot, -foot_amp * knee_r, 0.0f, 0.0f);
 
-  const float arm_tuck = env_float("RKG_LIVE_ARM_TUCK", 0.35f);
-  const float arm_amp = env_float("RKG_LIVE_ARM_SWING", 0.22f) * stride * grounded_scale + 0.01f;
+  const float arm_tuck = env_float("RKG_LIVE_ARM_TUCK", -0.20f);
+  const float arm_amp = env_float("RKG_LIVE_ARM_SWING", 0.16f) * stride * grounded_scale + 0.01f;
   add_rot(g_state.bone_l_upper_arm, arm_amp * swing_r, 0.0f, arm_tuck);
   add_rot(g_state.bone_r_upper_arm, arm_amp * swing_l, 0.0f, -arm_tuck);
   add_rot(g_state.bone_l_lower_arm, 0.18f * arm_amp * swing_r, 0.0f, 0.0f);
@@ -1451,7 +1451,7 @@ static void update_skinned_live_pose() {
 
   const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
   const float step_rate = 1.1f + speed_ease * 1.4f;
-  const float gait_time_scale = env_float("RKG_LIVE_GAIT_SCALE", 0.02f);
+  const float gait_time_scale = env_float("RKG_LIVE_GAIT_SCALE", 0.005f);
   g_state.skinned_live_phase += dt * step_rate * gait_time_scale * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
