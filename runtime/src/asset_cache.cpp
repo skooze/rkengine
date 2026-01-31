@@ -207,6 +207,15 @@ bool AssetCache::load_asset_dir(const fs::path& asset_dir, std::string& error) {
     record.name = "manny";
   }
   record.source_path = asset_doc.value("source_path", "");
+  if (asset_doc.contains("mesh") && asset_doc["mesh"].is_object()) {
+    const auto& mesh_node = asset_doc["mesh"];
+    if (mesh_node.contains("scale") && mesh_node["scale"].is_array()) {
+      const auto& arr = mesh_node["scale"];
+      for (size_t i = 0; i < 3 && i < arr.size(); ++i) {
+        record.mesh.mesh_scale[i] = arr[i].get<float>();
+      }
+    }
+  }
 
   const fs::path mesh_path = asset_dir / "mesh.bin";
   if (!load_mesh_bin(mesh_path, record.mesh, error)) {

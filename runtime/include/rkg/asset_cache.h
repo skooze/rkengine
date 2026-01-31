@@ -20,6 +20,7 @@ struct MeshInfo {
   bool has_weights = false;
   std::array<float, 3> bounds_min{0.0f, 0.0f, 0.0f};
   std::array<float, 3> bounds_max{0.0f, 0.0f, 0.0f};
+  std::array<float, 3> mesh_scale{1.0f, 1.0f, 1.0f};
 };
 
 struct MaterialInfo {

@@ -1204,8 +1204,9 @@ void RuntimeHost::load_initial_level() {
           rig_scale = std::strtof(scale_env, nullptr);
         } else {
           const float height = rig_asset->mesh.bounds_max[1] - rig_asset->mesh.bounds_min[1];
-          if (height > 0.0001f) {
-            rig_scale = 1.8f / height;
+          const float mesh_scale_y = rig_asset->mesh.mesh_scale[1];
+          if (height > 0.0001f && mesh_scale_y > 0.000001f) {
+            rig_scale = 1.8f / (height * mesh_scale_y);
           }
         }
         if (rig_scale > 0.0001f) {
@@ -1218,12 +1219,14 @@ void RuntimeHost::load_initial_level() {
             rkg::log::info("runtime: player rig scale set to " + std::to_string(rig_scale) +
                            " (mesh height=" + std::to_string(rig_asset->mesh.bounds_max[1] -
                                                              rig_asset->mesh.bounds_min[1]) +
+                           ", mesh scale=" + std::to_string(rig_asset->mesh.mesh_scale[1]) +
                            ")");
           }
           const bool default_pos =
               transform->position[0] == 0.0f && transform->position[1] == 0.0f && transform->position[2] == 0.0f;
           if (default_pos) {
-            const float offset_y = -rig_asset->mesh.bounds_min[1] * rig_scale;
+            const float mesh_scale_y = rig_asset->mesh.mesh_scale[1];
+            const float offset_y = -rig_asset->mesh.bounds_min[1] * rig_scale * mesh_scale_y;
             if (offset_y != 0.0f) {
               transform->position[1] += offset_y;
               rkg::log::info("runtime: player rig offset set to " + std::to_string(offset_y) +

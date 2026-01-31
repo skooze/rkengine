@@ -247,6 +247,7 @@ void write_asset_json(const fs::path& path,
                       const std::string& name,
                       const fs::path& source,
                       const MeshPrimitiveInfo& mesh,
+                      const std::array<float, 3>& mesh_scale,
                       size_t material_count,
                       size_t texture_count,
                       uint32_t mesh_bin_version,
@@ -282,6 +283,12 @@ void write_asset_json(const fs::path& path,
   writer.value(static_cast<uint64_t>(mesh.vertex_count));
   writer.key("index_count");
   writer.value(static_cast<uint64_t>(mesh.index_count));
+  writer.key("scale");
+  writer.begin_array();
+  writer.value(mesh_scale[0]);
+  writer.value(mesh_scale[1]);
+  writer.value(mesh_scale[2]);
+  writer.end_array();
   writer.key("attributes");
   writer.begin_array();
   writer.value("POSITION");
@@ -703,6 +710,21 @@ ImportResult import_glb(const fs::path& input_path,
     return result;
   }
 
+  std::array<float, 3> mesh_scale{1.0f, 1.0f, 1.0f};
+  if (data->nodes_count > 0) {
+    for (size_t i = 0; i < data->nodes_count; ++i) {
+      const cgltf_node& node = data->nodes[i];
+      if (node.mesh == &mesh) {
+        if (node.has_scale) {
+          mesh_scale[0] = static_cast<float>(node.scale[0]);
+          mesh_scale[1] = static_cast<float>(node.scale[1]);
+          mesh_scale[2] = static_cast<float>(node.scale[2]);
+        }
+        break;
+      }
+    }
+  }
+
   const size_t vertex_count = pos_accessor->count;
   std::vector<float> positions(vertex_count * 3, 0.0f);
   std::vector<float> normals(vertex_count * 3, 0.0f);
@@ -820,6 +842,7 @@ ImportResult import_glb(const fs::path& input_path,
                      asset_name,
                      input_path,
                      mesh_info,
+                     mesh_scale,
                      materials.size(),
                      textures.size(),
                      version,
