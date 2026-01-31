@@ -4863,7 +4863,10 @@ int main(int argc, char** argv) {
     params.run_simulation = run_sim;
     params.update_input = false;
     auto action_provider = [&](const std::string& name) -> rkg::input::ActionState {
-      if (!state.viewport_focused || state.chat_active) {
+      if (state.chat_active) {
+        return {};
+      }
+      if (!state.viewport_focused && state.play_state != PlayState::Play) {
         return {};
       }
       if (state.play_state == PlayState::Play && name == "Quit") {
