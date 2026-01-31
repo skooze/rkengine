@@ -1200,6 +1200,13 @@ void RuntimeHost::load_initial_level() {
         float rig_scale = 0.0f;
         const char* scale_env = std::getenv("RKG_RIG_SCALE");
         const bool has_scale_env = (scale_env && *scale_env);
+        float root_scale = 1.0f;
+        if (!rig_asset->skeleton.bones.empty()) {
+          const auto& root = rig_asset->skeleton.bones.front();
+          root_scale = std::max(std::max(std::abs(root.local_pose.scale[0]),
+                                         std::abs(root.local_pose.scale[1])),
+                                std::abs(root.local_pose.scale[2]));
+        }
         if (has_scale_env) {
           rig_scale = std::strtof(scale_env, nullptr);
         } else {
@@ -1208,6 +1215,9 @@ void RuntimeHost::load_initial_level() {
           if (height > 0.0001f && mesh_scale_y > 0.000001f) {
             rig_scale = 1.8f / (height * mesh_scale_y);
           }
+        }
+        if (root_scale > 0.0001f) {
+          rig_scale /= root_scale;
         }
         if (rig_scale > 0.0001f) {
           const bool default_scale =
@@ -1220,6 +1230,7 @@ void RuntimeHost::load_initial_level() {
                            " (mesh height=" + std::to_string(rig_asset->mesh.bounds_max[1] -
                                                              rig_asset->mesh.bounds_min[1]) +
                            ", mesh scale=" + std::to_string(rig_asset->mesh.mesh_scale[1]) +
+                           ", root scale=" + std::to_string(root_scale) +
                            ")");
           }
           const bool default_pos =
