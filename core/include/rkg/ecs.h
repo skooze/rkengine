@@ -44,6 +44,12 @@ enum class ColliderType : uint8_t {
   Capsule = 2
 };
 
+enum class MovementMode : uint8_t {
+  Grounded = 0,
+  Falling = 1,
+  Sliding = 2
+};
+
 struct Collider {
   ColliderType type = ColliderType::Plane;
   float center[3] = {0.0f, 0.0f, 0.0f};
@@ -61,13 +67,41 @@ struct CharacterController {
   float max_speed = 4.0f;
   float accel = 20.0f;
   float friction = 8.0f;
+  float braking_deceleration = 16.0f;
+  float braking_friction_factor = 2.0f;
+  float max_air_speed = 4.0f;
+  float max_air_accel = 12.0f;
+  float air_control = 0.35f;
+  float air_control_boost_multiplier = 2.0f;
+  float air_control_boost_velocity_threshold = 1.0f;
   float gravity = -9.8f;
+  float terminal_velocity = 55.0f;
   float jump_impulse = 5.0f;
   float slope_limit_deg = 45.0f;
+  float step_height = 0.35f;
+  float skin_width = 0.02f;
+  float ground_snap_max = 0.2f;
+  float max_depenetration_velocity = 10.0f;
+  int max_sweep_iterations = 4;
+  int max_substeps = 8;
+  float max_substep_dt = 1.0f / 60.0f;
+  float turn_boost_factor = 0.5f;
+  float turn_speed_threshold = 1.0f;
+  float input_smooth_tau = 0.08f;
   bool grounded = false;
+  MovementMode mode = MovementMode::Falling;
   float vertical_velocity = 0.0f;
   float ground_height = 0.0f;
   bool jump_held = false;
+  float time_since_grounded = 0.0f;
+  float coyote_time = 0.1f;
+  float jump_buffer_time = 0.1f;
+  float jump_buffer = 0.0f;
+  float desired_move_dir[3] = {0.0f, 0.0f, 0.0f};
+  float desired_move_speed = 0.0f;
+  bool use_desired_input = false;
+  float smoothed_input[3] = {0.0f, 0.0f, 0.0f};
+  float external_base_velocity[3] = {0.0f, 0.0f, 0.0f};
 };
 
 struct Bone {
