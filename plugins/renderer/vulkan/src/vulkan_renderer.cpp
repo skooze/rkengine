@@ -93,6 +93,7 @@ struct VulkanState {
 
   // Phase 2B: textured static mesh demo resources.
   VkPipeline textured_pipeline = VK_NULL_HANDLE;
+  VkPipeline textured_pipeline_translucent = VK_NULL_HANDLE;
   VkPipelineLayout textured_pipeline_layout = VK_NULL_HANDLE;
   VkDescriptorSetLayout textured_desc_layout = VK_NULL_HANDLE;
   VkDescriptorPool textured_desc_pool = VK_NULL_HANDLE;
@@ -113,6 +114,7 @@ struct VulkanState {
 
   // Phase 4: skinned mesh demo resources.
   VkPipeline skinned_pipeline = VK_NULL_HANDLE;
+  VkPipeline skinned_pipeline_translucent = VK_NULL_HANDLE;
   VkPipelineLayout skinned_pipeline_layout = VK_NULL_HANDLE;
   VkDescriptorSetLayout skinned_desc_layout = VK_NULL_HANDLE;
   VkDescriptorPool skinned_desc_pool = VK_NULL_HANDLE;
@@ -173,7 +175,9 @@ bool create_viewport_pipeline();
 bool create_viewport_line_pipeline();
 bool create_viewport_vertex_buffer();
 bool create_textured_pipeline();
+bool create_textured_pipeline_translucent();
 bool create_skinned_pipeline();
+bool create_skinned_pipeline_translucent();
 bool load_textured_asset();
 bool create_swapchain();
 bool create_render_pass();
@@ -1289,9 +1293,17 @@ void destroy_offscreen() {
     vkDestroyPipeline(g_state.device, g_state.textured_pipeline, nullptr);
     g_state.textured_pipeline = VK_NULL_HANDLE;
   }
+  if (g_state.textured_pipeline_translucent != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.textured_pipeline_translucent, nullptr);
+    g_state.textured_pipeline_translucent = VK_NULL_HANDLE;
+  }
   if (g_state.skinned_pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(g_state.device, g_state.skinned_pipeline, nullptr);
     g_state.skinned_pipeline = VK_NULL_HANDLE;
+  }
+  if (g_state.skinned_pipeline_translucent != VK_NULL_HANDLE) {
+    vkDestroyPipeline(g_state.device, g_state.skinned_pipeline_translucent, nullptr);
+    g_state.skinned_pipeline_translucent = VK_NULL_HANDLE;
   }
   if (g_state.viewport_pipeline != VK_NULL_HANDLE) {
     vkDestroyPipeline(g_state.device, g_state.viewport_pipeline, nullptr);
@@ -1573,10 +1585,16 @@ bool create_offscreen(uint32_t width, uint32_t height) {
     if (!create_textured_pipeline()) {
       rkg::log::warn("textured pipeline setup failed");
     }
+    if (!create_textured_pipeline_translucent()) {
+      rkg::log::warn("textured translucent pipeline setup failed");
+    }
   }
   if (g_state.skinned_ready) {
     if (!create_skinned_pipeline()) {
       rkg::log::warn("skinned pipeline setup failed");
+    }
+    if (!create_skinned_pipeline_translucent()) {
+      rkg::log::warn("skinned translucent pipeline setup failed");
     }
   }
 
@@ -1901,9 +1919,10 @@ bool create_viewport_line_pipeline() {
   return true;
 }
 
-bool create_textured_pipeline() {
+static bool create_textured_pipeline_internal(VkPipeline* out_pipeline, bool depth_write, bool enable_blend) {
   if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
-  if (g_state.textured_pipeline != VK_NULL_HANDLE) return true;
+  if (!out_pipeline) return false;
+  if (*out_pipeline != VK_NULL_HANDLE) return true;
 
   if (g_state.textured_desc_layout == VK_NULL_HANDLE) {
     VkDescriptorSetLayoutBinding binding{};
@@ -2010,7 +2029,7 @@ bool create_textured_pipeline() {
   VkPipelineDepthStencilStateCreateInfo depth{};
   depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth.depthTestEnable = VK_TRUE;
-  depth.depthWriteEnable = VK_TRUE;
+  depth.depthWriteEnable = depth_write ? VK_TRUE : VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth.depthBoundsTestEnable = VK_FALSE;
   depth.stencilTestEnable = VK_FALSE;
@@ -2018,7 +2037,15 @@ bool create_textured_pipeline() {
   VkPipelineColorBlendAttachmentState color_blend_attach{};
   color_blend_attach.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  color_blend_attach.blendEnable = VK_FALSE;
+  color_blend_attach.blendEnable = enable_blend ? VK_TRUE : VK_FALSE;
+  if (enable_blend) {
+    color_blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    color_blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attach.colorBlendOp = VK_BLEND_OP_ADD;
+    color_blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    color_blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attach.alphaBlendOp = VK_BLEND_OP_ADD;
+  }
 
   VkPipelineColorBlendStateCreateInfo color_blend{};
   color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -2048,7 +2075,7 @@ bool create_textured_pipeline() {
   pipeline_info.subpass = 0;
 
   const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
-                                                    &g_state.textured_pipeline);
+                                                    out_pipeline);
   vkDestroyShaderModule(g_state.device, vert, nullptr);
   vkDestroyShaderModule(g_state.device, frag, nullptr);
   if (result != VK_SUCCESS) {
@@ -2058,9 +2085,18 @@ bool create_textured_pipeline() {
   return true;
 }
 
-bool create_skinned_pipeline() {
+bool create_textured_pipeline() {
+  return create_textured_pipeline_internal(&g_state.textured_pipeline, true, false);
+}
+
+bool create_textured_pipeline_translucent() {
+  return create_textured_pipeline_internal(&g_state.textured_pipeline_translucent, false, true);
+}
+
+static bool create_skinned_pipeline_internal(VkPipeline* out_pipeline, bool depth_write, bool enable_blend) {
   if (g_state.offscreen_render_pass == VK_NULL_HANDLE) return false;
-  if (g_state.skinned_pipeline != VK_NULL_HANDLE) return true;
+  if (!out_pipeline) return false;
+  if (*out_pipeline != VK_NULL_HANDLE) return true;
 
   if (g_state.skinned_desc_layout == VK_NULL_HANDLE) {
     rkg::log::error("skinned pipeline descriptor layout missing");
@@ -2163,7 +2199,7 @@ bool create_skinned_pipeline() {
   VkPipelineDepthStencilStateCreateInfo depth{};
   depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth.depthTestEnable = VK_TRUE;
-  depth.depthWriteEnable = VK_TRUE;
+  depth.depthWriteEnable = depth_write ? VK_TRUE : VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth.depthBoundsTestEnable = VK_FALSE;
   depth.stencilTestEnable = VK_FALSE;
@@ -2171,7 +2207,15 @@ bool create_skinned_pipeline() {
   VkPipelineColorBlendAttachmentState color_blend_attach{};
   color_blend_attach.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  color_blend_attach.blendEnable = VK_FALSE;
+  color_blend_attach.blendEnable = enable_blend ? VK_TRUE : VK_FALSE;
+  if (enable_blend) {
+    color_blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    color_blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attach.colorBlendOp = VK_BLEND_OP_ADD;
+    color_blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    color_blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attach.alphaBlendOp = VK_BLEND_OP_ADD;
+  }
 
   VkPipelineColorBlendStateCreateInfo color_blend{};
   color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -2201,7 +2245,7 @@ bool create_skinned_pipeline() {
   pipeline_info.subpass = 0;
 
   const VkResult result = vkCreateGraphicsPipelines(g_state.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
-                                                    &g_state.skinned_pipeline);
+                                                    out_pipeline);
   vkDestroyShaderModule(g_state.device, vert, nullptr);
   vkDestroyShaderModule(g_state.device, frag, nullptr);
   if (result != VK_SUCCESS) {
@@ -2209,6 +2253,14 @@ bool create_skinned_pipeline() {
     return false;
   }
   return true;
+}
+
+bool create_skinned_pipeline() {
+  return create_skinned_pipeline_internal(&g_state.skinned_pipeline, true, false);
+}
+
+bool create_skinned_pipeline_translucent() {
+  return create_skinned_pipeline_internal(&g_state.skinned_pipeline_translucent, false, true);
 }
 
 bool create_viewport_vertex_buffer() {
@@ -2907,10 +2959,16 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       vkCmdSetViewport(cmd, 0, 1, &viewport);
       vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+      const float textured_alpha = textured_demo ? textured_demo->alpha : 1.0f;
+      const bool translucent = textured_alpha < 0.999f;
       if (use_skinned) {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.skinned_pipeline);
+        VkPipeline pipeline = translucent ? g_state.skinned_pipeline_translucent : g_state.skinned_pipeline;
+        if (pipeline == VK_NULL_HANDLE) pipeline = g_state.skinned_pipeline;
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
       } else {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_state.textured_pipeline);
+        VkPipeline pipeline = translucent ? g_state.textured_pipeline_translucent : g_state.textured_pipeline;
+        if (pipeline == VK_NULL_HANDLE) pipeline = g_state.textured_pipeline;
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
       }
       VkDeviceSize offsets[] = {0};
       if (use_skinned) {
