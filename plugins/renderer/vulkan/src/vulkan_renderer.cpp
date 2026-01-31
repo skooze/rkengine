@@ -978,12 +978,14 @@ static uint32_t find_bone_index_by_name(const SkeletonAsset& skel,
 
 static uint32_t find_side_bone(const SkeletonAsset& skel,
                                const std::vector<std::string>& side,
-                               const std::vector<std::string>& part) {
+                               const std::vector<std::string>& part,
+                               const std::vector<std::string>& exclude = {}) {
   for (uint32_t i = 0; i < skel.bones.size(); ++i) {
     const std::string n = to_lower(skel.bones[i].name);
     if (n.empty()) continue;
     if (!name_has(n, side)) continue;
     if (!name_has(n, part)) continue;
+    if (!exclude.empty() && name_has(n, exclude)) continue;
     return i;
   }
   return UINT32_MAX;
@@ -995,33 +997,31 @@ static void build_live_bone_map() {
 
   const std::vector<std::string> left_tags = {"left", "_l", ".l", " l", "l_", "l-", " left"};
   const std::vector<std::string> right_tags = {"right", "_r", ".r", " r", "r_", "r-", " right"};
-  const std::vector<std::string> hips_tags = {"pelvis", "hip", "root", "body", "center"};
-  const std::vector<std::string> spine_tags = {"spine", "spine1", "spine_01", "spine_1"};
-  const std::vector<std::string> chest_tags = {"chest", "upperchest", "spine2", "spine_02", "spine_2"};
+  const std::vector<std::string> hips_tags = {"hips", "pelvis", "hip", "root", "body", "center"};
+  const std::vector<std::string> spine_tags = {"spine"};
   const std::vector<std::string> neck_tags = {"neck", "neck_01"};
   const std::vector<std::string> head_tags = {"head"};
-  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "legup"};
-  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin", "legdown"};
   const std::vector<std::string> foot_tags = {"foot", "ankle", "ball", "toe"};
-  const std::vector<std::string> upper_arm_tags = {"upperarm", "arm_upper", "uparm", "clav", "shoulder"};
-  const std::vector<std::string> lower_arm_tags = {"lowerarm", "forearm", "arm_lower", "lowarm"};
 
   g_state.bone_hips = find_bone_index_by_name(skel, hips_tags, {});
-  g_state.bone_spine = find_bone_index_by_name(skel, spine_tags, {});
-  g_state.bone_chest = find_bone_index_by_name(skel, chest_tags, {});
+  g_state.bone_spine = find_bone_index_by_name(skel, spine_tags, {"spine02", "spine01"});
+  g_state.bone_chest = find_bone_index_by_name(skel, {"spine02", "spine_02", "spine2"}, {});
+  if (g_state.bone_chest == UINT32_MAX) {
+    g_state.bone_chest = find_bone_index_by_name(skel, {"spine01", "spine_01", "spine1"}, {});
+  }
   g_state.bone_neck = find_bone_index_by_name(skel, neck_tags, {});
   g_state.bone_head = find_bone_index_by_name(skel, head_tags, {});
 
-  g_state.bone_l_thigh = find_side_bone(skel, left_tags, thigh_tags);
-  g_state.bone_r_thigh = find_side_bone(skel, right_tags, thigh_tags);
-  g_state.bone_l_calf = find_side_bone(skel, left_tags, calf_tags);
-  g_state.bone_r_calf = find_side_bone(skel, right_tags, calf_tags);
+  g_state.bone_l_thigh = find_side_bone(skel, left_tags, {"upleg", "upperleg", "thigh"});
+  g_state.bone_r_thigh = find_side_bone(skel, right_tags, {"upleg", "upperleg", "thigh"});
+  g_state.bone_l_calf = find_side_bone(skel, left_tags, {"leg", "calf", "lowerleg", "shin"}, {"upleg", "upperleg", "thigh"});
+  g_state.bone_r_calf = find_side_bone(skel, right_tags, {"leg", "calf", "lowerleg", "shin"}, {"upleg", "upperleg", "thigh"});
   g_state.bone_l_foot = find_side_bone(skel, left_tags, foot_tags);
   g_state.bone_r_foot = find_side_bone(skel, right_tags, foot_tags);
-  g_state.bone_l_upper_arm = find_side_bone(skel, left_tags, upper_arm_tags);
-  g_state.bone_r_upper_arm = find_side_bone(skel, right_tags, upper_arm_tags);
-  g_state.bone_l_lower_arm = find_side_bone(skel, left_tags, lower_arm_tags);
-  g_state.bone_r_lower_arm = find_side_bone(skel, right_tags, lower_arm_tags);
+  g_state.bone_l_upper_arm = find_side_bone(skel, left_tags, {"arm", "upperarm", "uparm", "shoulder"}, {"forearm", "lowerarm"});
+  g_state.bone_r_upper_arm = find_side_bone(skel, right_tags, {"arm", "upperarm", "uparm", "shoulder"}, {"forearm", "lowerarm"});
+  g_state.bone_l_lower_arm = find_side_bone(skel, left_tags, {"forearm", "lowerarm"});
+  g_state.bone_r_lower_arm = find_side_bone(skel, right_tags, {"forearm", "lowerarm"});
 
   if (g_state.bone_l_thigh == UINT32_MAX || g_state.bone_r_thigh == UINT32_MAX) {
     const uint32_t any_thigh = find_bone_index_by_name(skel, thigh_tags, {});
@@ -1029,7 +1029,7 @@ static void build_live_bone_map() {
     if (g_state.bone_r_thigh == UINT32_MAX) g_state.bone_r_thigh = any_thigh;
   }
   if (g_state.bone_l_calf == UINT32_MAX || g_state.bone_r_calf == UINT32_MAX) {
-    const uint32_t any_calf = find_bone_index_by_name(skel, calf_tags, {});
+    const uint32_t any_calf = find_bone_index_by_name(skel, {"leg", "calf", "lowerleg"}, {"upleg", "upperleg", "thigh"});
     if (g_state.bone_l_calf == UINT32_MAX) g_state.bone_l_calf = any_calf;
     if (g_state.bone_r_calf == UINT32_MAX) g_state.bone_r_calf = any_calf;
   }
@@ -1106,15 +1106,15 @@ static void update_skinned_live_pose() {
   bool grounded = false;
   rkg::get_vulkan_viewport_skinned_live_params(fwd, strafe, grounded);
   const float speed = std::sqrt(fwd * fwd + strafe * strafe);
-  const float speed_norm = std::min(speed / 3.0f, 1.0f);
+  const float speed_norm = std::min(speed / 2.0f, 1.0f);
   const float speed_ease = speed_norm * speed_norm * (3.0f - 2.0f * speed_norm);
 
   if (!g_state.skinned_live_map_valid) {
     build_live_bone_map();
   }
 
-  const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 15.0f));
-  const float cadence = 0.55f + speed_ease * 0.95f;
+  const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
+  const float cadence = 0.35f + speed_ease * 0.75f;
   g_state.skinned_live_phase += dt * cadence * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
@@ -1136,9 +1136,18 @@ static void update_skinned_live_pose() {
     rkg::log::info("renderer:vulkan skinned live rig map: hips=" + name_or_idx(g_state.bone_hips) +
                    " spine=" + name_or_idx(g_state.bone_spine) +
                    " chest=" + name_or_idx(g_state.bone_chest) +
+                   " neck=" + name_or_idx(g_state.bone_neck) +
                    " head=" + name_or_idx(g_state.bone_head) +
                    " l_thigh=" + name_or_idx(g_state.bone_l_thigh) +
-                   " r_thigh=" + name_or_idx(g_state.bone_r_thigh));
+                   " r_thigh=" + name_or_idx(g_state.bone_r_thigh) +
+                   " l_calf=" + name_or_idx(g_state.bone_l_calf) +
+                   " r_calf=" + name_or_idx(g_state.bone_r_calf) +
+                   " l_foot=" + name_or_idx(g_state.bone_l_foot) +
+                   " r_foot=" + name_or_idx(g_state.bone_r_foot) +
+                   " l_arm=" + name_or_idx(g_state.bone_l_upper_arm) +
+                   " r_arm=" + name_or_idx(g_state.bone_r_upper_arm) +
+                   " l_fore=" + name_or_idx(g_state.bone_l_lower_arm) +
+                   " r_fore=" + name_or_idx(g_state.bone_r_lower_arm));
     g_state.skinned_live_logged = true;
   }
   // TEMP: dump skeleton names once to validate bone mapping. Remove after mapping is confirmed.
