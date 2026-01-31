@@ -1,1 +1,6 @@
-Already up to date.
+From github.com:skooze/rkengine
+   1fe9d1a..faaf6af  main       -> origin/main
+Updating 1fe9d1a..faaf6af
+Fast-forward
+ apps/rkg_editor/src/main.cpp | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
