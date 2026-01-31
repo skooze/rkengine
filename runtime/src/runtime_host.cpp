@@ -1270,13 +1270,21 @@ void RuntimeHost::load_initial_level() {
                 rkg::log::info("runtime: rig skeleton min y=" + std::to_string(min_y));
               }
             }
-            if (offset_y != 0.0f) {
-              transform->position[1] += offset_y;
-              // DEBUG: remove after rig offset is stable.
-              rkg::log::info(std::string("runtime: player rig offset set to ") + std::to_string(offset_y) +
-                             " (grounded by mesh bounds)");
-            }
+          if (offset_y != 0.0f) {
+            transform->position[1] += offset_y;
+            // DEBUG: remove after rig offset is stable.
+            rkg::log::info(std::string("runtime: player rig offset set to ") + std::to_string(offset_y) +
+                           " (grounded by mesh bounds)");
           }
+          // Final snap to ground based on mesh bottom after scaling.
+          const float bottom_y = transform->position[1] + rig_asset->mesh.bounds_min[1] * rig_scale * mesh_scale_y;
+          if (std::abs(bottom_y) > 0.0001f) {
+            transform->position[1] -= bottom_y;
+            // DEBUG: remove after rig grounding is stable.
+            rkg::log::info("runtime: player rig ground snap " + std::to_string(-bottom_y) +
+                           " (bottom y=" + std::to_string(bottom_y) + ")");
+          }
+        }
           if (auto* controller = registry_.get_character_controller(player_)) {
             const float height = (rig_asset->mesh.bounds_max[1] - rig_asset->mesh.bounds_min[1]) *
                                  rig_scale * mesh_scale_y;
