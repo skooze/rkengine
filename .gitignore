@@ -5,6 +5,8 @@ out/
 .idea/
 *.user
 *.log
+!build_logs/*.log
+imgui.ini
 compile_commands.json
 *.exe
 *.dll

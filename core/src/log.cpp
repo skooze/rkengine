@@ -84,7 +84,7 @@ void init() {
 void init(const std::string& app_name, const std::filesystem::path& root) {
   g_app_name = app_name;
   g_root_path = root;
-  std::filesystem::path log_dir = g_root_path / "build" / "logs";
+  std::filesystem::path log_dir = g_root_path / "build_logs";
   std::error_code ec;
   std::filesystem::create_directories(log_dir, ec);
   const std::string file_name = g_app_name + "_" + timestamp_for_filename() + ".log";
