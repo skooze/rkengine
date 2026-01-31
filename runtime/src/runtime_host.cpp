@@ -733,8 +733,19 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
 
   project_name_ = !project_.name.empty() ? project_.name : project_root_.filename().string();
 
+  bool loaded_input_map = false;
   if (!project_.input_map.empty()) {
-    input_map_.load_from_file(project_root_ / project_.input_map);
+    loaded_input_map = input_map_.load_from_file(project_root_ / project_.input_map);
+  }
+  if (!loaded_input_map) {
+    // Default WASD bindings so movement works even without a project input map.
+    input_map_.bind("MoveForward", rkg::platform::KeyCode::W);
+    input_map_.bind("MoveBack", rkg::platform::KeyCode::S);
+    input_map_.bind("MoveLeft", rkg::platform::KeyCode::A);
+    input_map_.bind("MoveRight", rkg::platform::KeyCode::D);
+    input_map_.bind("Jump", rkg::platform::KeyCode::Space);
+    input_map_.bind("Sprint", rkg::platform::KeyCode::LeftShift);
+    rkg::log::info("runtime: using default WASD input map");
   }
   input_.set_map(input_map_);
 
