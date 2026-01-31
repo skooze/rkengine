@@ -4357,7 +4357,8 @@ void update_camera_and_draw_list(EditorState& state) {
   const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
 
   // Draw skeletons first so bones remain visible even when line capacity is limited.
-  if (state.show_world_grid) {
+  const bool allow_grids = state.show_skeleton_debug || state.play_state != PlayState::Play;
+  if (state.show_world_grid && allow_grids) {
     const float extent = state.grid_half_extent;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
     for (int i = -steps; i <= steps; ++i) {
@@ -4367,7 +4368,7 @@ void update_camera_and_draw_list(EditorState& state) {
     }
   }
 
-  if (state.show_character_grid) {
+  if (state.show_character_grid && allow_grids) {
     rkg::ecs::Entity rig_entity = player;
     if (rig_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(rig_entity)) {
       rig_entity = state.selected_entity;
