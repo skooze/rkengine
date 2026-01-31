@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   652a085..5b7876a  main       -> origin/main
-Updating 652a085..5b7876a
+   e1311b8..7b8e8f6  main       -> origin/main
+Updating e1311b8..7b8e8f6
 Fast-forward
- apps/rkg_editor/src/main.cpp | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ apps/rkg_editor/src/main.cpp | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
