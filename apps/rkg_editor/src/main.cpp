@@ -330,6 +330,7 @@ struct EditorState {
   bool viewport_hovered = false;
   bool ui_capturing = false;
   bool mouse_relative = false;
+  bool mouse_capture_suspended = false;
   bool chat_active = false;
   bool auto_select = true;
   bool pick_requested = false;
@@ -2668,6 +2669,9 @@ void draw_viewport(EditorState& state) {
       ImGui::IsMouseDown(ImGuiMouseButton_Middle);
   if (hovered && (clicked_any || held_any)) {
     state.viewport_focused = true;
+    if (state.play_state == PlayState::Play) {
+      state.mouse_capture_suspended = false;
+    }
   }
   if (hovered && std::abs(io.MouseWheel) > 0.0001f && !io.WantTextInput) {
     state.camera_distance -= io.MouseWheel * 0.4f;
@@ -2685,6 +2689,12 @@ void draw_viewport(EditorState& state) {
   }
   if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
     state.viewport_focused = false;
+    state.mouse_capture_suspended = true;
+    if (state.runtime) {
+      state.runtime->platform().set_relative_mouse(false);
+      state.runtime->platform().set_cursor_visible(true);
+      state.mouse_relative = false;
+    }
     state.auto_select = false;
     state.selected_entity = rkg::ecs::kInvalidEntity;
     state.selected_name.clear();
@@ -4105,18 +4115,15 @@ void update_camera_and_draw_list(EditorState& state) {
       (state.play_state == PlayState::Play || state.viewport_focused || state.viewport_hovered) &&
       !state.chat_active && !io.WantTextInput;
   const bool want_relative_mouse = (state.play_state == PlayState::Play) &&
-                                   !state.chat_active && !io.WantTextInput;
+                                   !state.chat_active && !io.WantTextInput &&
+                                   !state.mouse_capture_suspended;
   if (want_relative_mouse != state.mouse_relative) {
     state.runtime->platform().set_relative_mouse(want_relative_mouse);
     state.mouse_relative = want_relative_mouse;
   }
 
-  if (state.play_state == PlayState::Play && state.viewport_focused &&
-      !state.chat_active && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-    state.stop_requested = true;
-    state.play_state = PlayState::Edit;
-    state.lock_editor_pivot = false;
-    state.viewport_focused = false;
+  if (state.play_state != PlayState::Play) {
+    state.mouse_capture_suspended = false;
   }
   if (camera_input_enabled) {
     const bool always_look = (state.play_state == PlayState::Play);
