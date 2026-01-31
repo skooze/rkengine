@@ -1405,7 +1405,8 @@ static void update_skinned_live_pose() {
 
   const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
   const float step_rate = 1.1f + speed_ease * 1.4f;
-  g_state.skinned_live_phase += dt * step_rate * 6.2831853f;
+  const float gait_time_scale = 0.01f; // 100x slower gait for debugging/preview.
+  g_state.skinned_live_phase += dt * step_rate * gait_time_scale * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
   }
