@@ -4063,7 +4063,7 @@ void update_camera_and_draw_list(EditorState& state) {
     }
   }
 
-  if (state.play_state == PlayState::Play && state.viewport_focused && !state.chat_active &&
+  if (state.play_state == PlayState::Play && !state.chat_active &&
       player != rkg::ecs::kInvalidEntity) {
     if (auto* transform = registry.get_transform(player)) {
       transform->rotation[1] = state.camera_yaw;
@@ -4102,9 +4102,10 @@ void update_camera_and_draw_list(EditorState& state) {
   // - Mouse wheel: zoom (distance)
   // - MMB drag: pan (move pivot in view plane)
   const bool camera_input_enabled =
-      (state.viewport_focused || state.viewport_hovered) && !state.chat_active && !io.WantTextInput;
+      (state.play_state == PlayState::Play || state.viewport_focused || state.viewport_hovered) &&
+      !state.chat_active && !io.WantTextInput;
   const bool want_relative_mouse = (state.play_state == PlayState::Play) &&
-                                   state.viewport_focused && !state.chat_active;
+                                   !state.chat_active && !io.WantTextInput;
   if (want_relative_mouse != state.mouse_relative) {
     state.runtime->platform().set_relative_mouse(want_relative_mouse);
     state.mouse_relative = want_relative_mouse;
