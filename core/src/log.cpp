@@ -11,6 +11,7 @@
 #include <iostream>
 #include <mutex>
 #include <sstream>
+#include <cstdlib>
 
 #if defined(__linux__)
 #include <execinfo.h>
@@ -84,7 +85,16 @@ void init() {
 void init(const std::string& app_name, const std::filesystem::path& root) {
   g_app_name = app_name;
   g_root_path = root;
-  std::filesystem::path log_dir = g_root_path / "build_logs";
+  std::filesystem::path log_dir;
+  if (const char* override_dir = std::getenv("RKG_LOG_DIR"); override_dir && *override_dir) {
+    log_dir = override_dir;
+  } else if (const char* xdg_state = std::getenv("XDG_STATE_HOME"); xdg_state && *xdg_state) {
+    log_dir = std::filesystem::path(xdg_state) / "rkg" / "logs";
+  } else if (const char* home = std::getenv("HOME"); home && *home) {
+    log_dir = std::filesystem::path(home) / ".local" / "state" / "rkg" / "logs";
+  } else {
+    log_dir = g_root_path / "build_logs";
+  }
   std::error_code ec;
   std::filesystem::create_directories(log_dir, ec);
   const std::string file_name = g_app_name + "_" + timestamp_for_filename() + ".log";
