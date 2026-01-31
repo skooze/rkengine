@@ -755,7 +755,10 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
                        " idx=" + std::to_string(asset.mesh.index_count) +
                        " mats=" + std::to_string(asset.materials.size()) +
                        " tex=" + std::to_string(asset.textures.size()) +
-                       " joints=" + std::to_string(joint_count) + ")");
+                       " joints=" + std::to_string(joint_count) +
+                       " scale=" + std::to_string(asset.mesh.mesh_scale[0]) +
+                       "," + std::to_string(asset.mesh.mesh_scale[1]) +
+                       "," + std::to_string(asset.mesh.mesh_scale[2]) + ")");
       }
     } else {
       rkg::log::warn(std::string("asset_cache: ") + asset_error);
