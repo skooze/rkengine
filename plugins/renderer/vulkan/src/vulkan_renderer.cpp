@@ -1059,35 +1059,36 @@ static void apply_live_pose(const SkeletonAsset& skel,
   };
 
   const float stride = std::min(std::max(speed_norm, 0.0f), 1.0f);
+  const float stride_ease = stride * stride * (3.0f - 2.0f * stride);
   const float swing = std::sin(phase);
   const float swing2 = std::sin(phase * 2.0f);
-  const float grounded_scale = grounded ? 1.0f : 0.35f;
+  const float grounded_scale = grounded ? 1.0f : 0.45f;
 
-  const float pelvis_bob = 0.025f * stride * grounded_scale;
-  const float pelvis_sway = 0.03f * stride * grounded_scale;
-  add_pos(g_state.bone_hips, 0.0f, pelvis_bob * swing2, 0.0f);
-  add_rot(g_state.bone_hips, -fwd * 0.15f * stride, 0.0f, -strafe * 0.2f * stride);
+  const float pelvis_bob = 0.018f * stride_ease * grounded_scale;
+  const float pelvis_sway = 0.02f * stride_ease * grounded_scale;
+  add_pos(g_state.bone_hips, pelvis_sway * swing, pelvis_bob * swing2, 0.0f);
+  add_rot(g_state.bone_hips, -fwd * 0.12f * stride_ease, 0.0f, -strafe * 0.18f * stride_ease);
 
-  add_rot(g_state.bone_spine, fwd * 0.12f * stride, 0.0f, strafe * 0.15f * stride);
-  add_rot(g_state.bone_chest, fwd * 0.08f * stride, 0.0f, strafe * 0.1f * stride);
-  add_rot(g_state.bone_neck, fwd * 0.05f * stride, 0.0f, strafe * 0.05f * stride);
-  add_rot(g_state.bone_head, fwd * 0.03f * stride, 0.0f, strafe * 0.04f * stride);
+  add_rot(g_state.bone_spine, fwd * 0.10f * stride_ease, 0.0f, strafe * 0.12f * stride_ease);
+  add_rot(g_state.bone_chest, fwd * 0.06f * stride_ease, 0.0f, strafe * 0.08f * stride_ease);
+  add_rot(g_state.bone_neck, fwd * 0.04f * stride_ease, 0.0f, strafe * 0.04f * stride_ease);
+  add_rot(g_state.bone_head, fwd * 0.02f * stride_ease, 0.0f, strafe * 0.03f * stride_ease);
 
-  const float thigh_amp = 0.8f * stride * grounded_scale + 0.05f;
-  const float calf_amp = 0.7f * stride * grounded_scale;
-  const float foot_amp = 0.2f * stride * grounded_scale;
-  add_rot(g_state.bone_l_thigh, thigh_amp * swing, 0.0f, strafe * 0.15f * stride);
-  add_rot(g_state.bone_r_thigh, -thigh_amp * swing, 0.0f, -strafe * 0.15f * stride);
+  const float thigh_amp = 0.55f * stride_ease * grounded_scale + 0.03f;
+  const float calf_amp = 0.45f * stride_ease * grounded_scale;
+  const float foot_amp = 0.12f * stride_ease * grounded_scale;
+  add_rot(g_state.bone_l_thigh, thigh_amp * swing, 0.0f, strafe * 0.12f * stride_ease);
+  add_rot(g_state.bone_r_thigh, -thigh_amp * swing, 0.0f, -strafe * 0.12f * stride_ease);
   add_rot(g_state.bone_l_calf, calf_amp * std::max(0.0f, -swing), 0.0f, 0.0f);
   add_rot(g_state.bone_r_calf, calf_amp * std::max(0.0f, swing), 0.0f, 0.0f);
   add_rot(g_state.bone_l_foot, -foot_amp * std::max(0.0f, swing), 0.0f, 0.0f);
   add_rot(g_state.bone_r_foot, -foot_amp * std::max(0.0f, -swing), 0.0f, 0.0f);
 
-  const float arm_amp = 0.5f * stride * grounded_scale + 0.05f;
+  const float arm_amp = 0.35f * stride_ease * grounded_scale + 0.04f;
   add_rot(g_state.bone_l_upper_arm, -arm_amp * swing, 0.0f, 0.0f);
   add_rot(g_state.bone_r_upper_arm, arm_amp * swing, 0.0f, 0.0f);
-  add_rot(g_state.bone_l_lower_arm, -0.4f * arm_amp * swing, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_lower_arm, 0.4f * arm_amp * swing, 0.0f, 0.0f);
+  add_rot(g_state.bone_l_lower_arm, -0.25f * arm_amp * swing, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_lower_arm, 0.25f * arm_amp * swing, 0.0f, 0.0f);
 }
 
 static void update_skinned_live_pose() {
@@ -1104,21 +1105,22 @@ static void update_skinned_live_pose() {
   bool grounded = false;
   rkg::get_vulkan_viewport_skinned_live_params(fwd, strafe, grounded);
   const float speed = std::sqrt(fwd * fwd + strafe * strafe);
-  const float speed_norm = std::min(speed / 2.5f, 1.0f);
+  const float speed_norm = std::min(speed / 3.0f, 1.0f);
+  const float speed_ease = speed_norm * speed_norm * (3.0f - 2.0f * speed_norm);
 
   if (!g_state.skinned_live_map_valid) {
     build_live_bone_map();
   }
 
-  const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 15.0f));
-  const float freq = 1.2f + speed_norm * 1.8f;
-  g_state.skinned_live_phase += dt * freq * 6.2831853f;
+  const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 20.0f));
+  const float cadence = 1.0f + speed_ease * 1.6f;
+  g_state.skinned_live_phase += dt * cadence * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
   }
 
   std::vector<BonePose> posed;
-  apply_live_pose(g_state.skinned_skeleton, g_state.skinned_live_phase, speed_norm,
+  apply_live_pose(g_state.skinned_skeleton, g_state.skinned_live_phase, speed_ease,
                   fwd, strafe, grounded, posed);
 
   if (!g_state.skinned_live_logged) {

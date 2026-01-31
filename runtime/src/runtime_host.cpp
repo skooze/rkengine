@@ -1102,7 +1102,25 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       forward_speed = local_z;
       strafe_speed = local_x;
     }
-    rkg::set_vulkan_viewport_skinned_live_params(forward_speed, strafe_speed, grounded);
+    // Smooth the drive signals so procedural rigs don't jitter at high FPS.
+    static float smooth_fwd = 0.0f;
+    static float smooth_strafe = 0.0f;
+    const float smooth_dt = (sim_dt > 0.0f) ? sim_dt : frame_dt;
+    const float alpha = std::min(1.0f, std::max(0.0f, smooth_dt * 6.0f));
+    smooth_fwd += (forward_speed - smooth_fwd) * alpha;
+    smooth_strafe += (strafe_speed - smooth_strafe) * alpha;
+
+    // DEBUG: keep sparse logging to tune rig drive. Remove once tuned.
+    static float live_log_accum = 0.0f;
+    live_log_accum += smooth_dt;
+    if (live_log_accum > 0.5f) {
+      live_log_accum = 0.0f;
+      rkg::log::info("runtime: live_rig fwd=" + std::to_string(smooth_fwd) +
+                     " strafe=" + std::to_string(smooth_strafe) +
+                     " grounded=" + std::to_string(grounded));
+    }
+
+    rkg::set_vulkan_viewport_skinned_live_params(smooth_fwd, smooth_strafe, grounded);
   }
 }
 
