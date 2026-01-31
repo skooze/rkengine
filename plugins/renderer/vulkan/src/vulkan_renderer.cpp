@@ -159,6 +159,7 @@ struct VulkanState {
   // Live/procedural rig drive state (Phase 4).
   bool skinned_live_enabled = false;
   bool skinned_live_logged = false;
+  bool skinned_live_dump_logged = false;
   float skinned_live_phase = 0.0f;
   float skinned_live_fwd = 0.0f;
   float skinned_live_strafe = 0.0f;
@@ -992,18 +993,18 @@ static void build_live_bone_map() {
   const auto& skel = g_state.skinned_skeleton;
   if (skel.bones.empty()) return;
 
-  const std::vector<std::string> left_tags = {"left", "_l", ".l", " l"};
-  const std::vector<std::string> right_tags = {"right", "_r", ".r", " r"};
-  const std::vector<std::string> hips_tags = {"hip", "pelvis", "root"};
-  const std::vector<std::string> spine_tags = {"spine"};
-  const std::vector<std::string> chest_tags = {"chest", "upperchest", "spine2", "spine_02"};
-  const std::vector<std::string> neck_tags = {"neck"};
+  const std::vector<std::string> left_tags = {"left", "_l", ".l", " l", "l_", "l-", " left"};
+  const std::vector<std::string> right_tags = {"right", "_r", ".r", " r", "r_", "r-", " right"};
+  const std::vector<std::string> hips_tags = {"pelvis", "hip", "root", "body", "center"};
+  const std::vector<std::string> spine_tags = {"spine", "spine1", "spine_01", "spine_1"};
+  const std::vector<std::string> chest_tags = {"chest", "upperchest", "spine2", "spine_02", "spine_2"};
+  const std::vector<std::string> neck_tags = {"neck", "neck_01"};
   const std::vector<std::string> head_tags = {"head"};
-  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "hip"};
-  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin"};
-  const std::vector<std::string> foot_tags = {"foot", "ankle"};
-  const std::vector<std::string> upper_arm_tags = {"upperarm", "arm_upper", "uparm"};
-  const std::vector<std::string> lower_arm_tags = {"lowerarm", "forearm", "arm_lower"};
+  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "legup"};
+  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin", "legdown"};
+  const std::vector<std::string> foot_tags = {"foot", "ankle", "ball", "toe"};
+  const std::vector<std::string> upper_arm_tags = {"upperarm", "arm_upper", "uparm", "clav", "shoulder"};
+  const std::vector<std::string> lower_arm_tags = {"lowerarm", "forearm", "arm_lower", "lowarm"};
 
   g_state.bone_hips = find_bone_index_by_name(skel, hips_tags, {});
   g_state.bone_spine = find_bone_index_by_name(skel, spine_tags, {});
@@ -1139,6 +1140,21 @@ static void update_skinned_live_pose() {
                    " l_thigh=" + name_or_idx(g_state.bone_l_thigh) +
                    " r_thigh=" + name_or_idx(g_state.bone_r_thigh));
     g_state.skinned_live_logged = true;
+  }
+  if (!g_state.skinned_live_dump_logged && env_flag_enabled("RKG_LOG_SKELETON_NAMES")) {
+    const size_t max_names = 64;
+    std::string line = "renderer:vulkan skeleton names (first " + std::to_string(max_names) + "): ";
+    for (size_t i = 0; i < g_state.skinned_skeleton.bones.size() && i < max_names; ++i) {
+      const auto& name = g_state.skinned_skeleton.bones[i].name;
+      if (!name.empty()) {
+        line += std::to_string(i) + ":" + name + " ";
+      }
+    }
+    if (g_state.skinned_skeleton.bones.size() > max_names) {
+      line += "...";
+    }
+    rkg::log::info(line);
+    g_state.skinned_live_dump_logged = true;
   }
 
   compute_skin_matrices_from_bones(posed, g_state.skinned_skeleton.inverse_bind, g_state.skinned_joint_mats);
