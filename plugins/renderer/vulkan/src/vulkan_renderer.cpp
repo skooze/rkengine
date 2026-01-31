@@ -685,19 +685,19 @@ fs::path select_asset_dir(std::string& asset_name) {
       }
     }
   }
-  if (auto manny = resolve_in_dir(assets_dir, "manny"); !manny.empty()) {
-    asset_name = "manny";
-    return manny;
-  }
   if (auto manny = resolve_in_dir(generated_assets_dir, "manny"); !manny.empty()) {
     asset_name = "manny";
     return manny;
   }
-  if (auto testmanny = resolve_in_dir(assets_dir, "testmanny"); !testmanny.empty()) {
+  if (auto manny = resolve_in_dir(assets_dir, "manny"); !manny.empty()) {
+    asset_name = "manny";
+    return manny;
+  }
+  if (auto testmanny = resolve_in_dir(generated_assets_dir, "testmanny"); !testmanny.empty()) {
     asset_name = "testmanny";
     return testmanny;
   }
-  if (auto testmanny = resolve_in_dir(generated_assets_dir, "testmanny"); !testmanny.empty()) {
+  if (auto testmanny = resolve_in_dir(assets_dir, "testmanny"); !testmanny.empty()) {
     asset_name = "testmanny";
     return testmanny;
   }

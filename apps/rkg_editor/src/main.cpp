@@ -4193,25 +4193,25 @@ void update_camera_and_draw_list(EditorState& state) {
         }
       }
       if (textured_asset_dir.empty()) {
-        const fs::path manny = assets_dir / "manny";
-        if (fs::exists(manny / "asset.json")) {
-          textured_asset_dir = manny;
-        }
-      }
-      if (textured_asset_dir.empty()) {
         const fs::path manny = generated_assets_dir / "manny";
         if (fs::exists(manny / "asset.json")) {
           textured_asset_dir = manny;
         }
       }
       if (textured_asset_dir.empty()) {
-        const fs::path testmanny = assets_dir / "testmanny";
+        const fs::path manny = assets_dir / "manny";
+        if (fs::exists(manny / "asset.json")) {
+          textured_asset_dir = manny;
+        }
+      }
+      if (textured_asset_dir.empty()) {
+        const fs::path testmanny = generated_assets_dir / "testmanny";
         if (fs::exists(testmanny / "asset.json")) {
           textured_asset_dir = testmanny;
         }
       }
       if (textured_asset_dir.empty()) {
-        const fs::path testmanny = generated_assets_dir / "testmanny";
+        const fs::path testmanny = assets_dir / "testmanny";
         if (fs::exists(testmanny / "asset.json")) {
           textured_asset_dir = testmanny;
         }
