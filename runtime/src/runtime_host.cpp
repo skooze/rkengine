@@ -1286,7 +1286,8 @@ void RuntimeHost::load_initial_level() {
                                 rig_scale * mesh_scale_z;
             const float min_xz = std::max(0.0001f, std::min(width, depth));
             const float desired_radius = std::max(0.15f, min_xz * 0.25f);
-            const float desired_half_height = std::max(0.2f, (height * 0.5f) - desired_radius);
+            const float desired_bottom = -rig_asset->mesh.bounds_min[1] * rig_scale * mesh_scale_y;
+            const float desired_half_height = std::max(0.1f, desired_bottom - desired_radius);
             const bool default_controller =
                 controller->half_height == 0.9f && controller->radius == 0.35f;
             if (default_controller || has_scale_env) {
@@ -1296,7 +1297,8 @@ void RuntimeHost::load_initial_level() {
               rkg::log::info("runtime: controller size set (radius=" +
                              std::to_string(controller->radius) +
                              ", half_height=" + std::to_string(controller->half_height) +
-                             ", mesh height=" + std::to_string(height) + ")");
+                             ", mesh height=" + std::to_string(height) +
+                             ", mesh bottom=" + std::to_string(desired_bottom) + ")");
             }
           }
         }
