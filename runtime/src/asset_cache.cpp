@@ -264,6 +264,7 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
   }
   const fs::path manny_asset_dir = assets_dir / "manny";
   if (fs::exists(manny_source)) {
+    rkg::log::info(std::string("asset_cache: manny source -> ") + manny_source.string());
     const fs::path manny_asset_json = manny_asset_dir / "asset.json";
     if (!fs::exists(manny_asset_json)) {
       rkg::asset::ImportOptions options{};
