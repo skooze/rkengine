@@ -1253,7 +1253,6 @@ void RuntimeHost::load_initial_level() {
               transform->position[0] == 0.0f && transform->position[1] == 0.0f && transform->position[2] == 0.0f;
           if (default_pos) {
             float offset_y = -rig_asset->mesh.bounds_min[1] * rig_scale * mesh_scale_y;
-            bool used_skeleton_ground = false;
             if (!rig_asset->skeleton.bones.empty()) {
               rkg::ecs::Skeleton temp{};
               temp.bones = rig_asset->skeleton.bones;
@@ -1269,16 +1268,13 @@ void RuntimeHost::load_initial_level() {
                 }
                 // DEBUG: remove after grounding is stable.
                 rkg::log::info("runtime: rig skeleton min y=" + std::to_string(min_y));
-                offset_y = -min_y;
-                used_skeleton_ground = true;
               }
             }
             if (offset_y != 0.0f) {
               transform->position[1] += offset_y;
               // DEBUG: remove after rig offset is stable.
               rkg::log::info(std::string("runtime: player rig offset set to ") + std::to_string(offset_y) +
-                             (used_skeleton_ground ? " (grounded by skeleton min y)" :
-                                                     " (grounded by mesh bounds)"));
+                             " (grounded by mesh bounds)");
             }
           }
         }

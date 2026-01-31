@@ -4370,14 +4370,6 @@ void update_camera_and_draw_list(EditorState& state) {
       rig_transform = registry.get_transform(rig_entity);
       if (rig_transform) {
         rig_root = *rig_transform;
-        if (auto* skeleton = registry.get_skeleton(rig_entity)) {
-          if (!skeleton->bones.empty()) {
-            rkg::ecs::compute_skeleton_world_pose(*rig_transform, *skeleton);
-            if (!skeleton->world_pose.empty()) {
-              rig_root = skeleton->world_pose[0];
-            }
-          }
-        }
       }
     }
 
