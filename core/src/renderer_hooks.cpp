@@ -19,6 +19,7 @@ VulkanViewportCamera g_viewport_camera{};
 VulkanViewportLineList g_viewport_line_list{};
 VulkanViewportTexturedDemo g_viewport_textured_demo{};
 bool g_viewport_textured_demo_enabled = true;
+bool g_viewport_skinned_test_walk_enabled = false;
 } // namespace
 
 void register_vulkan_hooks(const VulkanHooks* hooks) {
@@ -184,6 +185,14 @@ void set_vulkan_viewport_textured_demo_enabled(bool enabled) {
 
 bool get_vulkan_viewport_textured_demo_enabled() {
   return g_viewport_textured_demo_enabled;
+}
+
+void set_vulkan_viewport_skinned_test_walk_enabled(bool enabled) {
+  g_viewport_skinned_test_walk_enabled = enabled;
+}
+
+bool get_vulkan_viewport_skinned_test_walk_enabled() {
+  return g_viewport_skinned_test_walk_enabled;
 }
 
 } // namespace rkg

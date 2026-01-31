@@ -84,4 +84,7 @@ const VulkanViewportTexturedDemo* get_vulkan_viewport_textured_demo();
 void set_vulkan_viewport_textured_demo_enabled(bool enabled);
 bool get_vulkan_viewport_textured_demo_enabled();
 
+void set_vulkan_viewport_skinned_test_walk_enabled(bool enabled);
+bool get_vulkan_viewport_skinned_test_walk_enabled();
+
 } // namespace rkg

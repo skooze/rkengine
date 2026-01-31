@@ -15,6 +15,8 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -128,6 +130,14 @@ struct VulkanState {
   uint32_t skinned_index_count = 0;
   uint32_t skinned_joint_count = 0;
   bool skinned_ready = false;
+  SkeletonAsset skinned_skeleton{};
+  std::vector<rkg::Mat4> skinned_joint_mats{};
+  bool skinned_test_walk = false;
+  bool skinned_test_walk_logged = false;
+  uint32_t skinned_test_left_thigh = UINT32_MAX;
+  uint32_t skinned_test_left_calf = UINT32_MAX;
+  uint32_t skinned_test_right_thigh = UINT32_MAX;
+  uint32_t skinned_test_right_calf = UINT32_MAX;
 };
 
 VulkanState g_state{};
@@ -456,6 +466,17 @@ bool read_file_bytes(const fs::path& path, std::vector<uint8_t>& out) {
   out.resize(static_cast<size_t>(size));
   in.seekg(0, std::ios::beg);
   in.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(out.size()));
+  return true;
+}
+
+bool update_host_buffer(const void* data, size_t byte_size, VkDeviceMemory memory) {
+  if (!data || byte_size == 0 || memory == VK_NULL_HANDLE) return false;
+  void* mapped = nullptr;
+  if (vkMapMemory(g_state.device, memory, 0, byte_size, 0, &mapped) != VK_SUCCESS) {
+    return false;
+  }
+  std::memcpy(mapped, data, byte_size);
+  vkUnmapMemory(g_state.device, memory);
   return true;
 }
 
@@ -878,6 +899,7 @@ bool load_mesh_bin_skinned(const fs::path& path,
 
 struct BonePose {
   int parent = -1;
+  std::string name;
   float pos[3]{0.0f, 0.0f, 0.0f};
   float rot[3]{0.0f, 0.0f, 0.0f};
   float scale[3]{1.0f, 1.0f, 1.0f};
@@ -887,6 +909,140 @@ struct SkeletonAsset {
   std::vector<BonePose> bones;
   std::vector<rkg::Mat4> inverse_bind;
 };
+
+static bool env_flag_enabled(const char* name) {
+  const char* val = std::getenv(name);
+  if (!val) return false;
+  if (std::strcmp(val, "0") == 0) return false;
+  if (std::strcmp(val, "false") == 0) return false;
+  if (std::strcmp(val, "FALSE") == 0) return false;
+  return true;
+}
+
+static std::string to_lower(std::string s) {
+  for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+static bool name_has(const std::string& name, const std::vector<std::string>& needles) {
+  for (const auto& needle : needles) {
+    if (name.find(needle) != std::string::npos) return true;
+  }
+  return false;
+}
+
+static uint32_t find_bone_index_by_name(const SkeletonAsset& skel,
+                                        const std::vector<std::string>& include,
+                                        const std::vector<std::string>& exclude) {
+  for (uint32_t i = 0; i < skel.bones.size(); ++i) {
+    const std::string n = to_lower(skel.bones[i].name);
+    if (n.empty()) continue;
+    if (!include.empty() && !name_has(n, include)) continue;
+    if (!exclude.empty() && name_has(n, exclude)) continue;
+    return i;
+  }
+  return UINT32_MAX;
+}
+
+static void apply_test_walk_pose(const SkeletonAsset& skel,
+                                 double t,
+                                 std::vector<BonePose>& out,
+                                 uint32_t& out_left_thigh,
+                                 uint32_t& out_left_calf,
+                                 uint32_t& out_right_thigh,
+                                 uint32_t& out_right_calf) {
+  out = skel.bones;
+  out_left_thigh = UINT32_MAX;
+  out_left_calf = UINT32_MAX;
+  out_right_thigh = UINT32_MAX;
+  out_right_calf = UINT32_MAX;
+
+  // Find leg bones by name (best-effort).
+  const std::vector<std::string> left_tags = {"left", "_l", ".l", " l"};
+  const std::vector<std::string> right_tags = {"right", "_r", ".r", " r"};
+  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "hip"};
+  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin"};
+  auto find_side = [&](const std::vector<std::string>& side,
+                       const std::vector<std::string>& part) -> uint32_t {
+    for (uint32_t i = 0; i < skel.bones.size(); ++i) {
+      const std::string n = to_lower(skel.bones[i].name);
+      if (n.empty()) continue;
+      if (!name_has(n, side)) continue;
+      if (!name_has(n, part)) continue;
+      return i;
+    }
+    return UINT32_MAX;
+  };
+
+  out_left_thigh = find_side(left_tags, thigh_tags);
+  out_left_calf = find_side(left_tags, calf_tags);
+  out_right_thigh = find_side(right_tags, thigh_tags);
+  out_right_calf = find_side(right_tags, calf_tags);
+
+  // Fallback: try generic leg names without side.
+  if (out_left_thigh == UINT32_MAX || out_right_thigh == UINT32_MAX) {
+    const uint32_t any_thigh = find_bone_index_by_name(skel, thigh_tags, {});
+    if (out_left_thigh == UINT32_MAX) out_left_thigh = any_thigh;
+    if (out_right_thigh == UINT32_MAX) out_right_thigh = any_thigh;
+  }
+  if (out_left_calf == UINT32_MAX || out_right_calf == UINT32_MAX) {
+    const uint32_t any_calf = find_bone_index_by_name(skel, calf_tags, {});
+    if (out_left_calf == UINT32_MAX) out_left_calf = any_calf;
+    if (out_right_calf == UINT32_MAX) out_right_calf = any_calf;
+  }
+
+  const float swing = std::sin(static_cast<float>(t * 2.0 * 3.14159265 * 1.2));
+  const float thigh_amp = 0.6f;
+  const float calf_amp = 0.35f;
+  const float left_thigh = thigh_amp * swing;
+  const float right_thigh = -thigh_amp * swing;
+  const float left_calf = calf_amp * std::max(0.0f, -swing);
+  const float right_calf = calf_amp * std::max(0.0f, swing);
+
+  if (out_left_thigh != UINT32_MAX) out[out_left_thigh].rot[0] += left_thigh;
+  if (out_right_thigh != UINT32_MAX) out[out_right_thigh].rot[0] += right_thigh;
+  if (out_left_calf != UINT32_MAX) out[out_left_calf].rot[0] += left_calf;
+  if (out_right_calf != UINT32_MAX) out[out_right_calf].rot[0] += right_calf;
+}
+
+static void update_skinned_test_walk() {
+  g_state.skinned_test_walk = env_flag_enabled("RKG_SKIN_TEST_WALK") ||
+                              rkg::get_vulkan_viewport_skinned_test_walk_enabled();
+  if (!g_state.skinned_test_walk || !g_state.skinned_ready) return;
+  if (g_state.skinned_skeleton.bones.empty() || g_state.skinned_joint_count == 0) return;
+  if (g_state.skinned_joint_memory == VK_NULL_HANDLE) return;
+
+  static const auto start = std::chrono::steady_clock::now();
+  const auto now = std::chrono::steady_clock::now();
+  const double t = std::chrono::duration<double>(now - start).count();
+
+  std::vector<BonePose> posed;
+  uint32_t l_thigh = UINT32_MAX;
+  uint32_t l_calf = UINT32_MAX;
+  uint32_t r_thigh = UINT32_MAX;
+  uint32_t r_calf = UINT32_MAX;
+  apply_test_walk_pose(g_state.skinned_skeleton, t, posed, l_thigh, l_calf, r_thigh, r_calf);
+
+  if (!g_state.skinned_test_walk_logged) {
+    auto name_or_idx = [&](uint32_t idx) -> std::string {
+      if (idx == UINT32_MAX) return "none";
+      if (idx < g_state.skinned_skeleton.bones.size() &&
+          !g_state.skinned_skeleton.bones[idx].name.empty()) {
+        return g_state.skinned_skeleton.bones[idx].name;
+      }
+      return std::string("#") + std::to_string(idx);
+    };
+    rkg::log::info("renderer:vulkan skinned test walk: left_thigh=" + name_or_idx(l_thigh) +
+                   " left_calf=" + name_or_idx(l_calf) +
+                   " right_thigh=" + name_or_idx(r_thigh) +
+                   " right_calf=" + name_or_idx(r_calf));
+    g_state.skinned_test_walk_logged = true;
+  }
+
+  compute_skin_matrices_from_bones(posed, g_state.skinned_skeleton.inverse_bind, g_state.skinned_joint_mats);
+  const size_t byte_count = g_state.skinned_joint_mats.size() * sizeof(rkg::Mat4);
+  update_host_buffer(g_state.skinned_joint_mats.data(), byte_count, g_state.skinned_joint_memory);
+}
 
 #if RKG_ENABLE_DATA_JSON
 using json = nlohmann::json;
@@ -916,6 +1072,9 @@ bool load_skeleton_json(const fs::path& path, SkeletonAsset& out) {
     if (!entry.is_object()) continue;
     BonePose bone{};
     bone.parent = entry.value("parent", -1);
+    if (entry.contains("name") && entry["name"].is_string()) {
+      bone.name = entry["name"].get<std::string>();
+    }
     if (entry.contains("local_pose")) {
       const auto& pose = entry["local_pose"];
       if (pose.contains("position")) read_vec3(pose["position"], bone.pos);
@@ -955,8 +1114,10 @@ bool load_skin_bin(const fs::path& path, SkeletonAsset& out) {
   return true;
 }
 
-void compute_skin_matrices(const SkeletonAsset& skel, std::vector<rkg::Mat4>& out) {
-  const size_t joint_count = skel.bones.size();
+void compute_skin_matrices_from_bones(const std::vector<BonePose>& bones,
+                                      const std::vector<rkg::Mat4>& inverse_bind,
+                                      std::vector<rkg::Mat4>& out) {
+  const size_t joint_count = bones.size();
   out.resize(joint_count);
   std::vector<rkg::Mat4> world(joint_count, rkg::mat4_identity());
   std::vector<uint8_t> visited(joint_count, 0);
@@ -973,7 +1134,7 @@ void compute_skin_matrices(const SkeletonAsset& skel, std::vector<rkg::Mat4>& ou
     if (idx >= joint_count) return rkg::mat4_identity();
     if (visited[idx]) return world[idx];
     visited[idx] = 1;
-    const BonePose& bone = skel.bones[idx];
+    const BonePose& bone = bones[idx];
     rkg::Mat4 local = build_local(bone);
     if (bone.parent >= 0 && static_cast<size_t>(bone.parent) < joint_count) {
       rkg::Mat4 parent_world = compute_world(static_cast<size_t>(bone.parent));
@@ -990,9 +1151,13 @@ void compute_skin_matrices(const SkeletonAsset& skel, std::vector<rkg::Mat4>& ou
 
   for (size_t i = 0; i < joint_count; ++i) {
     rkg::Mat4 inv = rkg::mat4_identity();
-    if (i < skel.inverse_bind.size()) inv = skel.inverse_bind[i];
+    if (i < inverse_bind.size()) inv = inverse_bind[i];
     out[i] = rkg::mat4_mul(world[i], inv);
   }
+}
+
+void compute_skin_matrices(const SkeletonAsset& skel, std::vector<rkg::Mat4>& out) {
+  compute_skin_matrices_from_bones(skel.bones, skel.inverse_bind, out);
 }
 
 bool load_materials_json(const fs::path& path,
@@ -1177,6 +1342,7 @@ bool load_textured_asset() {
 #endif
     const bool skin_ok = load_skin_bin(asset_dir / "skin.bin", skeleton);
     if (skel_ok && skin_ok && !skeleton.bones.empty()) {
+      g_state.skinned_skeleton = skeleton;
       std::vector<rkg::Mat4> joint_mats;
       compute_skin_matrices(skeleton, joint_mats);
       if (!joint_mats.empty()) {
@@ -1198,6 +1364,7 @@ bool load_textured_asset() {
           rkg::log::warn("renderer:vulkan skinned demo: joint buffer create failed");
           return false;
         }
+        g_state.skinned_joint_mats = joint_mats;
         g_state.skinned_index_count = static_cast<uint32_t>(skinned_indices.size());
         g_state.skinned_joint_count = static_cast<uint32_t>(joint_mats.size());
 
@@ -1276,6 +1443,9 @@ bool load_textured_asset() {
         vkUpdateDescriptorSets(g_state.device, 2, writes, 0, nullptr);
 
         g_state.skinned_ready = true;
+        g_state.skinned_test_walk = env_flag_enabled("RKG_SKIN_TEST_WALK") ||
+                                    rkg::get_vulkan_viewport_skinned_test_walk_enabled();
+        g_state.skinned_test_walk_logged = false;
         rkg::log::info("renderer:vulkan skinned demo: joints=" +
                        std::to_string(g_state.skinned_joint_count));
       }
@@ -2930,6 +3100,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     const auto* camera = rkg::get_vulkan_viewport_camera();
+    update_skinned_test_walk();
     const auto* textured_demo = rkg::get_vulkan_viewport_textured_demo();
     const bool textured_enabled = rkg::get_vulkan_viewport_textured_demo_enabled();
     const bool use_skinned = g_state.skinned_ready &&
