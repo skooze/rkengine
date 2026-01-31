@@ -1024,7 +1024,7 @@ static void build_live_bone_map() {
   g_state.bone_r_lower_arm = find_side_bone(skel, right_tags, {"forearm", "lowerarm"});
 
   if (g_state.bone_l_thigh == UINT32_MAX || g_state.bone_r_thigh == UINT32_MAX) {
-    const uint32_t any_thigh = find_bone_index_by_name(skel, thigh_tags, {});
+    const uint32_t any_thigh = find_bone_index_by_name(skel, {"upleg", "upperleg", "thigh"}, {});
     if (g_state.bone_l_thigh == UINT32_MAX) g_state.bone_l_thigh = any_thigh;
     if (g_state.bone_r_thigh == UINT32_MAX) g_state.bone_r_thigh = any_thigh;
   }
