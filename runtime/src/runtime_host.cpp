@@ -1301,10 +1301,12 @@ void RuntimeHost::load_initial_level() {
             if (default_controller || has_scale_env) {
               controller->radius = desired_radius;
               controller->half_height = desired_half_height;
+              controller->center_offset = controller->half_height + controller->radius;
               // DEBUG: remove after controller sizing is stable.
               rkg::log::info("runtime: controller size set (radius=" +
                              std::to_string(controller->radius) +
                              ", half_height=" + std::to_string(controller->half_height) +
+                             ", center_offset=" + std::to_string(controller->center_offset) +
                              ", mesh height=" + std::to_string(height) +
                              ", mesh bottom=" + std::to_string(desired_bottom) + ")");
             }

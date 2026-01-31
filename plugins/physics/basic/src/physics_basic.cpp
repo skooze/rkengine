@@ -105,7 +105,8 @@ void update_character(rkg::ecs::Registry& registry,
   transform->position[1] += velocity->linear[1] * dt;
   transform->position[2] += velocity->linear[2] * dt;
 
-  const float capsule_bottom = transform->position[1] - (controller.half_height + controller.radius);
+  const float capsule_center_y = transform->position[1] + controller.center_offset;
+  const float capsule_bottom = capsule_center_y - (controller.half_height + controller.radius);
   if (capsule_bottom < 0.0f) {
     transform->position[1] -= capsule_bottom;
     if (velocity->linear[1] < 0.0f) {

@@ -57,6 +57,7 @@ struct Collider {
 struct CharacterController {
   float radius = 0.35f;
   float half_height = 0.9f;
+  float center_offset = 0.0f;
   float max_speed = 4.0f;
   float accel = 20.0f;
   float friction = 8.0f;
