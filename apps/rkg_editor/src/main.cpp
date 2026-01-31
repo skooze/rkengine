@@ -364,6 +364,10 @@ struct EditorState {
   bool show_skeleton_debug = true;
   bool show_textured_demo = true;
   bool show_renderables = true;
+  bool last_show_world_grid = true;
+  bool last_show_character_grid = true;
+  bool last_show_skeleton_debug = true;
+  bool last_allow_grids = true;
   float grid_half_extent = 10.0f;
   float grid_step = 1.0f;
 
@@ -2633,6 +2637,22 @@ void draw_viewport(EditorState& state) {
     }
     ImGui::Separator();
   }
+  const bool allow_grids = state.show_skeleton_debug || state.play_state != PlayState::Play;
+  if (state.show_world_grid != state.last_show_world_grid ||
+      state.show_character_grid != state.last_show_character_grid ||
+      state.show_skeleton_debug != state.last_show_skeleton_debug ||
+      allow_grids != state.last_allow_grids) {
+    // DEBUG: viewport toggle tracing to diagnose grid visibility. Remove once resolved.
+    rkg::log::info("viewport: world_grid=" + std::to_string(state.show_world_grid) +
+                   " character_grid=" + std::to_string(state.show_character_grid) +
+                   " skeletons=" + std::to_string(state.show_skeleton_debug) +
+                   " allow_grids=" + std::to_string(allow_grids) +
+                   " play=" + std::to_string(state.play_state == PlayState::Play));
+    state.last_show_world_grid = state.show_world_grid;
+    state.last_show_character_grid = state.show_character_grid;
+    state.last_show_skeleton_debug = state.show_skeleton_debug;
+    state.last_allow_grids = allow_grids;
+  }
   const ImVec2 avail = ImGui::GetContentRegionAvail();
   const ImVec2 cursor = ImGui::GetCursorScreenPos();
   state.viewport_pos[0] = cursor.x;
@@ -4357,7 +4377,6 @@ void update_camera_and_draw_list(EditorState& state) {
   const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
 
   // Draw skeletons first so bones remain visible even when line capacity is limited.
-  const bool allow_grids = state.show_skeleton_debug || state.play_state != PlayState::Play;
   if (state.show_world_grid && allow_grids) {
     const float extent = state.grid_half_extent;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
