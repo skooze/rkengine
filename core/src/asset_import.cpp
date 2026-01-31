@@ -715,20 +715,14 @@ ImportResult import_glb(const fs::path& input_path,
     for (size_t i = 0; i < data->nodes_count; ++i) {
       const cgltf_node& node = data->nodes[i];
       if (node.mesh == &mesh) {
-        if (node.has_matrix) {
-          float m[16]{};
-          cgltf_node_transform_local(&node, m);
-          const float sx = std::sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
-          const float sy = std::sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
-          const float sz = std::sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
-          if (sx > 0.0f) mesh_scale[0] = sx;
-          if (sy > 0.0f) mesh_scale[1] = sy;
-          if (sz > 0.0f) mesh_scale[2] = sz;
-        } else if (node.has_scale) {
-          mesh_scale[0] = static_cast<float>(node.scale[0]);
-          mesh_scale[1] = static_cast<float>(node.scale[1]);
-          mesh_scale[2] = static_cast<float>(node.scale[2]);
-        }
+        float m[16]{};
+        cgltf_node_transform_world(&node, m);
+        const float sx = std::sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+        const float sy = std::sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
+        const float sz = std::sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+        if (sx > 0.0f) mesh_scale[0] = sx;
+        if (sy > 0.0f) mesh_scale[1] = sy;
+        if (sz > 0.0f) mesh_scale[2] = sz;
         break;
       }
     }
