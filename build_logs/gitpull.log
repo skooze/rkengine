@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   5e0c302..6ef56f2  main       -> origin/main
-Updating 5e0c302..6ef56f2
+   eb42dc8..c10bc4b  main       -> origin/main
+Updating eb42dc8..c10bc4b
 Fast-forward
- apps/rkg_editor/src/main.cpp | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ plugins/renderer/vulkan/src/vulkan_renderer.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
