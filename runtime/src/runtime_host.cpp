@@ -1090,7 +1090,10 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
         const float sin_y = std::sin(yaw);
         const float world_x = dir_x * cos_y + dir_z * sin_y;
         const float world_z = -dir_x * sin_y + dir_z * cos_y;
-        const float max_speed = controller ? controller->max_speed : 2.0f;
+        float max_speed = controller ? controller->max_speed : 2.0f;
+        if (controller && controller->is_sprinting) {
+          max_speed *= controller->sprint_multiplier;
+        }
         vx = world_x * max_speed;
         vz = world_z * max_speed;
       }
@@ -1102,7 +1105,10 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       forward_speed = local_z;
       strafe_speed = local_x;
 
-      const float max_speed = controller ? controller->max_speed : 2.0f;
+      float max_speed = controller ? controller->max_speed : 2.0f;
+      if (controller && controller->is_sprinting) {
+        max_speed *= controller->sprint_multiplier;
+      }
       const float speed_mag = std::sqrt(forward_speed * forward_speed + strafe_speed * strafe_speed);
       if (speed_mag > max_speed && speed_mag > 0.0001f) {
         const float scale = max_speed / speed_mag;

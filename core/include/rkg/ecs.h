@@ -65,6 +65,7 @@ struct CharacterController {
   float half_height = 0.9f;
   float center_offset = 0.0f;
   float max_speed = 4.0f;
+  float sprint_multiplier = 1.75f;
   float accel = 20.0f;
   float friction = 8.0f;
   float braking_deceleration = 16.0f;
@@ -77,6 +78,8 @@ struct CharacterController {
   float gravity = -9.8f;
   float terminal_velocity = 55.0f;
   float jump_impulse = 5.0f;
+  float rotation_rate_deg_per_sec = 720.0f;
+  float min_speed_to_rotate = 0.2f;
   float slope_limit_deg = 45.0f;
   float step_height = 0.35f;
   float skin_width = 0.02f;
@@ -90,6 +93,7 @@ struct CharacterController {
   float input_smooth_tau = 0.08f;
   bool grounded = false;
   MovementMode mode = MovementMode::Falling;
+  bool is_sprinting = false;
   float vertical_velocity = 0.0f;
   float ground_height = 0.0f;
   bool jump_held = false;
@@ -97,6 +101,8 @@ struct CharacterController {
   float coyote_time = 0.1f;
   float jump_buffer_time = 0.1f;
   float jump_buffer = 0.0f;
+  float just_jumped_time = 0.0f;
+  float just_jumped_no_snap_window = 0.1f;
   float desired_move_dir[3] = {0.0f, 0.0f, 0.0f};
   float desired_move_speed = 0.0f;
   bool use_desired_input = false;

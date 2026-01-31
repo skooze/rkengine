@@ -73,6 +73,12 @@ static Vec3 project_on_plane(const Vec3& v, const Vec3& n) {
   return sub(v, mul(n, dot(v, n)));
 }
 
+static float wrap_pi(float angle) {
+  while (angle > kPi) angle -= 2.0f * kPi;
+  while (angle < -kPi) angle += 2.0f * kPi;
+  return angle;
+}
+
 static Vec3 approach_vec(const Vec3& current, const Vec3& target, float max_delta) {
   Vec3 delta = sub(target, current);
   const float dlen = length(delta);
@@ -96,6 +102,38 @@ static Vec3 up_axis() {
   return {0.0f, 1.0f, 0.0f};
 }
 
+static void rotate_toward_movement(rkg::ecs::Transform& transform,
+                                   const Vec3& velocity,
+                                   const Vec3& desired_dir,
+                                   const rkg::ecs::CharacterController& controller,
+                                   float dt,
+                                   bool grounded) {
+  Vec3 planar = v3(velocity.x, 0.0f, velocity.z);
+  float speed = length(planar);
+  Vec3 dir = v3();
+  if (speed > controller.min_speed_to_rotate) {
+    dir = mul(planar, 1.0f / speed);
+  } else {
+    const float dlen = length(desired_dir);
+    if (dlen > kEps) {
+      dir = mul(desired_dir, 1.0f / dlen);
+    } else {
+      return;
+    }
+  }
+
+  const float desired_yaw = std::atan2(dir.x, dir.z);
+  const float current_yaw = transform.rotation[1];
+  float delta = wrap_pi(desired_yaw - current_yaw);
+  float rate = controller.rotation_rate_deg_per_sec * (kPi / 180.0f);
+  if (!grounded) {
+    rate *= 0.5f;
+  }
+  const float max_delta = rate * dt;
+  delta = clampf(delta, -max_delta, max_delta);
+  transform.rotation[1] = current_yaw + delta;
+}
+
 struct GroundHit {
   bool hit = false;
   bool walkable = false;
@@ -114,6 +152,15 @@ struct MotorInput {
   float mag = 0.0f;
   bool jump_pressed = false;
   bool jump_held = false;
+};
+
+struct FrameInputSnapshot {
+  rkg::input::ActionState forward{};
+  rkg::input::ActionState back{};
+  rkg::input::ActionState left{};
+  rkg::input::ActionState right{};
+  rkg::input::ActionState jump{};
+  rkg::input::ActionState sprint{};
 };
 
 rkg::HostContext* g_ctx = nullptr;
@@ -148,26 +195,40 @@ void ensure_ground_plane() {
 
 static MotorInput gather_input(const rkg::ecs::Transform& transform,
                                rkg::ecs::CharacterController& controller,
+                               const FrameInputSnapshot* snapshot,
+                               bool jump_pressed_once,
                                float dt) {
   MotorInput input{};
-  const auto forward = get_action("MoveForward");
-  const auto back = get_action("MoveBack");
-  const auto left = get_action("MoveLeft");
-  const auto right = get_action("MoveRight");
-  const auto jump = get_action("Jump");
-  const auto sprint = get_action("Sprint");
+  FrameInputSnapshot local{};
+  if (!snapshot) {
+    local.forward = get_action("MoveForward");
+    local.back = get_action("MoveBack");
+    local.left = get_action("MoveLeft");
+    local.right = get_action("MoveRight");
+    local.jump = get_action("Jump");
+    local.sprint = get_action("Sprint");
+    snapshot = &local;
+  }
 
-  input.jump_pressed = jump.pressed;
-  input.jump_held = jump.held;
+  input.jump_pressed = jump_pressed_once || (snapshot->jump.pressed);
+  input.jump_held = snapshot->jump.held;
 
   Vec3 raw_dir = v3();
   float raw_mag = 0.0f;
+  bool sprint_active = controller.is_sprinting;
+  if (!controller.use_desired_input) {
+    sprint_active = snapshot->sprint.held;
+  } else if (controller.desired_move_speed > controller.max_speed * 1.01f) {
+    sprint_active = true;
+  }
+  controller.is_sprinting = sprint_active;
+  const float max_speed = controller.max_speed * (sprint_active ? controller.sprint_multiplier : 1.0f);
 
   if (controller.use_desired_input) {
     Vec3 desired = from_array(controller.desired_move_dir);
     float desired_speed = controller.desired_move_speed;
     if (desired_speed > kEps) {
-      raw_mag = clampf(desired_speed / std::max(controller.max_speed, kEps), 0.0f, 1.0f);
+      raw_mag = clampf(desired_speed / std::max(max_speed, kEps), 0.0f, 1.0f);
       raw_dir = normalize(desired);
     } else {
       const float len = length(desired);
@@ -179,10 +240,10 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
   } else {
     float dir_x = 0.0f;
     float dir_z = 0.0f;
-    if (forward.held) dir_z += 1.0f;
-    if (back.held) dir_z -= 1.0f;
-    if (left.held) dir_x += 1.0f;
-    if (right.held) dir_x -= 1.0f;
+    if (snapshot->forward.held) dir_z += 1.0f;
+    if (snapshot->back.held) dir_z -= 1.0f;
+    if (snapshot->left.held) dir_x += 1.0f;
+    if (snapshot->right.held) dir_x -= 1.0f;
 
     float len = std::sqrt(dir_x * dir_x + dir_z * dir_z);
     if (len > kEps) {
@@ -195,9 +256,6 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
       const float world_z = -dir_x * sin_y + dir_z * cos_y;
       raw_dir = v3(world_x, 0.0f, world_z);
       raw_mag = 1.0f;
-    }
-    if (sprint.held) {
-      raw_mag = std::min(1.0f, raw_mag * 1.0f);
     }
   }
 
@@ -444,9 +502,17 @@ static Vec3 update_ground_velocity(const rkg::ecs::CharacterController& controll
   Vec3 v_lat = sub(velocity, v_vert);
   Vec3 v_ground = sub(v_lat, mul(ground_normal, dot(v_lat, ground_normal)));
 
+  Vec3 desired_dir_ground = project_on_plane(desired_dir, ground_normal);
+  float desired_dir_len = length(desired_dir_ground);
+  if (desired_dir_len > kEps) {
+    desired_dir_ground = mul(desired_dir_ground, 1.0f / desired_dir_len);
+  } else {
+    desired_dir_ground = v3();
+  }
+
   const float speed = length(v_ground);
   const bool has_input = desired_speed > 0.01f;
-  const Vec3 desired_vel = mul(desired_dir, desired_speed);
+  const Vec3 desired_vel = mul(desired_dir_ground, desired_speed);
 
   if (has_input) {
     Vec3 delta = sub(desired_vel, v_ground);
@@ -590,6 +656,8 @@ static void move_with_collisions(rkg::ecs::Registry& registry,
 static void update_character(rkg::ecs::Registry& registry,
                              rkg::ecs::Entity entity,
                              rkg::ecs::CharacterController& controller,
+                             const FrameInputSnapshot* snapshot,
+                             bool jump_pressed_once,
                              float dt) {
   auto* transform = registry.get_transform(entity);
   if (!transform) {
@@ -605,7 +673,9 @@ static void update_character(rkg::ecs::Registry& registry,
     }
   }
 
-  MotorInput input = gather_input(*transform, controller, dt);
+  MotorInput input = gather_input(*transform, controller, snapshot, jump_pressed_once, dt);
+
+  controller.just_jumped_time = std::max(0.0f, controller.just_jumped_time - dt);
 
   // Jump buffer & coyote time.
   if (input.jump_pressed) {
@@ -615,6 +685,8 @@ static void update_character(rkg::ecs::Registry& registry,
   }
 
   GroundHit ground = find_ground(registry, entity, *transform, controller);
+  const float pre_ground_dist = ground.distance;
+  const bool pre_ground_hit = ground.hit && ground.walkable;
   const bool on_ground = ground.hit && ground.walkable &&
                          (ground.distance <= controller.skin_width + controller.ground_snap_max);
 
@@ -643,7 +715,9 @@ static void update_character(rkg::ecs::Registry& registry,
 
   Vec3 velocity = from_array(velocity_comp->linear);
   Vec3 desired_dir = input.dir_world;
-  float desired_speed = input.mag * controller.max_speed;
+  const float max_speed = controller.max_speed *
+                          (controller.is_sprinting ? controller.sprint_multiplier : 1.0f);
+  float desired_speed = input.mag * max_speed;
 
   if (controller.mode == rkg::ecs::MovementMode::Grounded) {
     velocity = update_ground_velocity(controller, velocity, desired_dir, desired_speed,
@@ -670,6 +744,7 @@ static void update_character(rkg::ecs::Registry& registry,
     velocity.y = controller.jump_impulse;
     controller.grounded = false;
     controller.mode = rkg::ecs::MovementMode::Falling;
+    controller.just_jumped_time = controller.just_jumped_no_snap_window;
   }
 
   // Apply base velocity (moving platforms), if any.
@@ -680,17 +755,34 @@ static void update_character(rkg::ecs::Registry& registry,
 
   move_with_collisions(registry, entity, controller, *transform, velocity, ground.normal, dt);
 
+  rotate_toward_movement(*transform, velocity, desired_dir, controller, dt,
+                         controller.mode == rkg::ecs::MovementMode::Grounded);
+
   // Post-move ground snap.
   GroundHit after_ground = find_ground(registry, entity, *transform, controller);
   if (after_ground.hit && after_ground.walkable) {
-    if (after_ground.distance <= controller.ground_snap_max + controller.skin_width) {
-      const float snap = std::max(0.0f, after_ground.distance - controller.skin_width);
+    const bool can_snap = (velocity.y <= 0.0f) && (controller.just_jumped_time <= 0.0f);
+    if (can_snap && after_ground.distance <= controller.ground_snap_max + controller.skin_width) {
       Vec3 pos = from_array(transform->position);
+      if (pre_ground_hit && pre_ground_dist > controller.skin_width &&
+          after_ground.distance <= controller.skin_width + controller.ground_snap_max) {
+        const float denom = pre_ground_dist - after_ground.distance;
+        if (std::abs(denom) > kEps) {
+          float t = (pre_ground_dist - controller.skin_width) / denom;
+          t = clampf(t, 0.0f, 1.0f);
+          Vec3 delta = mul(velocity, dt);
+          pos = sub(pos, mul(delta, 1.0f - t));
+        }
+      }
+      const float snap = std::max(0.0f, after_ground.distance - controller.skin_width);
       pos = sub(pos, mul(after_ground.normal, snap));
       to_array(pos, transform->position);
       controller.grounded = true;
       controller.mode = rkg::ecs::MovementMode::Grounded;
       controller.ground_height = transform->position[1];
+      if (velocity.y < 0.0f) {
+        velocity.y = 0.0f;
+      }
     }
   }
 
@@ -735,15 +827,24 @@ void physics_basic_update(float dt_seconds) {
     return;
   }
   ensure_ground_plane();
+  FrameInputSnapshot snapshot{};
+  snapshot.forward = get_action("MoveForward");
+  snapshot.back = get_action("MoveBack");
+  snapshot.left = get_action("MoveLeft");
+  snapshot.right = get_action("MoveRight");
+  snapshot.jump = get_action("Jump");
+  snapshot.sprint = get_action("Sprint");
   auto& registry = *g_ctx->registry;
   for (auto& kv : registry.character_controllers()) {
     auto& controller = kv.second;
     float remaining = dt_seconds;
     const float max_step = (controller.max_substep_dt > 0.0f) ? controller.max_substep_dt : dt_seconds;
     int steps = 0;
+    bool jump_pressed_once = snapshot.jump.pressed;
     while (remaining > 0.0f && steps < std::max(1, controller.max_substeps)) {
       const float step = std::min(remaining, max_step);
-      update_character(registry, kv.first, controller, step);
+      update_character(registry, kv.first, controller, &snapshot, jump_pressed_once, step);
+      jump_pressed_once = false;
       remaining -= step;
       ++steps;
     }

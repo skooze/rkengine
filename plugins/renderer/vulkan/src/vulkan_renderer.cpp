@@ -164,6 +164,7 @@ struct VulkanState {
   float skinned_live_fwd = 0.0f;
   float skinned_live_strafe = 0.0f;
   bool skinned_live_grounded = false;
+  float skinned_live_pelvis_offset = 0.0f;
   float frame_dt = 1.0f / 60.0f;
 
   // Cached bone indices for procedural rig drive.
@@ -1037,6 +1038,284 @@ static void build_live_bone_map() {
   g_state.skinned_live_map_valid = true;
 }
 
+static float clampf(float v, float lo, float hi) {
+  return std::min(std::max(v, lo), hi);
+}
+
+static float saturate(float v) {
+  return clampf(v, 0.0f, 1.0f);
+}
+
+static float smoothstep01(float v) {
+  v = saturate(v);
+  return v * v * (3.0f - 2.0f * v);
+}
+
+static float vec3_len(const rkg::Vec3& v) {
+  return std::sqrt(rkg::vec3_dot(v, v));
+}
+
+static rkg::Vec3 vec3_normalize_safe(const rkg::Vec3& v) {
+  const float len = vec3_len(v);
+  if (len <= 0.000001f) return {0.0f, 0.0f, 0.0f};
+  return rkg::vec3_mul(v, 1.0f / len);
+}
+
+static rkg::Vec3 mat4_get_translation(const rkg::Mat4& m) {
+  return {m.m[12], m.m[13], m.m[14]};
+}
+
+static rkg::Mat4 mat4_extract_rotation(const rkg::Mat4& m) {
+  rkg::Vec3 c0{m.m[0], m.m[1], m.m[2]};
+  rkg::Vec3 c1{m.m[4], m.m[5], m.m[6]};
+  rkg::Vec3 c2{m.m[8], m.m[9], m.m[10]};
+  c0 = vec3_normalize_safe(c0);
+  c1 = vec3_normalize_safe(c1);
+  c2 = vec3_normalize_safe(c2);
+  rkg::Mat4 out = rkg::mat4_identity();
+  out.m[0] = c0.x; out.m[1] = c0.y; out.m[2] = c0.z;
+  out.m[4] = c1.x; out.m[5] = c1.y; out.m[6] = c1.z;
+  out.m[8] = c2.x; out.m[9] = c2.y; out.m[10] = c2.z;
+  return out;
+}
+
+static rkg::Mat4 mat4_transpose3x3(const rkg::Mat4& m) {
+  rkg::Mat4 out = rkg::mat4_identity();
+  out.m[0] = m.m[0];  out.m[1] = m.m[4];  out.m[2] = m.m[8];
+  out.m[4] = m.m[1];  out.m[5] = m.m[5];  out.m[6] = m.m[9];
+  out.m[8] = m.m[2];  out.m[9] = m.m[6];  out.m[10] = m.m[10];
+  return out;
+}
+
+static rkg::Mat4 mat4_rotation_axis_angle(const rkg::Vec3& axis, float angle) {
+  rkg::Mat4 out = rkg::mat4_identity();
+  const float c = std::cos(angle);
+  const float s = std::sin(angle);
+  const float t = 1.0f - c;
+  const float x = axis.x;
+  const float y = axis.y;
+  const float z = axis.z;
+  out.m[0] = t * x * x + c;
+  out.m[1] = t * x * y + s * z;
+  out.m[2] = t * x * z - s * y;
+  out.m[4] = t * x * y - s * z;
+  out.m[5] = t * y * y + c;
+  out.m[6] = t * y * z + s * x;
+  out.m[8] = t * x * z + s * y;
+  out.m[9] = t * y * z - s * x;
+  out.m[10] = t * z * z + c;
+  return out;
+}
+
+static rkg::Mat4 mat4_rotation_from_to(const rkg::Vec3& from, const rkg::Vec3& to) {
+  const rkg::Vec3 f = vec3_normalize_safe(from);
+  const rkg::Vec3 t = vec3_normalize_safe(to);
+  const float dot = clampf(rkg::vec3_dot(f, t), -1.0f, 1.0f);
+  if (dot > 0.9999f) {
+    return rkg::mat4_identity();
+  }
+  if (dot < -0.9999f) {
+    rkg::Vec3 axis = rkg::vec3_cross(f, {0.0f, 1.0f, 0.0f});
+    if (vec3_len(axis) < 0.0001f) {
+      axis = rkg::vec3_cross(f, {1.0f, 0.0f, 0.0f});
+    }
+    axis = vec3_normalize_safe(axis);
+    return mat4_rotation_axis_angle(axis, 3.14159265f);
+  }
+  rkg::Vec3 axis = rkg::vec3_cross(f, t);
+  axis = vec3_normalize_safe(axis);
+  const float angle = std::acos(dot);
+  return mat4_rotation_axis_angle(axis, angle);
+}
+
+static rkg::Vec3 mat4_to_euler_xyz(const rkg::Mat4& m) {
+  const float r00 = m.m[0];
+  const float r01 = m.m[4];
+  const float r02 = m.m[8];
+  const float r10 = m.m[1];
+  const float r11 = m.m[5];
+  const float r12 = m.m[9];
+  const float r20 = m.m[2];
+  const float r21 = m.m[6];
+  const float r22 = m.m[10];
+
+  const float sy = clampf(-r20, -1.0f, 1.0f);
+  const float y = std::asin(sy);
+  const float cy = std::cos(y);
+  float x = 0.0f;
+  float z = 0.0f;
+  if (std::fabs(cy) > 0.0001f) {
+    x = std::atan2(r21, r22);
+    z = std::atan2(r10, r00);
+  } else {
+    x = std::atan2(-r12, r11);
+    z = 0.0f;
+  }
+  return {x, y, z};
+}
+
+static void compute_world_matrices(const std::vector<BonePose>& bones,
+                                   std::vector<rkg::Mat4>& world) {
+  const size_t joint_count = bones.size();
+  world.assign(joint_count, rkg::mat4_identity());
+  std::vector<uint8_t> visited(joint_count, 0);
+
+  auto build_local = [](const BonePose& bone) {
+    const rkg::Vec3 t{bone.pos[0], bone.pos[1], bone.pos[2]};
+    const rkg::Vec3 r{bone.rot[0], bone.rot[1], bone.rot[2]};
+    const rkg::Vec3 s{bone.scale[0], bone.scale[1], bone.scale[2]};
+    return rkg::mat4_mul(rkg::mat4_translation(t),
+                         rkg::mat4_mul(rkg::mat4_rotation_xyz(r), rkg::mat4_scale(s)));
+  };
+
+  std::function<rkg::Mat4(size_t)> compute_world = [&](size_t idx) -> rkg::Mat4 {
+    if (idx >= joint_count) return rkg::mat4_identity();
+    if (visited[idx]) return world[idx];
+    visited[idx] = 1;
+    const BonePose& bone = bones[idx];
+    rkg::Mat4 local = build_local(bone);
+    if (bone.parent >= 0 && static_cast<size_t>(bone.parent) < joint_count) {
+      rkg::Mat4 parent_world = compute_world(static_cast<size_t>(bone.parent));
+      world[idx] = rkg::mat4_mul(parent_world, local);
+    } else {
+      world[idx] = local;
+    }
+    return world[idx];
+  };
+
+  for (size_t i = 0; i < joint_count; ++i) {
+    compute_world(i);
+  }
+}
+
+static rkg::Vec3 solve_two_bone_ik(const rkg::Vec3& hip,
+                                   const rkg::Vec3& knee,
+                                   const rkg::Vec3& ankle,
+                                   const rkg::Vec3& target,
+                                   const rkg::Vec3& plane_normal) {
+  const float l1 = vec3_len(rkg::vec3_sub(knee, hip));
+  const float l2 = vec3_len(rkg::vec3_sub(ankle, knee));
+  rkg::Vec3 dir = rkg::vec3_sub(target, hip);
+  float d = vec3_len(dir);
+  if (d < 0.0001f) d = 0.0001f;
+  const float min_d = std::max(0.001f, std::fabs(l1 - l2) + 0.001f);
+  const float max_d = std::max(0.001f, l1 + l2 - 0.001f);
+  d = clampf(d, min_d, max_d);
+  dir = rkg::vec3_mul(dir, 1.0f / d);
+
+  const float x = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
+  float h_sq = l1 * l1 - x * x;
+  if (h_sq < 0.0f) h_sq = 0.0f;
+  const float h = std::sqrt(h_sq);
+
+  rkg::Vec3 axis = rkg::vec3_cross(plane_normal, dir);
+  axis = vec3_normalize_safe(axis);
+  if (vec3_len(axis) < 0.0001f) {
+    axis = vec3_normalize_safe(rkg::vec3_cross({0.0f, 1.0f, 0.0f}, dir));
+  }
+  const float side = rkg::vec3_dot(rkg::vec3_sub(knee, hip), axis) >= 0.0f ? 1.0f : -1.0f;
+  axis = rkg::vec3_mul(axis, side);
+
+  return rkg::vec3_add(hip, rkg::vec3_add(rkg::vec3_mul(dir, x), rkg::vec3_mul(axis, h)));
+}
+
+static void apply_bone_aim(std::vector<BonePose>& posed,
+                           const std::vector<rkg::Mat4>& world,
+                           uint32_t bone_idx,
+                           uint32_t child_idx,
+                           const rkg::Vec3& target_child_pos) {
+  if (bone_idx == UINT32_MAX || child_idx == UINT32_MAX) return;
+  if (bone_idx >= posed.size() || child_idx >= posed.size()) return;
+  const rkg::Vec3 bone_pos = mat4_get_translation(world[bone_idx]);
+  const rkg::Vec3 current_child_pos = mat4_get_translation(world[child_idx]);
+  const rkg::Vec3 current_dir = rkg::vec3_sub(current_child_pos, bone_pos);
+  const rkg::Vec3 desired_dir = rkg::vec3_sub(target_child_pos, bone_pos);
+  if (vec3_len(current_dir) < 0.0001f || vec3_len(desired_dir) < 0.0001f) return;
+
+  const rkg::Mat4 bone_world_rot = mat4_extract_rotation(world[bone_idx]);
+  rkg::Mat4 parent_world_rot = rkg::mat4_identity();
+  const int parent_idx = posed[bone_idx].parent;
+  if (parent_idx >= 0 && static_cast<size_t>(parent_idx) < world.size()) {
+    parent_world_rot = mat4_extract_rotation(world[static_cast<size_t>(parent_idx)]);
+  }
+  const rkg::Mat4 parent_world_inv = mat4_transpose3x3(parent_world_rot);
+  const rkg::Mat4 delta = mat4_rotation_from_to(current_dir, desired_dir);
+  const rkg::Mat4 new_world_rot = rkg::mat4_mul(delta, bone_world_rot);
+  const rkg::Mat4 local_rot = rkg::mat4_mul(parent_world_inv, new_world_rot);
+  const rkg::Vec3 euler = mat4_to_euler_xyz(local_rot);
+  posed[bone_idx].rot[0] = euler.x;
+  posed[bone_idx].rot[1] = euler.y;
+  posed[bone_idx].rot[2] = euler.z;
+}
+
+static void apply_leg_ik(const SkeletonAsset& skel,
+                         std::vector<BonePose>& posed,
+                         float lift_l,
+                         float lift_r,
+                         float speed_ease,
+                         bool grounded,
+                         float dt) {
+  (void)skel;
+  if (g_state.bone_hips == UINT32_MAX ||
+      g_state.bone_l_thigh == UINT32_MAX || g_state.bone_l_calf == UINT32_MAX || g_state.bone_l_foot == UINT32_MAX ||
+      g_state.bone_r_thigh == UINT32_MAX || g_state.bone_r_calf == UINT32_MAX || g_state.bone_r_foot == UINT32_MAX) {
+    return;
+  }
+  const float ik_strength = grounded ? (0.20f + 0.80f * speed_ease) : 0.0f;
+  const float ik_weight_l = ik_strength * (1.0f - lift_l);
+  const float ik_weight_r = ik_strength * (1.0f - lift_r);
+  if (ik_weight_l <= 0.001f && ik_weight_r <= 0.001f) {
+    const float relax_alpha = 1.0f - std::exp(-dt * 6.0f);
+    g_state.skinned_live_pelvis_offset += (0.0f - g_state.skinned_live_pelvis_offset) * relax_alpha;
+    posed[g_state.bone_hips].pos[1] += g_state.skinned_live_pelvis_offset;
+    return;
+  }
+
+  std::vector<rkg::Mat4> world;
+  compute_world_matrices(posed, world);
+
+  const rkg::Vec3 foot_l = mat4_get_translation(world[g_state.bone_l_foot]);
+  const rkg::Vec3 foot_r = mat4_get_translation(world[g_state.bone_r_foot]);
+  const float ground_y = 0.0f;
+  const float foot_clear = 0.02f;
+  rkg::Vec3 target_l = foot_l;
+  rkg::Vec3 target_r = foot_r;
+  target_l.y = foot_l.y + (ground_y + foot_clear - foot_l.y) * ik_weight_l;
+  target_r.y = foot_r.y + (ground_y + foot_clear - foot_r.y) * ik_weight_r;
+
+  const float max_pelvis_drop = 0.18f;
+  const float desired_drop = std::min(0.0f, std::min(target_l.y - foot_l.y, target_r.y - foot_r.y));
+  const float clamped_drop = clampf(desired_drop, -max_pelvis_drop, 0.0f);
+  const float pelvis_alpha = 1.0f - std::exp(-dt * 8.0f);
+  g_state.skinned_live_pelvis_offset += (clamped_drop - g_state.skinned_live_pelvis_offset) * pelvis_alpha;
+  posed[g_state.bone_hips].pos[1] += g_state.skinned_live_pelvis_offset;
+
+  compute_world_matrices(posed, world);
+  const rkg::Vec3 l_hip = mat4_get_translation(world[g_state.bone_l_thigh]);
+  const rkg::Vec3 l_knee = mat4_get_translation(world[g_state.bone_l_calf]);
+  const rkg::Vec3 l_foot = mat4_get_translation(world[g_state.bone_l_foot]);
+  const rkg::Vec3 r_hip = mat4_get_translation(world[g_state.bone_r_thigh]);
+  const rkg::Vec3 r_knee = mat4_get_translation(world[g_state.bone_r_calf]);
+  const rkg::Vec3 r_foot = mat4_get_translation(world[g_state.bone_r_foot]);
+
+  rkg::Vec3 l_plane = rkg::vec3_cross(rkg::vec3_sub(l_knee, l_hip), rkg::vec3_sub(l_foot, l_knee));
+  rkg::Vec3 r_plane = rkg::vec3_cross(rkg::vec3_sub(r_knee, r_hip), rkg::vec3_sub(r_foot, r_knee));
+  l_plane = vec3_normalize_safe(l_plane);
+  r_plane = vec3_normalize_safe(r_plane);
+  if (vec3_len(l_plane) < 0.0001f) l_plane = {0.0f, 0.0f, 1.0f};
+  if (vec3_len(r_plane) < 0.0001f) r_plane = {0.0f, 0.0f, 1.0f};
+
+  const rkg::Vec3 l_knee_target = solve_two_bone_ik(l_hip, l_knee, l_foot, target_l, l_plane);
+  const rkg::Vec3 r_knee_target = solve_two_bone_ik(r_hip, r_knee, r_foot, target_r, r_plane);
+
+  apply_bone_aim(posed, world, g_state.bone_l_thigh, g_state.bone_l_calf, l_knee_target);
+  apply_bone_aim(posed, world, g_state.bone_r_thigh, g_state.bone_r_calf, r_knee_target);
+
+  compute_world_matrices(posed, world);
+  apply_bone_aim(posed, world, g_state.bone_l_calf, g_state.bone_l_foot, target_l);
+  apply_bone_aim(posed, world, g_state.bone_r_calf, g_state.bone_r_foot, target_r);
+}
+
 static void apply_live_pose(const SkeletonAsset& skel,
                             float phase,
                             float speed_norm,
@@ -1059,8 +1338,7 @@ static void apply_live_pose(const SkeletonAsset& skel,
     out[idx].pos[2] += pz;
   };
 
-  const float stride = std::min(std::max(speed_norm, 0.0f), 1.0f);
-  const float stride_ease = stride * stride * (3.0f - 2.0f * stride);
+  const float stride = smoothstep01(speed_norm);
   const float grounded_scale = grounded ? 1.0f : 0.35f;
 
   const float phase_l = phase;
@@ -1071,22 +1349,22 @@ static void apply_live_pose(const SkeletonAsset& skel,
   const float lift_r = std::max(0.0f, swing_r);
   const float bob = std::sin(phase * 2.0f);
 
-  const float pelvis_bob = 0.035f * stride_ease * grounded_scale;
-  const float pelvis_sway = 0.0f;
-  const float pelvis_roll = 0.0f;
+  const float pelvis_bob = 0.028f * stride * grounded_scale;
+  const float pelvis_sway = 0.015f * strafe * stride * grounded_scale;
+  const float pelvis_roll = -0.06f * strafe * stride * grounded_scale;
   add_pos(g_state.bone_hips, pelvis_sway * (swing_l - swing_r), pelvis_bob * bob, 0.0f);
-  add_rot(g_state.bone_hips, -fwd * 0.20f * stride_ease, 0.0f, -strafe * 0.08f * stride_ease);
+  add_rot(g_state.bone_hips, -fwd * 0.22f * stride, 0.0f, pelvis_roll);
 
-  add_rot(g_state.bone_spine, fwd * 0.18f * stride_ease, 0.0f, strafe * 0.16f * stride_ease);
-  add_rot(g_state.bone_chest, fwd * 0.12f * stride_ease, 0.0f, strafe * 0.10f * stride_ease);
-  add_rot(g_state.bone_neck, fwd * 0.05f * stride_ease, 0.0f, strafe * 0.05f * stride_ease);
-  add_rot(g_state.bone_head, fwd * 0.03f * stride_ease, 0.0f, strafe * 0.04f * stride_ease);
+  add_rot(g_state.bone_spine, fwd * 0.18f * stride, 0.0f, strafe * 0.12f * stride);
+  add_rot(g_state.bone_chest, fwd * 0.14f * stride, 0.0f, strafe * 0.08f * stride);
+  add_rot(g_state.bone_neck, fwd * 0.06f * stride, 0.0f, strafe * 0.04f * stride);
+  add_rot(g_state.bone_head, fwd * 0.04f * stride, 0.0f, strafe * 0.03f * stride);
 
-  const float thigh_amp = 0.85f * stride_ease * grounded_scale + 0.06f;
-  const float calf_amp = 0.95f * stride_ease * grounded_scale;
-  const float foot_amp = 0.20f * stride_ease * grounded_scale;
-  add_rot(g_state.bone_l_thigh, thigh_amp * swing_l, 0.0f, strafe * 0.10f * stride_ease);
-  add_rot(g_state.bone_r_thigh, thigh_amp * swing_r, 0.0f, -strafe * 0.10f * stride_ease);
+  const float thigh_amp = (0.70f * stride * grounded_scale) + 0.05f;
+  const float calf_amp = 0.85f * stride * grounded_scale;
+  const float foot_amp = 0.18f * stride * grounded_scale;
+  add_rot(g_state.bone_l_thigh, thigh_amp * swing_l, 0.0f, strafe * 0.06f * stride);
+  add_rot(g_state.bone_r_thigh, thigh_amp * swing_r, 0.0f, -strafe * 0.06f * stride);
   const float knee_l = (lift_l * lift_l);
   const float knee_r = (lift_r * lift_r);
   add_rot(g_state.bone_l_calf, calf_amp * knee_l, 0.0f, 0.0f);
@@ -1094,11 +1372,11 @@ static void apply_live_pose(const SkeletonAsset& skel,
   add_rot(g_state.bone_l_foot, -foot_amp * knee_l, 0.0f, 0.0f);
   add_rot(g_state.bone_r_foot, -foot_amp * knee_r, 0.0f, 0.0f);
 
-  const float arm_amp = 0.20f * stride_ease * grounded_scale + 0.02f;
+  const float arm_amp = 0.32f * stride * grounded_scale + 0.02f;
   add_rot(g_state.bone_l_upper_arm, arm_amp * swing_r, 0.0f, 0.0f);
   add_rot(g_state.bone_r_upper_arm, arm_amp * swing_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_l_lower_arm, 0.15f * arm_amp * swing_r, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_lower_arm, 0.15f * arm_amp * swing_l, 0.0f, 0.0f);
+  add_rot(g_state.bone_l_lower_arm, 0.20f * arm_amp * swing_r, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_lower_arm, 0.20f * arm_amp * swing_l, 0.0f, 0.0f);
 }
 
 static void update_skinned_live_pose() {
@@ -1115,23 +1393,30 @@ static void update_skinned_live_pose() {
   bool grounded = false;
   rkg::get_vulkan_viewport_skinned_live_params(fwd, strafe, grounded);
   const float speed = std::sqrt(fwd * fwd + strafe * strafe);
-  const float speed_norm = std::min(speed / 4.0f, 1.0f);
-  const float speed_ease = speed_norm * speed_norm * (3.0f - 2.0f * speed_norm);
+  const float gait_speed_ref = 3.0f;
+  const float speed_norm = saturate(speed / gait_speed_ref);
+  const float speed_ease = smoothstep01(speed_norm);
+  const float dir_fwd = (speed > 0.0001f) ? (fwd / speed) : 0.0f;
+  const float dir_strafe = (speed > 0.0001f) ? (strafe / speed) : 0.0f;
 
   if (!g_state.skinned_live_map_valid) {
     build_live_bone_map();
   }
 
   const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
-  const float cadence = 0.02f + speed_ease * 0.06f;
-  g_state.skinned_live_phase += dt * cadence * 6.2831853f;
+  const float step_rate = 1.1f + speed_ease * 1.4f;
+  g_state.skinned_live_phase += dt * step_rate * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
   }
 
   std::vector<BonePose> posed;
-  apply_live_pose(g_state.skinned_skeleton, g_state.skinned_live_phase, speed_ease,
-                  fwd, strafe, grounded, posed);
+  apply_live_pose(g_state.skinned_skeleton, g_state.skinned_live_phase, speed_norm,
+                  dir_fwd, dir_strafe, grounded, posed);
+
+  const float lift_l = std::max(0.0f, std::sin(g_state.skinned_live_phase));
+  const float lift_r = std::max(0.0f, std::sin(g_state.skinned_live_phase + 3.14159265f));
+  apply_leg_ik(g_state.skinned_skeleton, posed, lift_l, lift_r, speed_ease, grounded, dt);
 
   if (!g_state.skinned_live_logged) {
     auto name_or_idx = [&](uint32_t idx) -> std::string {
