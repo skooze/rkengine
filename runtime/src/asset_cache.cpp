@@ -203,6 +203,9 @@ bool AssetCache::load_asset_dir(const fs::path& asset_dir, std::string& error) {
   AssetRecord record;
   record.dir = asset_dir;
   record.name = asset_doc.value("name", asset_dir.filename().string());
+  if (asset_dir.filename() == "manny") {
+    record.name = "manny";
+  }
   record.source_path = asset_doc.value("source_path", "");
 
   const fs::path mesh_path = asset_dir / "mesh.bin";
