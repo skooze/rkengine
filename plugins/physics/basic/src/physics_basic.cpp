@@ -63,6 +63,18 @@ void update_character(rkg::ecs::Registry& registry,
   const auto jump = get_action("Jump");
   const auto sprint = get_action("Sprint");
 
+  // DEBUG: input/movement tracing to diagnose stuck movement. Remove once resolved.
+  static int debug_frame = 0;
+  if ((debug_frame++ % 60) == 0) {
+    rkg::log::info("physics_basic: input fwd=" + std::to_string(forward.held) +
+                   " back=" + std::to_string(back.held) +
+                   " left=" + std::to_string(left.held) +
+                   " right=" + std::to_string(right.held) +
+                   " jump=" + std::to_string(jump.held) +
+                   " sprint=" + std::to_string(sprint.held) +
+                   " dt=" + std::to_string(dt));
+  }
+
   float dir_x = 0.0f;
   float dir_z = 0.0f;
   if (forward.held) dir_z += 1.0f;
@@ -104,6 +116,18 @@ void update_character(rkg::ecs::Registry& registry,
   transform->position[0] += velocity->linear[0] * dt;
   transform->position[1] += velocity->linear[1] * dt;
   transform->position[2] += velocity->linear[2] * dt;
+
+  // DEBUG: movement tracing to diagnose stuck movement. Remove once resolved.
+  if ((debug_frame % 60) == 0) {
+    rkg::log::info("physics_basic: pos=(" +
+                   std::to_string(transform->position[0]) + "," +
+                   std::to_string(transform->position[1]) + "," +
+                   std::to_string(transform->position[2]) + ") vel=(" +
+                   std::to_string(velocity->linear[0]) + "," +
+                   std::to_string(velocity->linear[1]) + "," +
+                   std::to_string(velocity->linear[2]) + ") grounded=" +
+                   std::to_string(controller.grounded));
+  }
 
   const float capsule_center_y = transform->position[1] + controller.center_offset;
   const float capsule_bottom = capsule_center_y - (controller.half_height + controller.radius);
