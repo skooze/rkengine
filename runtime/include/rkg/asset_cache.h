@@ -18,6 +18,8 @@ struct MeshInfo {
   bool has_tangents = false;
   bool has_joints = false;
   bool has_weights = false;
+  std::array<float, 3> bounds_min{0.0f, 0.0f, 0.0f};
+  std::array<float, 3> bounds_max{0.0f, 0.0f, 0.0f};
 };
 
 struct MaterialInfo {
@@ -33,6 +35,7 @@ struct SkeletonInfo {
 
 struct AssetRecord {
   std::string name;
+  std::string source_path;
   std::filesystem::path dir;
   MeshInfo mesh;
   std::vector<MaterialInfo> materials;

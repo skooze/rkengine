@@ -1251,7 +1251,8 @@ bool load_textured_asset() {
   }
 
   g_state.textured_ready = true;
-  rkg::log::info("renderer:vulkan textured demo: using asset " + g_state.textured_asset_name);
+  rkg::log::info("renderer:vulkan textured demo: using asset " + g_state.textured_asset_name +
+                 " dir=" + asset_dir.string());
   return true;
 }
 

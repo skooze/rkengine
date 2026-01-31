@@ -7,6 +7,8 @@
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
 
+#include <cstdlib>
+
 #if RKG_PLATFORM_SDL
 #include <SDL3/SDL.h>
 #endif
@@ -1194,7 +1196,36 @@ void RuntimeHost::load_initial_level() {
     }
 
     if (rig_asset && !rig_asset->skeleton.bones.empty()) {
-      rkg::log::info("runtime: player rig asset = " + rig_asset->name);
+      if (auto* transform = registry_.get_transform(player_)) {
+        float rig_scale = 0.0f;
+        if (const char* scale_env = std::getenv("RKG_RIG_SCALE"); scale_env && *scale_env) {
+          rig_scale = std::strtof(scale_env, nullptr);
+        } else {
+          const float height = rig_asset->mesh.bounds_max[1] - rig_asset->mesh.bounds_min[1];
+          if (height > 0.0001f) {
+            rig_scale = 1.8f / height;
+          }
+        }
+        if (rig_scale > 0.0001f) {
+          const bool default_scale =
+              transform->scale[0] == 1.0f && transform->scale[1] == 1.0f && transform->scale[2] == 1.0f;
+          if (default_scale || (scale_env && *scale_env)) {
+            transform->scale[0] = rig_scale;
+            transform->scale[1] = rig_scale;
+            transform->scale[2] = rig_scale;
+            rkg::log::info("runtime: player rig scale set to " + std::to_string(rig_scale) +
+                           " (mesh height=" + std::to_string(rig_asset->mesh.bounds_max[1] -
+                                                             rig_asset->mesh.bounds_min[1]) +
+                           ")");
+          }
+        }
+      }
+      if (!rig_asset->source_path.empty()) {
+        rkg::log::info("runtime: player rig asset = " + rig_asset->name +
+                       " (source=" + rig_asset->source_path + ")");
+      } else {
+        rkg::log::info("runtime: player rig asset = " + rig_asset->name);
+      }
       rkg::ecs::Skeleton skeleton{};
       skeleton.bones = rig_asset->skeleton.bones;
       registry_.set_skeleton(player_, skeleton);

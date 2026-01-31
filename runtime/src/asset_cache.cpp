@@ -60,6 +60,26 @@ bool load_mesh_bin(const fs::path& path, MeshInfo& out, std::string& error) {
   out.has_tangents = (flags & 4u) != 0;
   out.has_joints = (flags & 8u) != 0;
   out.has_weights = (flags & 16u) != 0;
+  const size_t pos_bytes = static_cast<size_t>(out.vertex_count) * 3 * sizeof(float);
+  size_t offset = sizeof(uint32_t) * 5;
+  if (bytes.size() >= offset + pos_bytes && out.vertex_count > 0) {
+    const float* positions = reinterpret_cast<const float*>(bytes.data() + offset);
+    std::array<float, 3> minv{positions[0], positions[1], positions[2]};
+    std::array<float, 3> maxv{positions[0], positions[1], positions[2]};
+    for (uint32_t i = 0; i < out.vertex_count; ++i) {
+      const float x = positions[i * 3 + 0];
+      const float y = positions[i * 3 + 1];
+      const float z = positions[i * 3 + 2];
+      if (x < minv[0]) minv[0] = x;
+      if (y < minv[1]) minv[1] = y;
+      if (z < minv[2]) minv[2] = z;
+      if (x > maxv[0]) maxv[0] = x;
+      if (y > maxv[1]) maxv[1] = y;
+      if (z > maxv[2]) maxv[2] = z;
+    }
+    out.bounds_min = minv;
+    out.bounds_max = maxv;
+  }
   return true;
 }
 
@@ -183,6 +203,7 @@ bool AssetCache::load_asset_dir(const fs::path& asset_dir, std::string& error) {
   AssetRecord record;
   record.dir = asset_dir;
   record.name = asset_doc.value("name", asset_dir.filename().string());
+  record.source_path = asset_doc.value("source_path", "");
 
   const fs::path mesh_path = asset_dir / "mesh.bin";
   if (!load_mesh_bin(mesh_path, record.mesh, error)) {
