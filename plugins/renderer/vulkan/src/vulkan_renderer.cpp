@@ -1700,7 +1700,8 @@ bool create_viewport_pipeline() {
 
   VkPipelineDepthStencilStateCreateInfo depth{};
   depth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depth.depthTestEnable = VK_FALSE;
+  // Depth test ON so grids/bones are occluded by meshes when appropriate.
+  depth.depthTestEnable = VK_TRUE;
   depth.depthWriteEnable = VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth.depthBoundsTestEnable = VK_FALSE;
