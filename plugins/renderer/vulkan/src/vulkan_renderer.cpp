@@ -1071,9 +1071,9 @@ static void apply_live_pose(const SkeletonAsset& skel,
   const float lift_r = std::max(0.0f, swing_r);
   const float bob = std::sin(phase * 2.0f);
 
-  const float pelvis_bob = 0.045f * stride_ease * grounded_scale;
-  const float pelvis_sway = 0.05f * stride_ease * grounded_scale;
-  const float pelvis_roll = 0.12f * stride_ease * grounded_scale;
+  const float pelvis_bob = 0.035f * stride_ease * grounded_scale;
+  const float pelvis_sway = 0.02f * stride_ease * grounded_scale;
+  const float pelvis_roll = 0.06f * stride_ease * grounded_scale;
   add_pos(g_state.bone_hips, pelvis_sway * (swing_l - swing_r), pelvis_bob * bob, 0.0f);
   add_rot(g_state.bone_hips, -fwd * 0.20f * stride_ease, 0.0f,
           -strafe * 0.22f * stride_ease + pelvis_roll * (swing_l - swing_r));
@@ -1083,21 +1083,23 @@ static void apply_live_pose(const SkeletonAsset& skel,
   add_rot(g_state.bone_neck, fwd * 0.05f * stride_ease, 0.0f, strafe * 0.05f * stride_ease);
   add_rot(g_state.bone_head, fwd * 0.03f * stride_ease, 0.0f, strafe * 0.04f * stride_ease);
 
-  const float thigh_amp = 0.95f * stride_ease * grounded_scale + 0.08f;
-  const float calf_amp = 0.75f * stride_ease * grounded_scale;
-  const float foot_amp = 0.28f * stride_ease * grounded_scale;
+  const float thigh_amp = 0.85f * stride_ease * grounded_scale + 0.06f;
+  const float calf_amp = 0.95f * stride_ease * grounded_scale;
+  const float foot_amp = 0.20f * stride_ease * grounded_scale;
   add_rot(g_state.bone_l_thigh, thigh_amp * swing_l, 0.0f, strafe * 0.10f * stride_ease);
   add_rot(g_state.bone_r_thigh, thigh_amp * swing_r, 0.0f, -strafe * 0.10f * stride_ease);
-  add_rot(g_state.bone_l_calf, calf_amp * lift_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_calf, calf_amp * lift_r, 0.0f, 0.0f);
-  add_rot(g_state.bone_l_foot, -foot_amp * lift_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_foot, -foot_amp * lift_r, 0.0f, 0.0f);
+  const float knee_l = (lift_l * lift_l);
+  const float knee_r = (lift_r * lift_r);
+  add_rot(g_state.bone_l_calf, calf_amp * knee_l, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_calf, calf_amp * knee_r, 0.0f, 0.0f);
+  add_rot(g_state.bone_l_foot, -foot_amp * knee_l, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_foot, -foot_amp * knee_r, 0.0f, 0.0f);
 
-  const float arm_amp = 0.55f * stride_ease * grounded_scale + 0.05f;
-  add_rot(g_state.bone_l_upper_arm, -arm_amp * swing_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_upper_arm, -arm_amp * swing_r, 0.0f, 0.0f);
-  add_rot(g_state.bone_l_lower_arm, -0.35f * arm_amp * swing_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_lower_arm, -0.35f * arm_amp * swing_r, 0.0f, 0.0f);
+  const float arm_amp = 0.35f * stride_ease * grounded_scale + 0.03f;
+  add_rot(g_state.bone_l_upper_arm, arm_amp * swing_r, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_upper_arm, arm_amp * swing_l, 0.0f, 0.0f);
+  add_rot(g_state.bone_l_lower_arm, 0.25f * arm_amp * swing_r, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_lower_arm, 0.25f * arm_amp * swing_l, 0.0f, 0.0f);
 }
 
 static void update_skinned_live_pose() {
