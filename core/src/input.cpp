@@ -99,6 +99,10 @@ void InputSystem::set_map(const InputMap& map) {
 }
 
 void InputSystem::update(const platform::Platform& platform) {
+  // DEBUG: input key state tracing to diagnose missing movement. Remove once resolved.
+  static int debug_frame = 0;
+  const bool should_log = ((debug_frame++ % 60) == 0);
+
   for (const auto& kv : bindings_) {
     const auto& action = kv.first;
     const auto key = kv.second;
@@ -110,6 +114,11 @@ void InputSystem::update(const platform::Platform& platform) {
     state.held = down;
     states_[action] = state;
     previous_[action] = down;
+
+    if (should_log) {
+      rkg::log::info("input: action=" + action + " key=" + std::to_string(static_cast<int>(key)) +
+                     " down=" + std::to_string(down));
+    }
   }
 }
 
