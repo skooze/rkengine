@@ -1198,7 +1198,9 @@ void RuntimeHost::load_initial_level() {
     if (rig_asset && !rig_asset->skeleton.bones.empty()) {
       if (auto* transform = registry_.get_transform(player_)) {
         float rig_scale = 0.0f;
-        if (const char* scale_env = std::getenv("RKG_RIG_SCALE"); scale_env && *scale_env) {
+        const char* scale_env = std::getenv("RKG_RIG_SCALE");
+        const bool has_scale_env = (scale_env && *scale_env);
+        if (has_scale_env) {
           rig_scale = std::strtof(scale_env, nullptr);
         } else {
           const float height = rig_asset->mesh.bounds_max[1] - rig_asset->mesh.bounds_min[1];
@@ -1209,7 +1211,7 @@ void RuntimeHost::load_initial_level() {
         if (rig_scale > 0.0001f) {
           const bool default_scale =
               transform->scale[0] == 1.0f && transform->scale[1] == 1.0f && transform->scale[2] == 1.0f;
-          if (default_scale || (scale_env && *scale_env)) {
+          if (default_scale || has_scale_env) {
             transform->scale[0] = rig_scale;
             transform->scale[1] = rig_scale;
             transform->scale[2] = rig_scale;
