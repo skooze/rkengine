@@ -2633,6 +2633,7 @@ void draw_viewport(EditorState& state) {
     }
     ImGui::Separator();
   }
+  rkg::set_vulkan_viewport_textured_demo_alpha(state.show_skeleton_debug ? 0.5f : 1.0f);
   const ImVec2 avail = ImGui::GetContentRegionAvail();
   const ImVec2 cursor = ImGui::GetCursorScreenPos();
   state.viewport_pos[0] = cursor.x;

@@ -73,10 +73,12 @@ const VulkanViewportLineList* get_vulkan_viewport_line_list();
 struct VulkanViewportTexturedDemo {
   float mvp[16]{};
   bool has_mvp = false;
+  float alpha = 1.0f;
   uint64_t version = 0;
 };
 
 void set_vulkan_viewport_textured_demo_mvp(const float* mvp);
+void set_vulkan_viewport_textured_demo_alpha(float alpha);
 const VulkanViewportTexturedDemo* get_vulkan_viewport_textured_demo();
 
 void set_vulkan_viewport_textured_demo_enabled(bool enabled);

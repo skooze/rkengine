@@ -2935,6 +2935,9 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
         push.mvp[15] = 1.0f;
       }
       std::memcpy(push.color, g_state.textured_base_color, sizeof(push.color));
+      if (textured_demo) {
+        push.color[3] *= textured_demo->alpha;
+      }
       if (use_skinned) {
         vkCmdPushConstants(cmd, g_state.skinned_pipeline_layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

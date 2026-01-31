@@ -167,6 +167,13 @@ void set_vulkan_viewport_textured_demo_mvp(const float* mvp) {
   g_viewport_textured_demo.version += 1;
 }
 
+void set_vulkan_viewport_textured_demo_alpha(float alpha) {
+  if (alpha < 0.0f) alpha = 0.0f;
+  if (alpha > 1.0f) alpha = 1.0f;
+  g_viewport_textured_demo.alpha = alpha;
+  g_viewport_textured_demo.version += 1;
+}
+
 const VulkanViewportTexturedDemo* get_vulkan_viewport_textured_demo() {
   return &g_viewport_textured_demo;
 }
