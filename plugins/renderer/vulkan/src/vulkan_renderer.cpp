@@ -1417,11 +1417,12 @@ static void apply_live_pose(const SkeletonAsset& skel,
   add_rot(g_state.bone_l_foot, -foot_amp * knee_l, 0.0f, 0.0f);
   add_rot(g_state.bone_r_foot, -foot_amp * knee_r, 0.0f, 0.0f);
 
-  const float arm_amp = 0.32f * stride * grounded_scale + 0.02f;
-  add_rot(g_state.bone_l_upper_arm, arm_amp * swing_r, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_upper_arm, arm_amp * swing_l, 0.0f, 0.0f);
-  add_rot(g_state.bone_l_lower_arm, 0.20f * arm_amp * swing_r, 0.0f, 0.0f);
-  add_rot(g_state.bone_r_lower_arm, 0.20f * arm_amp * swing_l, 0.0f, 0.0f);
+  const float arm_tuck = env_float("RKG_LIVE_ARM_TUCK", 0.35f);
+  const float arm_amp = env_float("RKG_LIVE_ARM_SWING", 0.22f) * stride * grounded_scale + 0.01f;
+  add_rot(g_state.bone_l_upper_arm, arm_amp * swing_r, 0.0f, arm_tuck);
+  add_rot(g_state.bone_r_upper_arm, arm_amp * swing_l, 0.0f, -arm_tuck);
+  add_rot(g_state.bone_l_lower_arm, 0.18f * arm_amp * swing_r, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_lower_arm, 0.18f * arm_amp * swing_l, 0.0f, 0.0f);
 }
 
 static void update_skinned_live_pose() {
@@ -1450,7 +1451,7 @@ static void update_skinned_live_pose() {
 
   const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
   const float step_rate = 1.1f + speed_ease * 1.4f;
-  const float gait_time_scale = env_float("RKG_LIVE_GAIT_SCALE", 0.10f);
+  const float gait_time_scale = env_float("RKG_LIVE_GAIT_SCALE", 0.02f);
   g_state.skinned_live_phase += dt * step_rate * gait_time_scale * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
