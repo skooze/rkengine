@@ -1710,7 +1710,13 @@ bool create_viewport_pipeline() {
   VkPipelineColorBlendAttachmentState color_blend_attach{};
   color_blend_attach.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  color_blend_attach.blendEnable = VK_FALSE;
+  color_blend_attach.blendEnable = VK_TRUE;
+  color_blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+  color_blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  color_blend_attach.colorBlendOp = VK_BLEND_OP_ADD;
+  color_blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  color_blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  color_blend_attach.alphaBlendOp = VK_BLEND_OP_ADD;
 
   VkPipelineColorBlendStateCreateInfo color_blend{};
   color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -1849,7 +1855,13 @@ bool create_viewport_line_pipeline() {
   VkPipelineColorBlendAttachmentState color_blend_attach{};
   color_blend_attach.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  color_blend_attach.blendEnable = VK_FALSE;
+  color_blend_attach.blendEnable = VK_TRUE;
+  color_blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+  color_blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  color_blend_attach.colorBlendOp = VK_BLEND_OP_ADD;
+  color_blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  color_blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  color_blend_attach.alphaBlendOp = VK_BLEND_OP_ADD;
 
   VkPipelineColorBlendStateCreateInfo color_blend{};
   color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
