@@ -1194,6 +1194,7 @@ void RuntimeHost::load_initial_level() {
     }
 
     if (rig_asset && !rig_asset->skeleton.bones.empty()) {
+      rkg::log::info("runtime: player rig asset = " + rig_asset->name);
       rkg::ecs::Skeleton skeleton{};
       skeleton.bones = rig_asset->skeleton.bones;
       registry_.set_skeleton(player_, skeleton);

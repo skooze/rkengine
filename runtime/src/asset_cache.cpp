@@ -265,17 +265,15 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
   const fs::path manny_asset_dir = assets_dir / "manny";
   if (fs::exists(manny_source)) {
     rkg::log::info(std::string("asset_cache: manny source -> ") + manny_source.string());
-    const fs::path manny_asset_json = manny_asset_dir / "asset.json";
-    if (!fs::exists(manny_asset_json)) {
-      rkg::asset::ImportOptions options{};
-      options.overwrite = true;
-      options.write_textures = true;
-      const auto result = rkg::asset::import_glb(manny_source, manny_asset_dir, options);
-      if (!result.ok) {
-        rkg::log::warn(std::string("asset_cache: auto-import manny failed: ") + result.error);
-      } else {
-        rkg::log::info("asset_cache: auto-imported manny.glb into content/assets/manny");
-      }
+    rkg::log::info("asset_cache: auto-importing manny into content/assets/manny");
+    rkg::asset::ImportOptions options{};
+    options.overwrite = true;
+    options.write_textures = true;
+    const auto result = rkg::asset::import_glb(manny_source, manny_asset_dir, options);
+    if (!result.ok) {
+      rkg::log::warn(std::string("asset_cache: auto-import manny failed: ") + result.error);
+    } else {
+      rkg::log::info("asset_cache: auto-imported manny.glb into content/assets/manny");
     }
   }
   for (const auto& entry : fs::directory_iterator(assets_dir)) {
