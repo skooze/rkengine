@@ -1296,9 +1296,8 @@ void RuntimeHost::load_initial_level() {
             const float desired_radius = std::max(0.15f, min_xz * 0.25f);
             const float desired_bottom = -rig_asset->mesh.bounds_min[1] * rig_scale * mesh_scale_y;
             const float desired_half_height = std::max(0.1f, desired_bottom - desired_radius);
-            const bool default_controller =
-                controller->half_height == 0.9f && controller->radius == 0.35f;
-            if (default_controller || has_scale_env) {
+            const bool keep_controller = std::getenv("RKG_RIG_KEEP_CONTROLLER") != nullptr;
+            if (!keep_controller) {
               controller->radius = desired_radius;
               controller->half_height = desired_half_height;
               controller->center_offset = controller->half_height + controller->radius;
