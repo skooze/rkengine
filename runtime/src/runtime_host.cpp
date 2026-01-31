@@ -1220,6 +1220,16 @@ void RuntimeHost::load_initial_level() {
                                                              rig_asset->mesh.bounds_min[1]) +
                            ")");
           }
+          const bool default_pos =
+              transform->position[0] == 0.0f && transform->position[1] == 0.0f && transform->position[2] == 0.0f;
+          if (default_pos) {
+            const float offset_y = -rig_asset->mesh.bounds_min[1] * rig_scale;
+            if (offset_y != 0.0f) {
+              transform->position[1] += offset_y;
+              rkg::log::info("runtime: player rig offset set to " + std::to_string(offset_y) +
+                             " (bounds min y=" + std::to_string(rig_asset->mesh.bounds_min[1]) + ")");
+            }
+          }
         }
       }
       if (!rig_asset->source_path.empty()) {
