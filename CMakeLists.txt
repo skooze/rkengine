@@ -13,6 +13,19 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(helpers)
 
+# Embed git hash for runtime logging (best-effort, offline-safe).
+set(RKG_GIT_HASH "unknown")
+execute_process(
+  COMMAND git rev-parse --short HEAD
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE RKG_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if(RKG_GIT_HASH)
+  add_compile_definitions(RKG_GIT_HASH="${RKG_GIT_HASH}")
+endif()
+
 # Build options
 if(WIN32)
   set(RKG_ENABLE_D3D12_DEFAULT ON)
