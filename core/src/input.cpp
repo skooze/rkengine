@@ -115,7 +115,7 @@ void InputSystem::update(const platform::Platform& platform) {
     states_[action] = state;
     previous_[action] = down;
 
-    if (should_log) {
+    if (should_log && down) {
       rkg::log::info("input: action=" + action + " key=" + std::to_string(static_cast<int>(key)) +
                      " down=" + std::to_string(down));
     }

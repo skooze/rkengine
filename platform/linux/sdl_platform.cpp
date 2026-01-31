@@ -658,12 +658,20 @@ void platform_poll_events(Platform* self) {
       const auto code = map_sdl_scancode(event.key.scancode);
       if (code != KeyCode::Unknown) {
         self->keys_down_.insert(code);
+        // DEBUG: key down tracing for movement issues. Remove once resolved.
+        rkg::log::info(std::string("platform: key_down scancode=") +
+                       std::to_string(static_cast<int>(event.key.scancode)) +
+                       " code=" + std::to_string(static_cast<int>(code)));
       }
     }
     if (event.type == SDL_EVENT_KEY_UP) {
       const auto code = map_sdl_scancode(event.key.scancode);
       if (code != KeyCode::Unknown) {
         self->keys_down_.erase(code);
+        // DEBUG: key up tracing for movement issues. Remove once resolved.
+        rkg::log::info(std::string("platform: key_up scancode=") +
+                       std::to_string(static_cast<int>(event.key.scancode)) +
+                       " code=" + std::to_string(static_cast<int>(code)));
       }
     }
     if (event.type == SDL_EVENT_MOUSE_MOTION) {
