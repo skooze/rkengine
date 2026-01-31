@@ -1,10 +1,6 @@
 From github.com:skooze/rkengine
-   173d878..5ffe30b  main       -> origin/main
-Updating 173d878..5ffe30b
+   8917b2f..dcfdd26  main       -> origin/main
+Updating 8917b2f..dcfdd26
 Fast-forward
- apps/rkg_editor/src/main.cpp                    |   4 +-
- core/include/rkg/renderer_hooks.h               |  10 +
- core/src/renderer_hooks.cpp                     |  28 +++
- plugins/renderer/vulkan/src/vulkan_renderer.cpp | 239 +++++++++++++++++-------
- runtime/src/runtime_host.cpp                    |  51 +++++
- 5 files changed, 261 insertions(+), 71 deletions(-)
+ plugins/renderer/vulkan/src/vulkan_renderer.cpp | 38 ++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
