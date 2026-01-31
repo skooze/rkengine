@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   8917b2f..dcfdd26  main       -> origin/main
-Updating 8917b2f..dcfdd26
+   943ebed..5d94fc4  main       -> origin/main
+Updating 943ebed..5d94fc4
 Fast-forward
- plugins/renderer/vulkan/src/vulkan_renderer.cpp | 38 ++++++++++++++++++-------
- 1 file changed, 27 insertions(+), 11 deletions(-)
+ core/src/log.cpp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)

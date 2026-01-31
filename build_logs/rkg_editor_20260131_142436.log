@@ -1,0 +1,615 @@
+[2026-01-31 14:24:36][INFO] log init
+[2026-01-31 14:24:36][INFO] log file: /home/skooze/rkg/build_logs/rkg_editor_20260131_142436.log
+[2026-01-31 14:24:36][INFO] platform: linux
+[2026-01-31 14:24:36][INFO] build: debug
+[2026-01-31 14:24:36][INFO] git: 5d94fc4
+[2026-01-31 14:24:36][INFO] runtime: input map file=/home/skooze/rkg/projects/demo_game/config/input.yaml loaded=1 bindings=9
+[2026-01-31 14:24:36][INFO] asset_cache: manny source -> /home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb
+[2026-01-31 14:24:36][INFO] asset_cache: auto-importing manny into build/content_cache/generated_assets/manny
+[2026-01-31 14:24:36][INFO] asset_cache: auto-imported manny.glb into build/content_cache/generated_assets/manny
+[2026-01-31 14:24:36][INFO] asset_cache: loaded testmanny (verts=69772 idx=418608 mats=0 tex=0 joints=24 scale=1.000000,1.000000,1.000000)
+[2026-01-31 14:24:36][INFO] asset_cache: loaded manny (verts=33592 idx=156288 mats=1 tex=2 joints=24 scale=0.010000,0.010000,0.010000)
+[2026-01-31 14:24:36][WARN] cooked content missing; using raw content (dev_mode)
+[2026-01-31 14:24:36][INFO] RLIMIT_NOFILE: 1024/524288
+[2026-01-31 14:24:36][INFO] RLIMIT_NPROC: 127047/127047
+[2026-01-31 14:24:36][INFO] Wayland socket: /run/user/1000/wayland-0 mode=srwxr-xr-x uid=1000 gid=1000
+[2026-01-31 14:24:36][INFO] Wayland socket connect ok: /run/user/1000/wayland-0
+[2026-01-31 14:24:36][INFO] Wayland wl_display_connect ok: wayland-0
+[2026-01-31 14:24:36][INFO] X11 socket: /tmp/.X11-unix/X1 mode=srwxr-xr-x uid=1000 gid=1000
+[2026-01-31 14:24:36][INFO] X11 socket connect ok: /tmp/.X11-unix/X1
+[2026-01-31 14:24:36][INFO] X11 XOpenDisplay ok: :1
+[2026-01-31 14:24:36][INFO] SDL system/info: App name: SDL Application
+[2026-01-31 14:24:36][INFO] SDL system/info: App version: <unspecified>
+[2026-01-31 14:24:36][INFO] SDL system/info: App ID: <unspecified>
+[2026-01-31 14:24:36][INFO] SDL system/info: SDL revision: SDL-release-3.4.0-0-ga962f40bb
+[2026-01-31 14:24:36][INFO] SDL system/debug: SDL chose video backend 'wayland'
+[2026-01-31 14:24:36][INFO] SDL current video driver: wayland
+[2026-01-31 14:24:36][INFO] renderer:vulkan skinned demo: joints=24
+[2026-01-31 14:24:36][INFO] renderer:vulkan textured demo: using asset manny dir=/home/skooze/rkg/build/content_cache/generated_assets/manny
+[2026-01-31 14:24:36][INFO] renderer:vulkan init
+[2026-01-31 14:24:36][INFO] renderer:vulkan dynamic rendering: enabled
+[2026-01-31 14:24:36][INFO] renderer: renderer_vulkan
+[2026-01-31 14:24:36][INFO] renderer caps: DrawPrimitive | DebugUiSupported
+[2026-01-31 14:24:36][WARN] script:lua not available (Lua not found)
+[2026-01-31 14:24:36][WARN] script:js not available (QuickJS/Duktape not found)
+[2026-01-31 14:24:36][INFO] debug_ui: swapchain_format=50
+[2026-01-31 14:24:36][INFO] debug_ui: backend caps api=pipeline_info_main render_pass=yes dynamic=yes color_format=no pipeline_rendering=yes msaa=yes
+[2026-01-31 14:24:36][INFO] debug_ui: render path render_pass
+[2026-01-31 14:24:36][INFO] debug_ui: init
+[2026-01-31 14:24:36][INFO] debug_ui enabled
+[2026-01-31 14:24:36][INFO] physics_basic: init
+[2026-01-31 14:24:36][INFO] level entity spawned: player_spawn
+[2026-01-31 14:24:36][INFO] level entity spawned: ground_plane_1
+[2026-01-31 14:24:36][INFO] level entity spawned: demo_quad_1
+[2026-01-31 14:24:36][INFO] runtime: player rig scale set to 1.058824 (mesh height=1.700000, mesh scale=0.010000, root scale=1.000000, final scale=0.010588,0.010588,0.010588)
+[2026-01-31 14:24:36][INFO] runtime: rig mesh bounds min=(-0.553406,-0.000000,-0.173289) max=(0.553406,1.700000,0.173289)
+[2026-01-31 14:24:36][INFO] runtime: rig skeleton min y=0.040637
+[2026-01-31 14:24:36][INFO] runtime: player rig offset set to 0.000000 (grounded by mesh bounds)
+[2026-01-31 14:24:36][INFO] runtime: controller size set (radius=0.150000, half_height=0.100000, center_offset=0.250000, mesh height=0.018000, mesh bottom=0.000000)
+[2026-01-31 14:24:36][INFO] runtime: player rig asset = manny (source=/home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb)
+[2026-01-31 14:24:36][INFO] runtime: attached skeleton from asset manny joints=24
+[2026-01-31 14:24:36][INFO] content watcher: inotify
+[2026-01-31 14:24:36][INFO] tick: begin
+[2026-01-31 14:24:36][INFO] tick: renderer update
+[2026-01-31 14:24:36][INFO] renderer:vulkan update begin
+[2026-01-31 14:24:36][WARN] renderer:vulkan swapchain rebuild requested
+[2026-01-31 14:24:36][INFO] renderer:vulkan update end
+[2026-01-31 14:24:36][INFO] debug_ui: new_frame begin
+[2026-01-31 14:24:36][INFO] debug_ui: new_frame end
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 0: draw_frame: wait fence
+[2026-01-31 14:24:36][INFO] renderer:vulkan swapchain=94467661135920
+[2026-01-31 14:24:36][INFO] renderer:vulkan swapchain images=3 views=3 framebuffers=3 cmd_buffers=3
+[2026-01-31 14:24:36][INFO] renderer:vulkan extent=1600x900
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 1: vkAcquireNextImageKHR
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 2: vkResetCommandBuffer
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 3: vkBeginCommandBuffer
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 4: swapchain: barrier to color attachment
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 5: swapchain: begin render pass
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 6: swapchain: clear attachments
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 7: imgui: render inside pass
+[2026-01-31 14:24:36][INFO] debug_ui: draw_data textures=1
+[2026-01-31 14:24:36][INFO] debug_ui: texture 0 status=0 tex_empty=false
+[2026-01-31 14:24:36][INFO] debug_ui: render draw_data lists=1 vtx=4 idx=6
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 8: swapchain: end render pass
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 9: vkEndCommandBuffer
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 10: vkQueueSubmit
+[2026-01-31 14:24:36][INFO] renderer:vulkan step 11: vkQueuePresentKHR
+[2026-01-31 14:24:36][INFO] event: mouse type=1024 x=771 y=22
+[2026-01-31 14:24:36][INFO] event: mouse type=1024 x=771 y=22
+[2026-01-31 14:24:38][INFO] renderer:vulkan skinned live rig map: hips=Hips spine=Spine02 chest=none head=Head l_thigh=LeftUpLeg r_thigh=RightUpLeg
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.000000,-0.000010,0.000000) vel=(0.000000,-0.009800,0.000000) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.000000,-0.000010,0.000000) vel=(0.000000,-0.009800,0.000000) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.000000,-0.000010,0.000000) vel=(0.000000,-0.009800,0.000000) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.000000,-0.000010,0.000000) vel=(0.000000,-0.009800,0.000000) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] platform: key_down scancode=26 code=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.081421,-0.000010,-0.017263) vel=(2.572372,-0.009800,-0.545406) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.269457,-0.000010,-0.059831) vel=(3.485243,-0.009800,-0.864854) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.490980,-0.000010,-0.120659) vel=(3.723207,-0.009800,-1.090057) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.716421,-0.000010,-0.189862) vel=(3.772862,-0.009800,-1.214217) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] runtime: live_rig fwd=2.754911 strafe=-0.064947 grounded=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(0.946555,-0.000010,-0.266973) vel=(3.772566,-0.009800,-1.296190) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(1.172905,-0.000010,-0.345607) vel=(3.772480,-0.009800,-1.319879) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] platform: key_down scancode=225 code=6
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(1.402924,-0.000010,-0.426847) vel=(3.821607,-0.009800,-1.367691) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(1.702698,-0.000010,-0.535239) vel=(5.752228,-0.009800,-2.103535) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:38][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:38][INFO] physics_basic: pos=(2.073474,-0.000010,-0.676007) vel=(6.273016,-0.009800,-2.475667) grounded=1
+[2026-01-31 14:24:38][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=26 code=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.458964,-0.000010,-0.837465) vel=(6.280857,-0.009800,-2.896723) grounded=1
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=4 code=2
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.699494,-0.000010,-1.119830) vel=(1.936561,-0.009800,-5.763855) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.695493,-0.000010,-1.494233) vel=(-1.950539,-0.009800,-5.897815) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] runtime: live_rig fwd=5.715192 strafe=1.056983 grounded=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.494875,-0.000010,-1.816354) vel=(-4.325158,-0.009800,-4.937771) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.202485,-0.000010,-2.104492) vel=(-5.094418,-0.009800,-4.585786) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=7 code=4
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.906268,-0.000010,-2.385311) vel=(-3.746149,-0.009800,-5.323470) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=1 right=1 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] platform: key_up scancode=4 code=2
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.773915,-0.000010,-2.742455) vel=(-0.106184,-0.009800,-6.025354) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=0 right=1 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.883872,-0.000010,-3.088249) vel=(3.092141,-0.009800,-5.590254) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=0 right=1 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.110961,-0.000010,-3.421999) vel=(4.180148,-0.009800,-5.349575) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=1 back=0 left=0 right=1 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:39][INFO] platform: key_up scancode=7 code=4
+[2026-01-31 14:24:39][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:39][INFO] platform: key_up scancode=225 code=6
+[2026-01-31 14:24:39][INFO] platform: key_up scancode=26 code=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.295186,-0.000010,-3.716305) vel=(2.241796,-0.009800,-3.968473) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=4 code=2
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.288791,-0.000010,-3.869254) vel=(-1.957182,-0.009800,-1.549936) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=0 left=1 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] runtime: live_rig fwd=3.315510 strafe=0.207980 grounded=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(2.127989,-0.000010,-3.961617) vel=(-2.999057,-0.009800,-1.836260) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=0 left=1 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.945850,-0.000010,-4.095601) vel=(-2.846426,-0.009800,-2.556395) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=0 left=1 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=22 code=3
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:39][INFO] platform: key_up scancode=4 code=2
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.761313,-0.000010,-4.220779) vel=(-3.368778,-0.009800,-0.962092) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=1 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.546414,-0.000010,-4.217021) vel=(-3.693771,-0.009800,0.490088) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=1 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] platform: key_down scancode=7 code=4
+[2026-01-31 14:24:39][INFO] physics_basic: pos=(1.317673,-0.000010,-4.188416) vel=(-3.873965,-0.009800,0.439907) grounded=1
+[2026-01-31 14:24:39][INFO] physics_basic: input fwd=0 back=1 left=0 right=1 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:39][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(1.096447,-0.000010,-4.114378) vel=(-3.555742,-0.009800,1.579226) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=1 left=0 right=1 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveBack key=3 down=1
+[2026-01-31 14:24:40][INFO] platform: key_up scancode=22 code=3
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.929822,-0.000010,-3.969438) vel=(-1.973338,-0.009800,3.075611) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=1 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] input: action=MoveRight key=4 down=1
+[2026-01-31 14:24:40][INFO] platform: key_up scancode=7 code=4
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.829939,-0.000010,-3.766917) vel=(-1.464239,-0.009800,3.408864) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.759618,-0.000010,-3.603205) vel=(-0.897006,-0.009800,2.088301) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] runtime: live_rig fwd=-0.893044 strafe=-2.072566 grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.717083,-0.000010,-3.504181) vel=(-0.553981,-0.009800,1.289713) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.690814,-0.000010,-3.443024) vel=(-0.342133,-0.009800,0.796513) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.674591,-0.000010,-3.405255) vel=(-0.211298,-0.009800,0.491919) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.664571,-0.000010,-3.381929) vel=(-0.130495,-0.009800,0.303804) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.658384,-0.000010,-3.367523) vel=(-0.080593,-0.009800,0.187626) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.654465,-0.000010,-3.358400) vel=(-0.048974,-0.009800,0.114014) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.652143,-0.000010,-3.352994) vel=(-0.030246,-0.009800,0.070414) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.650691,-0.000010,-3.349612) vel=(-0.018529,-0.009800,0.043136) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] runtime: live_rig fwd=0.010398 strafe=-0.295021 grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.649812,-0.000010,-3.347568) vel=(-0.011443,-0.009800,0.026641) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.649263,-0.000010,-3.346289) vel=(-0.007010,-0.009800,0.016320) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.648926,-0.000010,-3.345505) vel=(-0.004294,-0.009800,0.009998) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.648723,-0.000010,-3.345031) vel=(-0.002652,-0.009800,0.006175) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:40][INFO] physics_basic: pos=(0.648595,-0.000010,-3.344734) vel=(-0.001625,-0.009800,0.003783) grounded=1
+[2026-01-31 14:24:40][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=44 code=5
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(0.648501,0.178111,-3.344513) vel=(-0.000787,4.637402,0.001831) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=26 code=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(0.659333,0.442451,-3.336385) vel=(1.026685,4.039604,0.756460) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(0.778065,0.666893,-3.251067) vel=(2.607944,3.451607,1.835338) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] runtime: live_rig fwd=1.012395 strafe=-0.029959 grounded=0
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=225 code=6
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(0.969299,0.858900,-3.120865) vel=(4.104200,2.853809,2.705286) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=1 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(1.262947,1.012194,-2.933727) vel=(5.426238,2.265812,3.353193) grounded=0
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=1 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=4 code=2
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(1.617362,1.131867,-2.781278) vel=(6.201504,1.668015,0.650043) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=1 sprint=1 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_up scancode=225 code=6
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(1.940944,1.214014,-2.797383) vel=(4.607689,1.080017,-0.826603) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_up scancode=4 code=2
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(2.198180,1.261354,-2.851920) vel=(3.971504,0.482217,-0.218088) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(2.430745,1.272353,-2.823676) vel=(3.823039,-0.105783,0.892869) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(2.663606,1.247359,-2.760663) vel=(3.820055,-0.703583,1.103122) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(2.893228,1.187210,-2.693740) vel=(3.834104,-1.291582,1.114750) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=1 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] runtime: live_rig fwd=3.967876 strafe=0.508377 grounded=0
+[2026-01-31 14:24:41][INFO] input: action=Jump key=5 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_up scancode=44 code=5
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(3.127344,1.089882,-2.625878) vel=(3.840434,-1.889380,1.111053) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(3.361678,0.956088,-2.558143) vel=(3.842279,-2.487177,1.109975) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(3.596349,0.785829,-2.491404) vel=(3.850410,-3.084975,1.082857) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(3.831317,0.579104,-2.425661) vel=(3.852912,-3.682772,1.074489) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=225 code=6
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:41][INFO] platform: key_down scancode=4 code=2
+[2026-01-31 14:24:41][INFO] physics_basic: pos=(4.106414,0.340204,-2.361750) vel=(5.400047,-4.270770,0.082890) grounded=0
+[2026-01-31 14:24:41][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:41][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:41][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(4.448030,0.066023,-2.447244) vel=(5.873011,-4.858767,-2.420023) grounded=0
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(4.810262,-0.000010,-2.624982) vel=(5.980184,-0.009800,-3.231153) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=1 back=0 left=1 right=0 jump=0 sprint=1 dt=0.001000
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] input: action=Sprint key=6 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveLeft key=2 down=1
+[2026-01-31 14:24:42][INFO] input: action=MoveForward key=1 down=1
+[2026-01-31 14:24:42][INFO] platform: key_up scancode=4 code=2
+[2026-01-31 14:24:42][INFO] platform: key_up scancode=225 code=6
+[2026-01-31 14:24:42][INFO] platform: key_up scancode=26 code=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.166986,-0.000010,-2.818422) vel=(5.543120,-0.009800,-2.429278) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] runtime: live_rig fwd=4.570337 strafe=2.832668 grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.429836,-0.000010,-2.933616) vel=(3.423373,-0.009800,-1.500297) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.592172,-0.000010,-3.004758) vel=(2.114239,-0.009800,-0.926568) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.693699,-0.000010,-3.049253) vel=(1.295202,-0.009800,-0.567624) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.755904,-0.000010,-3.076514) vel=(0.793452,-0.009800,-0.347731) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.793528,-0.000010,-3.093003) vel=(0.490028,-0.009800,-0.214755) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.817060,-0.000010,-3.103317) vel=(0.300195,-0.009800,-0.131561) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.831296,-0.000010,-3.109555) vel=(0.185398,-0.009800,-0.081251) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.840202,-0.000010,-3.113456) vel=(0.113576,-0.009800,-0.049775) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.845587,-0.000010,-3.115816) vel=(0.070144,-0.009800,-0.030740) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] runtime: live_rig fwd=0.535015 strafe=0.365421 grounded=1
+[2026-01-31 14:24:42][INFO] platform: key_down scancode=41 code=7
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.848955,-0.000010,-3.117293) vel=(0.042971,-0.009800,-0.018832) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.850993,-0.000010,-3.118186) vel=(0.026538,-0.009800,-0.011630) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] input: action=Quit key=7 down=1
+[2026-01-31 14:24:42][INFO] platform: key_up scancode=41 code=7
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.852251,-0.000010,-3.118738) vel=(0.016390,-0.009800,-0.007183) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:42][INFO] physics_basic: pos=(5.853038,-0.000010,-3.119083) vel=(0.010040,-0.009800,-0.004400) grounded=1
+[2026-01-31 14:24:42][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.853515,-0.000010,-3.119291) vel=(0.006201,-0.009800,-0.002718) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.853808,-0.000010,-3.119420) vel=(0.003830,-0.009800,-0.001678) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.853990,-0.000010,-3.119500) vel=(0.002365,-0.009800,-0.001037) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854104,-0.000010,-3.119550) vel=(0.001449,-0.009800,-0.000635) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] runtime: live_rig fwd=0.028457 strafe=0.019728 grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854174,-0.000039,-3.119580) vel=(0.000888,-0.019600,-0.000389) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854215,-0.000010,-3.119597) vel=(0.000548,-0.009800,-0.000240) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854244,-0.000010,-3.119611) vel=(0.000336,-0.009800,-0.000147) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000207,-0.009800,-0.000091) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000127,-0.009800,-0.000056) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000078,-0.009800,-0.000034) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000048,-0.009800,-0.000021) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000030,-0.009800,-0.000013) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] runtime: live_rig fwd=0.001355 strafe=0.001072 grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000018,-0.009800,-0.000008) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000011,-0.009800,-0.000005) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000007,-0.009800,-0.000003) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000004,-0.009800,-0.000002) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:43][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000003,-0.009800,-0.000001) grounded=1
+[2026-01-31 14:24:43][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000002,-0.009800,-0.000001) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000001,-0.009800,-0.000000) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000001,-0.009800,-0.000000) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] runtime: live_rig fwd=0.000066 strafe=0.000055 grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000000,-0.009800,-0.000000) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000000,-0.009800,-0.000000) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] physics_basic: pos=(5.854264,-0.000010,-3.119617) vel=(0.000000,-0.009800,-0.000000) grounded=1
+[2026-01-31 14:24:44][INFO] physics_basic: input fwd=0 back=0 left=0 right=0 jump=0 sprint=0 dt=0.001000
+[2026-01-31 14:24:44][INFO] level entity spawned: player_spawn
+[2026-01-31 14:24:44][INFO] level entity spawned: ground_plane_1
+[2026-01-31 14:24:44][INFO] level entity spawned: demo_quad_1
+[2026-01-31 14:24:44][INFO] runtime: player rig scale set to 1.058824 (mesh height=1.700000, mesh scale=0.010000, root scale=1.000000, final scale=0.010588,0.010588,0.010588)
+[2026-01-31 14:24:44][INFO] runtime: rig mesh bounds min=(-0.553406,-0.000000,-0.173289) max=(0.553406,1.700000,0.173289)
+[2026-01-31 14:24:44][INFO] runtime: rig skeleton min y=0.040637
+[2026-01-31 14:24:44][INFO] runtime: player rig offset set to 0.000000 (grounded by mesh bounds)
+[2026-01-31 14:24:44][INFO] runtime: controller size set (radius=0.150000, half_height=0.100000, center_offset=0.250000, mesh height=0.018000, mesh bottom=0.000000)
+[2026-01-31 14:24:44][INFO] runtime: player rig asset = manny (source=/home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb)
+[2026-01-31 14:24:44][INFO] runtime: attached skeleton from asset manny joints=24
+[2026-01-31 14:24:44][INFO] content reloaded (raw)
+[2026-01-31 14:24:44][INFO] reload reason: stop
+[2026-01-31 14:24:46][INFO] debug_ui: shutdown
+[2026-01-31 14:24:46][INFO] physics_basic: shutdown
+[2026-01-31 14:24:46][INFO] renderer:vulkan shutdown
+[2026-01-31 14:24:46][INFO] log shutdown
