@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -165,6 +166,10 @@ struct VulkanState {
   float skinned_live_strafe = 0.0f;
   bool skinned_live_grounded = false;
   float skinned_live_pelvis_offset = 0.0f;
+  bool skinned_live_l_foot_locked = false;
+  bool skinned_live_r_foot_locked = false;
+  rkg::Vec3 skinned_live_l_foot_target{0.0f, 0.0f, 0.0f};
+  rkg::Vec3 skinned_live_r_foot_target{0.0f, 0.0f, 0.0f};
   float frame_dt = 1.0f / 60.0f;
 
   // Cached bone indices for procedural rig drive.
@@ -952,6 +957,15 @@ static bool env_flag_enabled(const char* name) {
   return true;
 }
 
+static float env_float(const char* name, float fallback) {
+  const char* val = std::getenv(name);
+  if (!val || !*val) return fallback;
+  char* end = nullptr;
+  const float out = std::strtof(val, &end);
+  if (end == val) return fallback;
+  return out;
+}
+
 static std::string to_lower(std::string s) {
   for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   return s;
@@ -1049,6 +1063,10 @@ static float saturate(float v) {
 static float smoothstep01(float v) {
   v = saturate(v);
   return v * v * (3.0f - 2.0f * v);
+}
+
+static rkg::Vec3 vec3_lerp(const rkg::Vec3& a, const rkg::Vec3& b, float t) {
+  return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
 }
 
 static float vec3_len(const rkg::Vec3& v) {
@@ -1277,11 +1295,38 @@ static void apply_leg_ik(const SkeletonAsset& skel,
   const rkg::Vec3 foot_l = mat4_get_translation(world[g_state.bone_l_foot]);
   const rkg::Vec3 foot_r = mat4_get_translation(world[g_state.bone_r_foot]);
   const float ground_y = 0.0f;
-  const float foot_clear = 0.02f;
-  rkg::Vec3 target_l = foot_l;
-  rkg::Vec3 target_r = foot_r;
-  target_l.y = foot_l.y + (ground_y + foot_clear - foot_l.y) * ik_weight_l;
-  target_r.y = foot_r.y + (ground_y + foot_clear - foot_r.y) * ik_weight_r;
+  const float foot_clear = 0.01f;
+
+  auto update_lock = [&](bool& locked, rkg::Vec3& target, const rkg::Vec3& foot,
+                         float lift, float weight) {
+    const float lock_in = 0.22f;
+    const float lock_out = 0.60f;
+    if (grounded && weight > 0.05f && lift < lock_in) {
+      if (!locked) {
+        locked = true;
+        target = foot;
+      }
+    }
+    if (!grounded || lift > lock_out) {
+      locked = false;
+    }
+    const rkg::Vec3 desired = locked ? target : foot;
+    const float alpha = 1.0f - std::exp(-dt * 18.0f);
+    target = vec3_lerp(target, desired, alpha);
+    return target;
+  };
+
+  rkg::Vec3 raw_target_l = update_lock(g_state.skinned_live_l_foot_locked,
+                                       g_state.skinned_live_l_foot_target,
+                                       foot_l, lift_l, ik_weight_l);
+  rkg::Vec3 raw_target_r = update_lock(g_state.skinned_live_r_foot_locked,
+                                       g_state.skinned_live_r_foot_target,
+                                       foot_r, lift_r, ik_weight_r);
+  raw_target_l.y = ground_y + foot_clear;
+  raw_target_r.y = ground_y + foot_clear;
+
+  rkg::Vec3 target_l = vec3_lerp(foot_l, raw_target_l, ik_weight_l);
+  rkg::Vec3 target_r = vec3_lerp(foot_r, raw_target_r, ik_weight_r);
 
   const float max_pelvis_drop = 0.18f;
   const float desired_drop = std::min(0.0f, std::min(target_l.y - foot_l.y, target_r.y - foot_r.y));
@@ -1405,7 +1450,7 @@ static void update_skinned_live_pose() {
 
   const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 12.0f));
   const float step_rate = 1.1f + speed_ease * 1.4f;
-  const float gait_time_scale = 0.01f; // 100x slower gait for debugging/preview.
+  const float gait_time_scale = env_float("RKG_LIVE_GAIT_SCALE", 0.10f);
   g_state.skinned_live_phase += dt * step_rate * gait_time_scale * 6.2831853f;
   if (g_state.skinned_live_phase > 6.2831853f) {
     g_state.skinned_live_phase -= 6.2831853f;
