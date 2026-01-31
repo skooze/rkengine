@@ -4375,8 +4375,8 @@ void update_camera_and_draw_list(EditorState& state) {
 
     const float extent = state.grid_half_extent * 0.5f;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
-    const Vec3 rig_pos{rig_root.position[0], rig_root.position[1], rig_root.position[2]};
-    const Vec3 rig_rot{rig_root.rotation[0], rig_root.rotation[1], rig_root.rotation[2]};
+    const Vec3 rig_pos{rig_root.position[0], 0.0f, rig_root.position[2]};
+    const Vec3 rig_rot{0.0f, 0.0f, 0.0f};
     const Mat4 rig_rot_m = mat4_rotation_xyz(rig_rot);
     const Vec3 rig_right = vec3_normalize(Vec3{rig_rot_m.m[0], rig_rot_m.m[1], rig_rot_m.m[2]});
     const Vec3 rig_up = vec3_normalize(Vec3{rig_rot_m.m[4], rig_rot_m.m[5], rig_rot_m.m[6]});

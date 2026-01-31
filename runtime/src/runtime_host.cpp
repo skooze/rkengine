@@ -1277,6 +1277,28 @@ void RuntimeHost::load_initial_level() {
                              " (grounded by mesh bounds)");
             }
           }
+          if (auto* controller = registry_.get_character_controller(player_)) {
+            const float height = (rig_asset->mesh.bounds_max[1] - rig_asset->mesh.bounds_min[1]) *
+                                 rig_scale * mesh_scale_y;
+            const float width = (rig_asset->mesh.bounds_max[0] - rig_asset->mesh.bounds_min[0]) *
+                                rig_scale * mesh_scale_x;
+            const float depth = (rig_asset->mesh.bounds_max[2] - rig_asset->mesh.bounds_min[2]) *
+                                rig_scale * mesh_scale_z;
+            const float min_xz = std::max(0.0001f, std::min(width, depth));
+            const float desired_radius = std::max(0.15f, min_xz * 0.25f);
+            const float desired_half_height = std::max(0.2f, (height * 0.5f) - desired_radius);
+            const bool default_controller =
+                controller->half_height == 0.9f && controller->radius == 0.35f;
+            if (default_controller || has_scale_env) {
+              controller->radius = desired_radius;
+              controller->half_height = desired_half_height;
+              // DEBUG: remove after controller sizing is stable.
+              rkg::log::info("runtime: controller size set (radius=" +
+                             std::to_string(controller->radius) +
+                             ", half_height=" + std::to_string(controller->half_height) +
+                             ", mesh height=" + std::to_string(height) + ")");
+            }
+          }
         }
       }
       if (!rig_asset->source_path.empty()) {
