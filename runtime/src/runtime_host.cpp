@@ -4,6 +4,7 @@
 #include "rkg/instructions.h"
 #include "rkg/log.h"
 #include "rkg/plugin_api.h"
+#include "rkg/renderer_hooks.h"
 #include "rkg/renderer_select.h"
 #include "rkg/renderer_util.h"
 
@@ -26,6 +27,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
@@ -1052,6 +1054,55 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
       if (action_state("MoveLeft").held) transform->position[0] -= speed * sim_dt;
       if (action_state("MoveRight").held) transform->position[0] += speed * sim_dt;
     }
+  }
+
+  // Feed live/procedural rig drive params to the renderer (LLM-friendly control surface).
+  if (params.run_simulation) {
+    float forward_speed = 0.0f;
+    float strafe_speed = 0.0f;
+    bool grounded = false;
+    if (player_ != rkg::ecs::kInvalidEntity) {
+      const auto* transform = registry_.get_transform(player_);
+      const auto* velocity = registry_.get_velocity(player_);
+      const auto* controller = registry_.get_character_controller(player_);
+      if (controller) {
+        grounded = controller->grounded;
+      }
+      float vx = 0.0f;
+      float vz = 0.0f;
+      if (velocity) {
+        vx = velocity->linear[0];
+        vz = velocity->linear[2];
+      } else {
+        float dir_x = 0.0f;
+        float dir_z = 0.0f;
+        if (action_state("MoveForward").held) dir_z += 1.0f;
+        if (action_state("MoveBack").held) dir_z -= 1.0f;
+        if (action_state("MoveLeft").held) dir_x += 1.0f;
+        if (action_state("MoveRight").held) dir_x -= 1.0f;
+        const float len = std::sqrt(dir_x * dir_x + dir_z * dir_z);
+        if (len > 0.0001f) {
+          dir_x /= len;
+          dir_z /= len;
+        }
+        const float yaw = transform ? transform->rotation[1] : 0.0f;
+        const float cos_y = std::cos(yaw);
+        const float sin_y = std::sin(yaw);
+        const float world_x = dir_x * cos_y + dir_z * sin_y;
+        const float world_z = -dir_x * sin_y + dir_z * cos_y;
+        const float max_speed = controller ? controller->max_speed : 2.0f;
+        vx = world_x * max_speed;
+        vz = world_z * max_speed;
+      }
+      const float yaw = transform ? transform->rotation[1] : 0.0f;
+      const float cos_y = std::cos(yaw);
+      const float sin_y = std::sin(yaw);
+      const float local_x = vx * cos_y - vz * sin_y;
+      const float local_z = vx * sin_y + vz * cos_y;
+      forward_speed = local_z;
+      strafe_speed = local_x;
+    }
+    rkg::set_vulkan_viewport_skinned_live_params(forward_speed, strafe_speed, grounded);
   }
 }
 

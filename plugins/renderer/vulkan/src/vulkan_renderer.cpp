@@ -155,6 +155,33 @@ struct VulkanState {
   uint32_t skinned_test_left_calf = UINT32_MAX;
   uint32_t skinned_test_right_thigh = UINT32_MAX;
   uint32_t skinned_test_right_calf = UINT32_MAX;
+
+  // Live/procedural rig drive state (Phase 4).
+  bool skinned_live_enabled = false;
+  bool skinned_live_logged = false;
+  float skinned_live_phase = 0.0f;
+  float skinned_live_fwd = 0.0f;
+  float skinned_live_strafe = 0.0f;
+  bool skinned_live_grounded = false;
+  float frame_dt = 1.0f / 60.0f;
+
+  // Cached bone indices for procedural rig drive.
+  bool skinned_live_map_valid = false;
+  uint32_t bone_hips = UINT32_MAX;
+  uint32_t bone_spine = UINT32_MAX;
+  uint32_t bone_chest = UINT32_MAX;
+  uint32_t bone_neck = UINT32_MAX;
+  uint32_t bone_head = UINT32_MAX;
+  uint32_t bone_l_thigh = UINT32_MAX;
+  uint32_t bone_l_calf = UINT32_MAX;
+  uint32_t bone_l_foot = UINT32_MAX;
+  uint32_t bone_r_thigh = UINT32_MAX;
+  uint32_t bone_r_calf = UINT32_MAX;
+  uint32_t bone_r_foot = UINT32_MAX;
+  uint32_t bone_l_upper_arm = UINT32_MAX;
+  uint32_t bone_l_lower_arm = UINT32_MAX;
+  uint32_t bone_r_upper_arm = UINT32_MAX;
+  uint32_t bone_r_lower_arm = UINT32_MAX;
 };
 
 VulkanState g_state{};
@@ -948,86 +975,153 @@ static uint32_t find_bone_index_by_name(const SkeletonAsset& skel,
   return UINT32_MAX;
 }
 
-static void apply_test_walk_pose(const SkeletonAsset& skel,
-                                 double t,
-                                 std::vector<BonePose>& out,
-                                 uint32_t& out_left_thigh,
-                                 uint32_t& out_left_calf,
-                                 uint32_t& out_right_thigh,
-                                 uint32_t& out_right_calf) {
-  out = skel.bones;
-  out_left_thigh = UINT32_MAX;
-  out_left_calf = UINT32_MAX;
-  out_right_thigh = UINT32_MAX;
-  out_right_calf = UINT32_MAX;
-
-  // Find leg bones by name (best-effort).
-  const std::vector<std::string> left_tags = {"left", "_l", ".l", " l"};
-  const std::vector<std::string> right_tags = {"right", "_r", ".r", " r"};
-  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "hip"};
-  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin"};
-  auto find_side = [&](const std::vector<std::string>& side,
-                       const std::vector<std::string>& part) -> uint32_t {
-    for (uint32_t i = 0; i < skel.bones.size(); ++i) {
-      const std::string n = to_lower(skel.bones[i].name);
-      if (n.empty()) continue;
-      if (!name_has(n, side)) continue;
-      if (!name_has(n, part)) continue;
-      return i;
-    }
-    return UINT32_MAX;
-  };
-
-  out_left_thigh = find_side(left_tags, thigh_tags);
-  out_left_calf = find_side(left_tags, calf_tags);
-  out_right_thigh = find_side(right_tags, thigh_tags);
-  out_right_calf = find_side(right_tags, calf_tags);
-
-  // Fallback: try generic leg names without side.
-  if (out_left_thigh == UINT32_MAX || out_right_thigh == UINT32_MAX) {
-    const uint32_t any_thigh = find_bone_index_by_name(skel, thigh_tags, {});
-    if (out_left_thigh == UINT32_MAX) out_left_thigh = any_thigh;
-    if (out_right_thigh == UINT32_MAX) out_right_thigh = any_thigh;
+static uint32_t find_side_bone(const SkeletonAsset& skel,
+                               const std::vector<std::string>& side,
+                               const std::vector<std::string>& part) {
+  for (uint32_t i = 0; i < skel.bones.size(); ++i) {
+    const std::string n = to_lower(skel.bones[i].name);
+    if (n.empty()) continue;
+    if (!name_has(n, side)) continue;
+    if (!name_has(n, part)) continue;
+    return i;
   }
-  if (out_left_calf == UINT32_MAX || out_right_calf == UINT32_MAX) {
-    const uint32_t any_calf = find_bone_index_by_name(skel, calf_tags, {});
-    if (out_left_calf == UINT32_MAX) out_left_calf = any_calf;
-    if (out_right_calf == UINT32_MAX) out_right_calf = any_calf;
-  }
-
-  const float swing = std::sin(static_cast<float>(t * 2.0 * 3.14159265 * 1.2));
-  const float thigh_amp = 0.6f;
-  const float calf_amp = 0.35f;
-  const float left_thigh = thigh_amp * swing;
-  const float right_thigh = -thigh_amp * swing;
-  const float left_calf = calf_amp * std::max(0.0f, -swing);
-  const float right_calf = calf_amp * std::max(0.0f, swing);
-
-  if (out_left_thigh != UINT32_MAX) out[out_left_thigh].rot[0] += left_thigh;
-  if (out_right_thigh != UINT32_MAX) out[out_right_thigh].rot[0] += right_thigh;
-  if (out_left_calf != UINT32_MAX) out[out_left_calf].rot[0] += left_calf;
-  if (out_right_calf != UINT32_MAX) out[out_right_calf].rot[0] += right_calf;
+  return UINT32_MAX;
 }
 
-static void update_skinned_test_walk() {
-  g_state.skinned_test_walk = env_flag_enabled("RKG_SKIN_TEST_WALK") ||
-                              rkg::get_vulkan_viewport_skinned_test_walk_enabled();
-  if (!g_state.skinned_test_walk || !g_state.skinned_ready) return;
+static void build_live_bone_map() {
+  const auto& skel = g_state.skinned_skeleton;
+  if (skel.bones.empty()) return;
+
+  const std::vector<std::string> left_tags = {"left", "_l", ".l", " l"};
+  const std::vector<std::string> right_tags = {"right", "_r", ".r", " r"};
+  const std::vector<std::string> hips_tags = {"hip", "pelvis", "root"};
+  const std::vector<std::string> spine_tags = {"spine"};
+  const std::vector<std::string> chest_tags = {"chest", "upperchest", "spine2", "spine_02"};
+  const std::vector<std::string> neck_tags = {"neck"};
+  const std::vector<std::string> head_tags = {"head"};
+  const std::vector<std::string> thigh_tags = {"thigh", "upperleg", "upleg", "leg_upper", "hip"};
+  const std::vector<std::string> calf_tags = {"calf", "lowerleg", "leg_lower", "shin"};
+  const std::vector<std::string> foot_tags = {"foot", "ankle"};
+  const std::vector<std::string> upper_arm_tags = {"upperarm", "arm_upper", "uparm"};
+  const std::vector<std::string> lower_arm_tags = {"lowerarm", "forearm", "arm_lower"};
+
+  g_state.bone_hips = find_bone_index_by_name(skel, hips_tags, {});
+  g_state.bone_spine = find_bone_index_by_name(skel, spine_tags, {});
+  g_state.bone_chest = find_bone_index_by_name(skel, chest_tags, {});
+  g_state.bone_neck = find_bone_index_by_name(skel, neck_tags, {});
+  g_state.bone_head = find_bone_index_by_name(skel, head_tags, {});
+
+  g_state.bone_l_thigh = find_side_bone(skel, left_tags, thigh_tags);
+  g_state.bone_r_thigh = find_side_bone(skel, right_tags, thigh_tags);
+  g_state.bone_l_calf = find_side_bone(skel, left_tags, calf_tags);
+  g_state.bone_r_calf = find_side_bone(skel, right_tags, calf_tags);
+  g_state.bone_l_foot = find_side_bone(skel, left_tags, foot_tags);
+  g_state.bone_r_foot = find_side_bone(skel, right_tags, foot_tags);
+  g_state.bone_l_upper_arm = find_side_bone(skel, left_tags, upper_arm_tags);
+  g_state.bone_r_upper_arm = find_side_bone(skel, right_tags, upper_arm_tags);
+  g_state.bone_l_lower_arm = find_side_bone(skel, left_tags, lower_arm_tags);
+  g_state.bone_r_lower_arm = find_side_bone(skel, right_tags, lower_arm_tags);
+
+  if (g_state.bone_l_thigh == UINT32_MAX || g_state.bone_r_thigh == UINT32_MAX) {
+    const uint32_t any_thigh = find_bone_index_by_name(skel, thigh_tags, {});
+    if (g_state.bone_l_thigh == UINT32_MAX) g_state.bone_l_thigh = any_thigh;
+    if (g_state.bone_r_thigh == UINT32_MAX) g_state.bone_r_thigh = any_thigh;
+  }
+  if (g_state.bone_l_calf == UINT32_MAX || g_state.bone_r_calf == UINT32_MAX) {
+    const uint32_t any_calf = find_bone_index_by_name(skel, calf_tags, {});
+    if (g_state.bone_l_calf == UINT32_MAX) g_state.bone_l_calf = any_calf;
+    if (g_state.bone_r_calf == UINT32_MAX) g_state.bone_r_calf = any_calf;
+  }
+
+  g_state.skinned_live_map_valid = true;
+}
+
+static void apply_live_pose(const SkeletonAsset& skel,
+                            float phase,
+                            float speed_norm,
+                            float fwd,
+                            float strafe,
+                            bool grounded,
+                            std::vector<BonePose>& out) {
+  out = skel.bones;
+
+  auto add_rot = [&](uint32_t idx, float rx, float ry, float rz) {
+    if (idx == UINT32_MAX || idx >= out.size()) return;
+    out[idx].rot[0] += rx;
+    out[idx].rot[1] += ry;
+    out[idx].rot[2] += rz;
+  };
+  auto add_pos = [&](uint32_t idx, float px, float py, float pz) {
+    if (idx == UINT32_MAX || idx >= out.size()) return;
+    out[idx].pos[0] += px;
+    out[idx].pos[1] += py;
+    out[idx].pos[2] += pz;
+  };
+
+  const float stride = std::min(std::max(speed_norm, 0.0f), 1.0f);
+  const float swing = std::sin(phase);
+  const float swing2 = std::sin(phase * 2.0f);
+  const float grounded_scale = grounded ? 1.0f : 0.35f;
+
+  const float pelvis_bob = 0.025f * stride * grounded_scale;
+  const float pelvis_sway = 0.03f * stride * grounded_scale;
+  add_pos(g_state.bone_hips, 0.0f, pelvis_bob * swing2, 0.0f);
+  add_rot(g_state.bone_hips, -fwd * 0.15f * stride, 0.0f, -strafe * 0.2f * stride);
+
+  add_rot(g_state.bone_spine, fwd * 0.12f * stride, 0.0f, strafe * 0.15f * stride);
+  add_rot(g_state.bone_chest, fwd * 0.08f * stride, 0.0f, strafe * 0.1f * stride);
+  add_rot(g_state.bone_neck, fwd * 0.05f * stride, 0.0f, strafe * 0.05f * stride);
+  add_rot(g_state.bone_head, fwd * 0.03f * stride, 0.0f, strafe * 0.04f * stride);
+
+  const float thigh_amp = 0.8f * stride * grounded_scale + 0.05f;
+  const float calf_amp = 0.7f * stride * grounded_scale;
+  const float foot_amp = 0.2f * stride * grounded_scale;
+  add_rot(g_state.bone_l_thigh, thigh_amp * swing, 0.0f, strafe * 0.15f * stride);
+  add_rot(g_state.bone_r_thigh, -thigh_amp * swing, 0.0f, -strafe * 0.15f * stride);
+  add_rot(g_state.bone_l_calf, calf_amp * std::max(0.0f, -swing), 0.0f, 0.0f);
+  add_rot(g_state.bone_r_calf, calf_amp * std::max(0.0f, swing), 0.0f, 0.0f);
+  add_rot(g_state.bone_l_foot, -foot_amp * std::max(0.0f, swing), 0.0f, 0.0f);
+  add_rot(g_state.bone_r_foot, -foot_amp * std::max(0.0f, -swing), 0.0f, 0.0f);
+
+  const float arm_amp = 0.5f * stride * grounded_scale + 0.05f;
+  add_rot(g_state.bone_l_upper_arm, -arm_amp * swing, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_upper_arm, arm_amp * swing, 0.0f, 0.0f);
+  add_rot(g_state.bone_l_lower_arm, -0.4f * arm_amp * swing, 0.0f, 0.0f);
+  add_rot(g_state.bone_r_lower_arm, 0.4f * arm_amp * swing, 0.0f, 0.0f);
+}
+
+static void update_skinned_live_pose() {
+  g_state.skinned_live_enabled = env_flag_enabled("RKG_SKIN_LIVE") ||
+                                 env_flag_enabled("RKG_SKIN_TEST_WALK") ||
+                                 rkg::get_vulkan_viewport_skinned_live_enabled() ||
+                                 rkg::get_vulkan_viewport_skinned_test_walk_enabled();
+  if (!g_state.skinned_live_enabled || !g_state.skinned_ready) return;
   if (g_state.skinned_skeleton.bones.empty() || g_state.skinned_joint_count == 0) return;
   if (g_state.skinned_joint_memory == VK_NULL_HANDLE) return;
 
-  static const auto start = std::chrono::steady_clock::now();
-  const auto now = std::chrono::steady_clock::now();
-  const double t = std::chrono::duration<double>(now - start).count();
+  float fwd = 0.0f;
+  float strafe = 0.0f;
+  bool grounded = false;
+  rkg::get_vulkan_viewport_skinned_live_params(fwd, strafe, grounded);
+  const float speed = std::sqrt(fwd * fwd + strafe * strafe);
+  const float speed_norm = std::min(speed / 2.5f, 1.0f);
+
+  if (!g_state.skinned_live_map_valid) {
+    build_live_bone_map();
+  }
+
+  const float dt = std::max(1.0f / 240.0f, std::min(g_state.frame_dt, 1.0f / 15.0f));
+  const float freq = 1.2f + speed_norm * 1.8f;
+  g_state.skinned_live_phase += dt * freq * 6.2831853f;
+  if (g_state.skinned_live_phase > 6.2831853f) {
+    g_state.skinned_live_phase -= 6.2831853f;
+  }
 
   std::vector<BonePose> posed;
-  uint32_t l_thigh = UINT32_MAX;
-  uint32_t l_calf = UINT32_MAX;
-  uint32_t r_thigh = UINT32_MAX;
-  uint32_t r_calf = UINT32_MAX;
-  apply_test_walk_pose(g_state.skinned_skeleton, t, posed, l_thigh, l_calf, r_thigh, r_calf);
+  apply_live_pose(g_state.skinned_skeleton, g_state.skinned_live_phase, speed_norm,
+                  fwd, strafe, grounded, posed);
 
-  if (!g_state.skinned_test_walk_logged) {
+  if (!g_state.skinned_live_logged) {
     auto name_or_idx = [&](uint32_t idx) -> std::string {
       if (idx == UINT32_MAX) return "none";
       if (idx < g_state.skinned_skeleton.bones.size() &&
@@ -1036,11 +1130,13 @@ static void update_skinned_test_walk() {
       }
       return std::string("#") + std::to_string(idx);
     };
-    rkg::log::info("renderer:vulkan skinned test walk: left_thigh=" + name_or_idx(l_thigh) +
-                   " left_calf=" + name_or_idx(l_calf) +
-                   " right_thigh=" + name_or_idx(r_thigh) +
-                   " right_calf=" + name_or_idx(r_calf));
-    g_state.skinned_test_walk_logged = true;
+    rkg::log::info("renderer:vulkan skinned live rig map: hips=" + name_or_idx(g_state.bone_hips) +
+                   " spine=" + name_or_idx(g_state.bone_spine) +
+                   " chest=" + name_or_idx(g_state.bone_chest) +
+                   " head=" + name_or_idx(g_state.bone_head) +
+                   " l_thigh=" + name_or_idx(g_state.bone_l_thigh) +
+                   " r_thigh=" + name_or_idx(g_state.bone_r_thigh));
+    g_state.skinned_live_logged = true;
   }
 
   compute_skin_matrices_from_bones(posed, g_state.skinned_skeleton.inverse_bind, g_state.skinned_joint_mats);
@@ -1450,6 +1546,8 @@ bool load_textured_asset() {
         g_state.skinned_test_walk = env_flag_enabled("RKG_SKIN_TEST_WALK") ||
                                     rkg::get_vulkan_viewport_skinned_test_walk_enabled();
         g_state.skinned_test_walk_logged = false;
+        g_state.skinned_live_map_valid = false;
+        g_state.skinned_live_logged = false;
         rkg::log::info("renderer:vulkan skinned demo: joints=" +
                        std::to_string(g_state.skinned_joint_count));
       }
@@ -3104,7 +3202,7 @@ bool record_command_buffer(VkCommandBuffer cmd, uint32_t image_index) {
       }
     }
     const auto* camera = rkg::get_vulkan_viewport_camera();
-    update_skinned_test_walk();
+    update_skinned_live_pose();
     const auto* textured_demo = rkg::get_vulkan_viewport_textured_demo();
     const bool textured_enabled = rkg::get_vulkan_viewport_textured_demo_enabled();
     const bool use_skinned = g_state.skinned_ready &&
@@ -3721,12 +3819,15 @@ void vulkan_on_window_resized(int, int) {
   g_state.swapchain_needs_rebuild = true;
 }
 
-void vulkan_update(float) {
+void vulkan_update(float dt) {
   static bool logged = false;
   if (!logged) {
     g_log_steps = true;
     g_log_step_index = 0;
     rkg::log::info("renderer:vulkan update begin");
+  }
+  if (dt > 0.0f && dt < 1.0f) {
+    g_state.frame_dt = dt;
   }
   if (!draw_frame()) {
     rkg::log::warn("renderer:vulkan draw_frame failed");

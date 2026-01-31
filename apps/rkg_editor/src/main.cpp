@@ -2571,7 +2571,7 @@ void draw_toolbar(EditorState& state) {
       state.lock_editor_pivot = false;
     }
     state.play_state = PlayState::Play;
-    rkg::set_vulkan_viewport_skinned_test_walk_enabled(true);
+    rkg::set_vulkan_viewport_skinned_live_enabled(true);
   }
   ImGui::SameLine();
   if (ImGui::Button("Pause")) {
@@ -2586,7 +2586,7 @@ void draw_toolbar(EditorState& state) {
   if (ImGui::Button("Stop")) {
     state.play_state = PlayState::Edit;
     state.stop_requested = true;
-    rkg::set_vulkan_viewport_skinned_test_walk_enabled(false);
+    rkg::set_vulkan_viewport_skinned_live_enabled(false);
     if (state.saved_editor_cam.valid) {
       state.camera_yaw = state.saved_editor_cam.yaw;
       state.camera_pitch = state.saved_editor_cam.pitch;

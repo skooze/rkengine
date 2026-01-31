@@ -87,4 +87,14 @@ bool get_vulkan_viewport_textured_demo_enabled();
 void set_vulkan_viewport_skinned_test_walk_enabled(bool enabled);
 bool get_vulkan_viewport_skinned_test_walk_enabled();
 
+// Procedural/live skinned rig control (LLM-friendly, heuristic driven).
+void set_vulkan_viewport_skinned_live_enabled(bool enabled);
+bool get_vulkan_viewport_skinned_live_enabled();
+void set_vulkan_viewport_skinned_live_params(float forward_speed,
+                                             float strafe_speed,
+                                             bool grounded);
+void get_vulkan_viewport_skinned_live_params(float& forward_speed,
+                                             float& strafe_speed,
+                                             bool& grounded);
+
 } // namespace rkg

@@ -20,6 +20,10 @@ VulkanViewportLineList g_viewport_line_list{};
 VulkanViewportTexturedDemo g_viewport_textured_demo{};
 bool g_viewport_textured_demo_enabled = true;
 bool g_viewport_skinned_test_walk_enabled = false;
+bool g_viewport_skinned_live_enabled = false;
+float g_viewport_skinned_live_fwd = 0.0f;
+float g_viewport_skinned_live_strafe = 0.0f;
+bool g_viewport_skinned_live_grounded = false;
 } // namespace
 
 void register_vulkan_hooks(const VulkanHooks* hooks) {
@@ -193,6 +197,30 @@ void set_vulkan_viewport_skinned_test_walk_enabled(bool enabled) {
 
 bool get_vulkan_viewport_skinned_test_walk_enabled() {
   return g_viewport_skinned_test_walk_enabled;
+}
+
+void set_vulkan_viewport_skinned_live_enabled(bool enabled) {
+  g_viewport_skinned_live_enabled = enabled;
+}
+
+bool get_vulkan_viewport_skinned_live_enabled() {
+  return g_viewport_skinned_live_enabled;
+}
+
+void set_vulkan_viewport_skinned_live_params(float forward_speed,
+                                             float strafe_speed,
+                                             bool grounded) {
+  g_viewport_skinned_live_fwd = forward_speed;
+  g_viewport_skinned_live_strafe = strafe_speed;
+  g_viewport_skinned_live_grounded = grounded;
+}
+
+void get_vulkan_viewport_skinned_live_params(float& forward_speed,
+                                             float& strafe_speed,
+                                             bool& grounded) {
+  forward_speed = g_viewport_skinned_live_fwd;
+  strafe_speed = g_viewport_skinned_live_strafe;
+  grounded = g_viewport_skinned_live_grounded;
 }
 
 } // namespace rkg
