@@ -734,10 +734,20 @@ bool RuntimeHost::init(const RuntimeHostInit& init, std::string& error) {
   project_name_ = !project_.name.empty() ? project_.name : project_root_.filename().string();
 
   bool loaded_input_map = false;
+  bool input_map_empty = true;
   if (!project_.input_map.empty()) {
-    loaded_input_map = input_map_.load_from_file(project_root_ / project_.input_map);
+    const auto map_path = project_root_ / project_.input_map;
+    loaded_input_map = input_map_.load_from_file(map_path);
+    input_map_empty = input_map_.bindings().empty();
+    // DEBUG: input map load diagnostics. Remove once input issues are resolved.
+    rkg::log::info(std::string("runtime: input map file=") + map_path.string() +
+                   " loaded=" + (loaded_input_map ? "1" : "0") +
+                   " bindings=" + std::to_string(input_map_.bindings().size()));
+    if (loaded_input_map && input_map_empty) {
+      rkg::log::warn("runtime: input map loaded but had zero bindings");
+    }
   }
-  if (!loaded_input_map) {
+  if (!loaded_input_map || input_map_empty) {
     // Default WASD bindings so movement works even without a project input map.
     input_map_.bind("MoveForward", rkg::platform::KeyCode::W);
     input_map_.bind("MoveBack", rkg::platform::KeyCode::S);
