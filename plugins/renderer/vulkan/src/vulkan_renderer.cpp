@@ -660,32 +660,60 @@ bool create_texture_from_rgba(const uint8_t* rgba, uint32_t width, uint32_t heig
 fs::path select_asset_dir(std::string& asset_name) {
   auto paths = rkg::resolve_paths(nullptr, std::nullopt, "demo_game");
   fs::path assets_dir = paths.content_root / "assets";
-  if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir)) {
+  fs::path repo_root = paths.content_root.parent_path().parent_path().parent_path();
+  fs::path generated_assets_dir = repo_root / "build" / "content_cache" / "generated_assets";
+  const bool assets_ok = fs::exists(assets_dir) && fs::is_directory(assets_dir);
+  const bool generated_ok = fs::exists(generated_assets_dir) && fs::is_directory(generated_assets_dir);
+  if (!assets_ok && !generated_ok) {
     return {};
   }
+  auto resolve_in_dir = [&](const fs::path& root, const std::string& name) -> fs::path {
+    if (root.empty()) return {};
+    fs::path candidate = root / name;
+    if (fs::exists(candidate / "asset.json")) return candidate;
+    return {};
+  };
   if (const char* env = std::getenv("RKG_RENDER_ASSET")) {
     if (env[0] != '\0') {
-      fs::path candidate = assets_dir / env;
-      if (fs::exists(candidate / "asset.json")) {
+      if (auto candidate = resolve_in_dir(assets_dir, env); !candidate.empty()) {
+        asset_name = env;
+        return candidate;
+      }
+      if (auto candidate = resolve_in_dir(generated_assets_dir, env); !candidate.empty()) {
         asset_name = env;
         return candidate;
       }
     }
   }
-  fs::path manny = assets_dir / "manny";
-  if (fs::exists(manny / "asset.json")) {
+  if (auto manny = resolve_in_dir(assets_dir, "manny"); !manny.empty()) {
     asset_name = "manny";
     return manny;
   }
-  fs::path testmanny = assets_dir / "testmanny";
-  if (fs::exists(testmanny / "asset.json")) {
+  if (auto manny = resolve_in_dir(generated_assets_dir, "manny"); !manny.empty()) {
+    asset_name = "manny";
+    return manny;
+  }
+  if (auto testmanny = resolve_in_dir(assets_dir, "testmanny"); !testmanny.empty()) {
+    asset_name = "testmanny";
+    return testmanny;
+  }
+  if (auto testmanny = resolve_in_dir(generated_assets_dir, "testmanny"); !testmanny.empty()) {
     asset_name = "testmanny";
     return testmanny;
   }
   std::vector<fs::path> dirs;
-  for (const auto& entry : fs::directory_iterator(assets_dir)) {
-    if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
-      dirs.push_back(entry.path());
+  if (assets_ok) {
+    for (const auto& entry : fs::directory_iterator(assets_dir)) {
+      if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+        dirs.push_back(entry.path());
+      }
+    }
+  }
+  if (generated_ok) {
+    for (const auto& entry : fs::directory_iterator(generated_assets_dir)) {
+      if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+        dirs.push_back(entry.path());
+      }
     }
   }
   if (dirs.empty()) return {};

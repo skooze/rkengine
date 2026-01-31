@@ -4174,17 +4174,32 @@ void update_camera_and_draw_list(EditorState& state) {
   fs::path textured_asset_dir;
   if (state.show_textured_demo && state.runtime) {
     const fs::path assets_dir = state.runtime->raw_content_root() / "assets";
-    if (fs::exists(assets_dir) && fs::is_directory(assets_dir)) {
+    const fs::path repo_root = state.runtime->raw_content_root().parent_path().parent_path().parent_path();
+    const fs::path generated_assets_dir = repo_root / "build" / "content_cache" / "generated_assets";
+    const bool assets_ok = fs::exists(assets_dir) && fs::is_directory(assets_dir);
+    const bool generated_ok = fs::exists(generated_assets_dir) && fs::is_directory(generated_assets_dir);
+    if (assets_ok || generated_ok) {
       if (const char* env = std::getenv("RKG_RENDER_ASSET")) {
         if (env[0] != '\0') {
           const fs::path candidate = assets_dir / env;
           if (fs::exists(candidate / "asset.json")) {
             textured_asset_dir = candidate;
+          } else {
+            const fs::path alt = generated_assets_dir / env;
+            if (fs::exists(alt / "asset.json")) {
+              textured_asset_dir = alt;
+            }
           }
         }
       }
       if (textured_asset_dir.empty()) {
         const fs::path manny = assets_dir / "manny";
+        if (fs::exists(manny / "asset.json")) {
+          textured_asset_dir = manny;
+        }
+      }
+      if (textured_asset_dir.empty()) {
+        const fs::path manny = generated_assets_dir / "manny";
         if (fs::exists(manny / "asset.json")) {
           textured_asset_dir = manny;
         }
@@ -4196,10 +4211,25 @@ void update_camera_and_draw_list(EditorState& state) {
         }
       }
       if (textured_asset_dir.empty()) {
+        const fs::path testmanny = generated_assets_dir / "testmanny";
+        if (fs::exists(testmanny / "asset.json")) {
+          textured_asset_dir = testmanny;
+        }
+      }
+      if (textured_asset_dir.empty()) {
         std::vector<fs::path> dirs;
-        for (const auto& entry : fs::directory_iterator(assets_dir)) {
-          if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
-            dirs.push_back(entry.path());
+        if (assets_ok) {
+          for (const auto& entry : fs::directory_iterator(assets_dir)) {
+            if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+              dirs.push_back(entry.path());
+            }
+          }
+        }
+        if (generated_ok) {
+          for (const auto& entry : fs::directory_iterator(generated_assets_dir)) {
+            if (entry.is_directory() && fs::exists(entry.path() / "asset.json")) {
+              dirs.push_back(entry.path());
+            }
           }
         }
         if (!dirs.empty()) {

@@ -274,6 +274,16 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
     error = "assets directory not found";
     return false;
   }
+  fs::path repo_root;
+  {
+    fs::path p = content_root;
+    for (int i = 0; i < 3 && p.has_parent_path(); ++i) {
+      p = p.parent_path();
+    }
+    repo_root = p;
+  }
+  const fs::path generated_assets_dir = repo_root / "build" / "content_cache" / "generated_assets";
+
   fs::path manny_source;
   if (const char* home = std::getenv("HOME")) {
     manny_source = fs::path(home) / "rkg" / "NecTr" / "AI_GUARD_1" / "AI_GUARD_1_Character_output.glb";
@@ -286,28 +296,35 @@ bool AssetCache::load_from_content_root(const fs::path& content_root, std::strin
   if (manny_source.empty() || !fs::exists(manny_source)) {
     manny_source = content_root / "source_assets" / "manny" / "manny.glb";
   }
-  const fs::path manny_asset_dir = assets_dir / "manny";
+  const fs::path manny_asset_dir = generated_assets_dir / "manny";
   if (fs::exists(manny_source)) {
     rkg::log::info(std::string("asset_cache: manny source -> ") + manny_source.string());
-    rkg::log::info("asset_cache: auto-importing manny into content/assets/manny");
+    rkg::log::info("asset_cache: auto-importing manny into build/content_cache/generated_assets/manny");
     rkg::asset::ImportOptions options{};
     options.overwrite = true;
     options.write_textures = true;
+    std::error_code ec;
+    fs::create_directories(manny_asset_dir, ec);
     const auto result = rkg::asset::import_glb(manny_source, manny_asset_dir, options);
     if (!result.ok) {
       rkg::log::warn(std::string("asset_cache: auto-import manny failed: ") + result.error);
     } else {
-      rkg::log::info("asset_cache: auto-imported manny.glb into content/assets/manny");
+      rkg::log::info("asset_cache: auto-imported manny.glb into build/content_cache/generated_assets/manny");
     }
   }
-  for (const auto& entry : fs::directory_iterator(assets_dir)) {
-    if (!entry.is_directory()) continue;
-    std::string err;
-    if (!load_asset_dir(entry.path(), err)) {
-      rkg::log::warn(std::string("asset_cache: skip ") + entry.path().string() + ": " + err);
-      continue;
+  auto load_dir_assets = [&](const fs::path& dir_root) {
+    if (!fs::exists(dir_root) || !fs::is_directory(dir_root)) return;
+    for (const auto& entry : fs::directory_iterator(dir_root)) {
+      if (!entry.is_directory()) continue;
+      std::string err;
+      if (!load_asset_dir(entry.path(), err)) {
+        rkg::log::warn(std::string("asset_cache: skip ") + entry.path().string() + ": " + err);
+        continue;
+      }
     }
-  }
+  };
+  load_dir_assets(assets_dir);
+  load_dir_assets(generated_assets_dir);
   return true;
 }
 
