@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   e1311b8..7b8e8f6  main       -> origin/main
-Updating e1311b8..7b8e8f6
+   f83a3ab..b8104cb  main       -> origin/main
+Updating f83a3ab..b8104cb
 Fast-forward
- apps/rkg_editor/src/main.cpp | 21 ++++++++++++++-------
- 1 file changed, 14 insertions(+), 7 deletions(-)
+ apps/rkg_editor/src/main.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
