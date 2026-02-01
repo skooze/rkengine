@@ -731,10 +731,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float phase_l = gait->phase;
   const float phase_r = gait->phase + kPi;
-  const float swing_l = 0.5f - 0.5f * std::cos(phase_l);
-  const float swing_r = 0.5f - 0.5f * std::cos(phase_r);
-  const float lift_l = std::max(0.0f, std::sin(phase_l));
-  const float lift_r = std::max(0.0f, std::sin(phase_r));
+  const float swing_raw_l = 0.5f - 0.5f * std::cos(phase_l);
+  const float swing_raw_r = 0.5f - 0.5f * std::cos(phase_r);
+  auto swing_progress = [&](float raw) {
+    if (raw <= gait->foot_lock_out) return 0.0f;
+    return saturate((raw - gait->foot_lock_out) / std::max(1.0f - gait->foot_lock_out, 0.001f));
+  };
+  const float swing_l = swing_progress(swing_raw_l);
+  const float swing_r = swing_progress(swing_raw_r);
+  const float lift_l = std::sin(kPi * swing_l);
+  const float lift_r = std::sin(kPi * swing_r);
   const float bob = std::sin(gait->phase * 2.0f);
 
   const float pelvis_bob = gait->pelvis_bob_scale * gait->leg_length * speed_norm;
@@ -759,7 +765,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float landing_drop = -gait->landing_compress * gait->leg_length * landing_alpha;
 
   if (gait->enable_pelvis_motion) {
-    const float sway_dir = (swing_l > 0.5f) ? 1.0f : -1.0f;
+    const float sway_dir = (swing_raw_l > 0.5f) ? 1.0f : -1.0f;
     add_pos(*skeleton, gait->bone_hips,
             pelvis_sway * sway_dir, pelvis_bob * bob + landing_drop, 0.0f);
     add_rot(*skeleton, gait->bone_hips,
@@ -805,6 +811,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 r_foot = safe_pos(gait->bone_r_foot);
 
   const Vec3 root_pos = from_array(transform->position);
+  const Vec3 l_hip_w = to_world_point(*transform, l_hip);
+  const Vec3 r_hip_w = to_world_point(*transform, r_hip);
+  const Vec3 hip_mid = mul(add(l_hip_w, r_hip_w), 0.5f);
   const Vec3 l_foot_w = to_world_point(*transform, l_foot);
   const Vec3 r_foot_w = to_world_point(*transform, r_foot);
   Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
@@ -822,7 +831,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const float turn_dir = (gait->yaw_rate >= 0.0f) ? 1.0f : -1.0f;
       offset = rotate_y(mul(right, lateral_offset * side_sign), turn_dir * 0.4f);
     }
-    Vec3 desired = add(root_pos, offset);
+    Vec3 desired = add(hip_mid, offset);
     const float ray_height = leg_len_world * 0.6f;
     RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 2.0f);
     if (hit.hit) {
@@ -833,9 +842,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   Vec3 l_lock_w = from_array(gait->left_lock_pos);
   Vec3 r_lock_w = from_array(gait->right_lock_pos);
-  update_foot_lock_internal(gait->left_locked, l_lock_w, l_foot_w, grounded, swing_l,
+  update_foot_lock_internal(gait->left_locked, l_lock_w, l_foot_w, grounded, swing_raw_l,
                             gait->foot_lock_in, gait->foot_lock_out, dt);
-  update_foot_lock_internal(gait->right_locked, r_lock_w, r_foot_w, grounded, swing_r,
+  update_foot_lock_internal(gait->right_locked, r_lock_w, r_foot_w, grounded, swing_raw_r,
                             gait->foot_lock_in, gait->foot_lock_out, dt);
   if (speed > 0.1f && gait->left_locked && gait->right_locked) {
     if (swing_l > swing_r) {
@@ -850,8 +859,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   Vec3 l_lock = to_local_point(*transform, l_lock_w);
   Vec3 r_lock = to_local_point(*transform, r_lock_w);
 
-  const bool left_swinging = grounded && (swing_l >= gait->foot_lock_out);
-  const bool right_swinging = grounded && (swing_r >= gait->foot_lock_out);
+  const bool left_swinging = grounded && (swing_raw_l >= gait->foot_lock_out);
+  const bool right_swinging = grounded && (swing_raw_r >= gait->foot_lock_out);
   if (left_swinging && !gait->left_step_active) {
     Vec3 step = compute_step_target(-1.0f);
     to_array(step, gait->left_step_pos);
