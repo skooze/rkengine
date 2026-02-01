@@ -1,9 +1,5 @@
 -- RKG_ENABLE_VULKAN=ON
 -- RKG_ENABLE_D3D12=OFF
-CMake Warning at plugins/scripting/lua/CMakeLists.txt:50 (message):
-  Lua found but lauxlib symbols are not linkable; disabling Lua scripting.
-
-
--- Configuring done (0.1s)
--- Generating done (0.0s)
--- Build files have been written to: /home/skooze/rkg/build
+-- Configuring done (0.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/rkoasis/rkg/build

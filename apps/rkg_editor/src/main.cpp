@@ -10,6 +10,7 @@
 #include "rkg/paths.h"
 #include "rkg/json_write.h"
 #include "rkg/renderer_hooks.h"
+#include "rkg/movement_log.h"
 
 #include <algorithm>
 #include <cctype>
@@ -2572,6 +2573,12 @@ void draw_toolbar(EditorState& state) {
     }
     state.play_state = PlayState::Play;
     rkg::set_vulkan_viewport_skinned_live_enabled(true);
+    if (state.runtime) {
+      const auto log_dir = state.runtime->paths().root / "build_logs";
+      std::error_code ec;
+      std::filesystem::create_directories(log_dir, ec);
+      rkg::movement_log::open(log_dir / "rkg_play_movement.log");
+    }
   }
   ImGui::SameLine();
   if (ImGui::Button("Pause")) {
@@ -2587,6 +2594,7 @@ void draw_toolbar(EditorState& state) {
     state.play_state = PlayState::Edit;
     state.stop_requested = true;
     rkg::set_vulkan_viewport_skinned_live_enabled(false);
+    rkg::movement_log::close();
     if (state.saved_editor_cam.valid) {
       state.camera_yaw = state.saved_editor_cam.yaw;
       state.camera_pitch = state.saved_editor_cam.pitch;

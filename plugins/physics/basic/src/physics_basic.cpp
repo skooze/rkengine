@@ -2,12 +2,14 @@
 #include "rkg/host_context.h"
 #include "rkg/input.h"
 #include "rkg/log.h"
+#include "rkg/movement_log.h"
 #include "rkg/plugin_api.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <sstream>
 
 namespace {
 
@@ -788,6 +790,38 @@ static void update_character(rkg::ecs::Registry& registry,
 
   to_array(velocity, velocity_comp->linear);
   controller.vertical_velocity = velocity.y;
+
+  // TEMP: movement log for play-session debugging (overwritten each Play). Remove when stable.
+  if (rkg::movement_log::enabled()) {
+    static float log_accum = 0.0f;
+    log_accum += dt;
+    if (log_accum >= 0.1f) {
+      log_accum = 0.0f;
+      std::ostringstream line;
+      line.setf(std::ios::fixed);
+      line.precision(3);
+      line << "entity=" << entity
+           << " pos=(" << transform->position[0] << "," << transform->position[1] << "," << transform->position[2] << ")"
+           << " vel=(" << velocity.x << "," << velocity.y << "," << velocity.z << ")"
+           << " grounded=" << controller.grounded
+           << " mode=" << static_cast<int>(controller.mode)
+           << " gdist=" << after_ground.distance
+           << " jump_buf=" << controller.jump_buffer
+           << " just_jump=" << controller.just_jumped_time
+           << " sprint=" << controller.is_sprinting
+           << " input_mag=" << input.mag
+           << " input_dir=(" << input.dir_world.x << "," << input.dir_world.y << "," << input.dir_world.z << ")";
+      if (snapshot) {
+        line << " keys[F:" << snapshot->forward.held
+             << " B:" << snapshot->back.held
+             << " L:" << snapshot->left.held
+             << " R:" << snapshot->right.held
+             << " J:" << snapshot->jump.held
+             << " S:" << snapshot->sprint.held << "]";
+      }
+      rkg::movement_log::write(line.str());
+    }
+  }
 
 #if RKG_MOVEMENT_DEBUG
   static int debug_frame = 0;
