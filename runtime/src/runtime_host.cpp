@@ -89,6 +89,9 @@ static void apply_gait_env_overrides(rkg::ecs::ProceduralGait& gait) {
   read_f("RKG_GAIT_ARM_SWING", gait.arm_swing_scale);
   read_f("RKG_GAIT_ARM_TUCK", gait.arm_tuck);
   read_f("RKG_GAIT_IK_BLEND", gait.ik_blend_speed);
+  if (const char* val = std::getenv("RKG_GAIT_DEBUG")) {
+    gait.debug_draw = (*val != '0');
+  }
 }
 
 bool load_cook_status(const fs::path& path, CookStatus& out, std::string& error) {

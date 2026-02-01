@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <cmath>
 #include <functional>
 #include <sstream>
@@ -83,10 +84,6 @@ static float smoothstep01(float v) {
 
 static float frac(float v) {
   return v - std::floor(v);
-}
-
-static Vec3 project_on_plane(const Vec3& v, const Vec3& n) {
-  return sub(v, mul(n, dot(v, n)));
 }
 
 static float wrap_pi(float angle) {
@@ -215,8 +212,6 @@ static rkg::Mat4 mat4_rotation_from_to(const rkg::Vec3& from, const rkg::Vec3& t
 
 static rkg::Vec3 mat4_to_euler_xyz(const rkg::Mat4& m) {
   const float r00 = m.m[0];
-  const float r01 = m.m[4];
-  const float r02 = m.m[8];
   const float r10 = m.m[1];
   const float r11 = m.m[5];
   const float r12 = m.m[9];
@@ -237,10 +232,6 @@ static rkg::Vec3 mat4_to_euler_xyz(const rkg::Mat4& m) {
     z = 0.0f;
   }
   return {x, y, z};
-}
-
-static rkg::Vec3 mat4_get_translation(const rkg::Mat4& m) {
-  return {m.m[12], m.m[13], m.m[14]};
 }
 
 static Vec3 mat4_mul_vec3(const rkg::Mat4& m, const Vec3& v) {
@@ -279,6 +270,15 @@ static Vec3 to_local_point(const ecs::Transform& root, const Vec3& world) {
   v.y /= sy;
   v.z /= sz;
   return v;
+}
+
+static Vec3 to_world_dir(const ecs::Transform& root, const Vec3& local_dir) {
+  return rotate_xyz_vec(local_dir, {root.rotation[0], root.rotation[1], root.rotation[2]});
+}
+
+static Vec3 to_local_dir(const ecs::Transform& root, const Vec3& world_dir) {
+  const Vec3 inv_rot{-root.rotation[0], -root.rotation[1], -root.rotation[2]};
+  return rotate_xyz_vec(world_dir, inv_rot);
 }
 
 static void compute_world_matrices(const ecs::Skeleton& skel,
@@ -453,11 +453,13 @@ static RayHit raycast_down(const ecs::Registry& registry,
   return best;
 }
 
-static Vec3 solve_two_bone_ik(const Vec3& hip,
-                              const Vec3& knee,
-                              const Vec3& ankle,
-                              const Vec3& target,
-                              const Vec3& pole_dir) {
+static Vec3 solve_two_bone_ik_pole(const Vec3& hip,
+                                   const Vec3& knee,
+                                   const Vec3& ankle,
+                                   const Vec3& target,
+                                   const Vec3& pole_point,
+                                   Vec3& prev_y,
+                                   float* continuity_out) {
   const float l1 = length(sub(knee, hip));
   const float l2 = length(sub(ankle, knee));
   Vec3 to_t = sub(target, hip);
@@ -466,26 +468,37 @@ static Vec3 solve_two_bone_ik(const Vec3& hip,
   const float min_d = std::max(0.001f, std::fabs(l1 - l2) + 0.001f);
   const float max_d = std::max(0.001f, l1 + l2 - 0.001f);
   const float d = clampf(d_raw, min_d, max_d);
-  Vec3 dir = mul(to_t, 1.0f / d_raw);
+  const Vec3 x = mul(to_t, 1.0f / d_raw);
 
-  const float x = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
-  float h_sq = l1 * l1 - x * x;
-  if (h_sq < 0.0f) h_sq = 0.0f;
-  const float h = std::sqrt(h_sq);
-
-  Vec3 pole = pole_dir;
-  pole = sub(pole, mul(dir, dot(pole, dir)));
-  float pole_len = length(pole);
-  if (pole_len < 0.0001f) {
-    pole = cross(v3(0.0f, 1.0f, 0.0f), dir);
-    if (length(pole) < 0.0001f) {
-      pole = cross(v3(1.0f, 0.0f, 0.0f), dir);
+  Vec3 z_raw = cross(x, sub(pole_point, hip));
+  if (length(z_raw) < 0.0001f) {
+    z_raw = cross(x, v3(0.0f, 1.0f, 0.0f));
+    if (length(z_raw) < 0.0001f) {
+      z_raw = cross(x, v3(1.0f, 0.0f, 0.0f));
     }
-    pole_len = length(pole);
   }
-  pole = mul(pole, 1.0f / std::max(pole_len, 0.0001f));
+  Vec3 z = normalize(z_raw);
+  Vec3 y = normalize(cross(z, x));
+  if (dot(y, sub(pole_point, hip)) < 0.0f) {
+    y = mul(y, -1.0f);
+    z = mul(z, -1.0f);
+  }
 
-  return add(hip, add(mul(dir, x), mul(pole, h)));
+  float cont = dot(prev_y, y);
+  if (cont < 0.0f) {
+    y = mul(y, -1.0f);
+    z = mul(z, -1.0f);
+    cont = -cont;
+  }
+  prev_y = y;
+  if (continuity_out) *continuity_out = cont;
+
+  const float along = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
+  float h_sq = l1 * l1 - along * along;
+  if (h_sq < 0.0f) h_sq = 0.0f;
+  const float height = std::sqrt(h_sq);
+
+  return add(hip, add(mul(x, along), mul(y, height)));
 }
 
 static void apply_bone_aim(ecs::Skeleton& skel,
@@ -623,36 +636,13 @@ static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& 
   r_pole = normalize(r_pole);
   if (length(l_pole) < kEps) l_pole = v3(0.0f, 0.0f, 1.0f);
   if (length(r_pole) < kEps) r_pole = v3(0.0f, 0.0f, 1.0f);
+  to_array(l_pole, gait.knee_prev_y_l);
+  to_array(r_pole, gait.knee_prev_y_r);
 
-  Vec3 right_axis = normalize(sub(r_hip, l_hip));
-  if (length(right_axis) < kEps) right_axis = v3(1.0f, 0.0f, 0.0f);
-  Vec3 up_axis = v3(0.0f, 1.0f, 0.0f);
-  if (gait.bone_head != UINT32_MAX && gait.bone_head < world.size()) {
-    Vec3 head = safe_pos(gait.bone_head);
-    Vec3 up = normalize(sub(head, hips_pos));
-    if (length(up) > kEps) up_axis = up;
-  }
-  Vec3 forward_axis = normalize(cross(up_axis, right_axis));
-  if (length(forward_axis) < kEps) forward_axis = v3(0.0f, 0.0f, 1.0f);
-
-  Vec3 dl = sub(l_foot, hips_pos);
-  Vec3 dr = sub(r_foot, hips_pos);
-  Vec3 home_l = v3(dot(dl, forward_axis), dot(dl, up_axis), dot(dl, right_axis));
-  Vec3 home_r = v3(dot(dr, forward_axis), dot(dr, up_axis), dot(dr, right_axis));
+  Vec3 home_l = sub(l_foot, hips_pos);
+  Vec3 home_r = sub(r_foot, hips_pos);
   to_array(home_l, gait.foot_home_l);
   to_array(home_r, gait.foot_home_r);
-
-  if (dot(l_pole, forward_axis) < 0.0f) l_pole = mul(l_pole, -1.0f);
-  if (dot(r_pole, forward_axis) < 0.0f) r_pole = mul(r_pole, -1.0f);
-
-  rkg::Mat4 l_thigh_rot = mat4_extract_rotation(world[gait.bone_l_thigh]);
-  rkg::Mat4 r_thigh_rot = mat4_extract_rotation(world[gait.bone_r_thigh]);
-  rkg::Mat4 l_thigh_inv = mat4_transpose3x3(l_thigh_rot);
-  rkg::Mat4 r_thigh_inv = mat4_transpose3x3(r_thigh_rot);
-  Vec3 l_pole_local = mat4_mul_vec3(l_thigh_inv, l_pole);
-  Vec3 r_pole_local = mat4_mul_vec3(r_thigh_inv, r_pole);
-  to_array(l_pole_local, gait.knee_plane_l);
-  to_array(r_pole_local, gait.knee_plane_r);
 }
 
 static void add_rot(ecs::Skeleton& skel, uint32_t idx, float rx, float ry, float rz) {
@@ -867,57 +857,72 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     return {world[idx].m[12], world[idx].m[13], world[idx].m[14]};
   };
   const Vec3 l_hip = safe_pos(gait->bone_l_thigh);
-  const Vec3 l_knee = safe_pos(gait->bone_l_calf);
   const Vec3 l_foot = safe_pos(gait->bone_l_foot);
   const Vec3 r_hip = safe_pos(gait->bone_r_thigh);
-  const Vec3 r_knee = safe_pos(gait->bone_r_calf);
   const Vec3 r_foot = safe_pos(gait->bone_r_foot);
 
-  const Vec3 root_pos = from_array(transform->position);
+  const Vec3 hips_e = safe_pos(gait->bone_hips);
+  const Vec3 hips_w = to_world_point(*transform, hips_e);
+  to_array(hips_w, gait->debug_hips_world);
   const Vec3 l_hip_w = to_world_point(*transform, l_hip);
   const Vec3 r_hip_w = to_world_point(*transform, r_hip);
-  const Vec3 hips_model = safe_pos(gait->bone_hips);
-  const Vec3 hips_w = to_world_point(*transform, hips_model);
-  to_array(hips_w, gait->debug_hips_world);
-  const Vec3 l_foot_w = to_world_point(*transform, l_foot);
-  const Vec3 r_foot_w = to_world_point(*transform, r_foot);
-  const float v_side = dot(planar, right);
-  Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
-  const float strafe_width_boost = 0.25f * hip_width_world * std::abs(v_side / std::max(max_speed, 0.1f));
+  Vec3 move_dir_world = (speed > 0.05f) ? normalize(planar) : forward;
+  Vec3 side_world = normalize(cross(up_axis(), move_dir_world));
+  if (length(side_world) < 0.0001f) side_world = right;
+  Vec3 side_e = normalize(to_local_dir(*transform, side_world));
+  if (length(side_e) < 0.0001f) side_e = v3(1.0f, 0.0f, 0.0f);
+
+  const Vec3 home_l_e = add(hips_e, from_array(gait->foot_home_l));
+  const Vec3 home_r_e = add(hips_e, from_array(gait->foot_home_r));
+  const Vec3 home_l_w = to_world_point(*transform, home_l_e);
+  const Vec3 home_r_w = to_world_point(*transform, home_r_e);
+
+  const float v_side = dot(planar, side_world);
   float step_len = 0.5f * stride_len_world;
   const float step_len_small = 0.05f * leg_len_world;
-  const float angle_step = clampf(gait->yaw_rate * (1.0f / std::max(cadence, 0.1f)) * 0.6f, -0.6f, 0.6f);
-  const float step_height = gait->step_height_scale * leg_len_world;
-  const Vec3 home_l = from_array(gait->foot_home_l);
-  const Vec3 home_r = from_array(gait->foot_home_r);
-  const Vec3 home_l_w = add(hips_w, add(mul(forward, home_l.x), add(mul(up_axis(), home_l.y), mul(right, home_l.z))));
-  const Vec3 home_r_w = add(hips_w, add(mul(forward, home_r.x), add(mul(up_axis(), home_r.y), mul(right, home_r.z))));
+  const float step_height = gait->step_height_scale * gait->leg_length;
+  const float step_time = 1.0f / std::max(cadence, 0.1f);
+  const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
+  const float width_ref = std::max(hip_width_world, 0.25f * leg_len_world);
+  const float width_boost = 0.25f * width_ref * std::abs(v_side / std::max(max_speed, 0.1f));
+  const float min_side = 0.20f * width_ref;
+  const float min_rad = 0.45f * leg_len_world;
 
-  auto compute_step_target = [&](float side_sign, const Vec3& base_w, const Vec3& home_bind) {
+  auto side_sign_for = [&](const Vec3& hip_world, float fallback) {
+    const float s = dot(sub(hip_world, hips_w), side_world);
+    if (s > 0.001f) return 1.0f;
+    if (s < -0.001f) return -1.0f;
+    return fallback;
+  };
+  const float side_sign_l = side_sign_for(l_hip_w, -1.0f);
+  const float side_sign_r = side_sign_for(r_hip_w, 1.0f);
+
+  auto compute_step_target = [&](float side_sign, const Vec3& base_w) {
     Vec3 desired = base_w;
     if (turn_in_place) {
-      Vec3 home_xz = add(mul(forward, home_bind.x), mul(right, home_bind.z));
-      Vec3 rotated = rotate_y(home_xz, angle_step);
-      desired = add(hips_w, add(rotated, mul(up_axis(), home_bind.y)));
-      desired = add(desired, mul(forward, step_len_small));
+      Vec3 off = sub(base_w, hips_w);
+      const float off_y = off.y;
+      off.y = 0.0f;
+      off = rotate_y(off, angle_step);
+      off.y = off_y;
+      desired = add(hips_w, off);
+      desired = add(desired, mul(move_dir_world, step_len_small));
     } else {
-      desired = add(desired, add(mul(move_dir, step_len), mul(right, strafe_width_boost * side_sign)));
+      desired = add(desired, add(mul(move_dir_world, step_len), mul(side_world, width_boost * side_sign)));
     }
 
-    const float min_side = 0.15f * hip_width_world;
-    float midline = dot(sub(desired, hips_w), right);
+    float midline = dot(sub(desired, hips_w), side_world);
     if (side_sign < 0.0f && midline > -min_side) {
-      desired = add(desired, mul(right, (-min_side - midline)));
+      desired = add(desired, mul(side_world, (-min_side - midline)));
     } else if (side_sign > 0.0f && midline < min_side) {
-      desired = add(desired, mul(right, (min_side - midline)));
+      desired = add(desired, mul(side_world, (min_side - midline)));
     }
 
     Vec3 rad = sub(desired, hips_w);
     rad.y = 0.0f;
-    const float min_rad = 0.35f * leg_len_world;
     float rad_len = length(rad);
     if (rad_len < min_rad) {
-      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(right, side_sign);
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_world, side_sign);
       Vec3 xz = add(hips_w, mul(rad_dir, min_rad));
       desired.x = xz.x;
       desired.z = xz.z;
@@ -928,11 +933,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (hit.hit) {
       desired.y = hit.point.y;
     }
-    return desired;
+    return to_local_point(*transform, desired);
   };
 
-  Vec3 l_lock_w = from_array(gait->left_lock_pos);
-  Vec3 r_lock_w = from_array(gait->right_lock_pos);
+  Vec3 l_lock_e = from_array(gait->left_lock_pos);
+  Vec3 r_lock_e = from_array(gait->right_lock_pos);
   const bool left_was_swing = gait->left_step_active;
   const bool right_was_swing = gait->right_step_active;
 
@@ -943,41 +948,41 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     gait->right_locked = false;
   } else {
     if (left_swing && !left_was_swing) {
-      Vec3 start = gait->left_locked ? l_lock_w : l_foot_w;
+      Vec3 start = gait->left_locked ? l_lock_e : l_foot;
       to_array(start, gait->left_swing_start_pos);
-      Vec3 end = compute_step_target(-1.0f, home_l_w, home_l);
+      Vec3 end = compute_step_target(side_sign_l, home_l_w);
       to_array(end, gait->left_step_pos);
       gait->left_step_active = true;
       gait->left_locked = false;
     }
     if (right_swing && !right_was_swing) {
-      Vec3 start = gait->right_locked ? r_lock_w : r_foot_w;
+      Vec3 start = gait->right_locked ? r_lock_e : r_foot;
       to_array(start, gait->right_swing_start_pos);
-      Vec3 end = compute_step_target(1.0f, home_r_w, home_r);
+      Vec3 end = compute_step_target(side_sign_r, home_r_w);
       to_array(end, gait->right_step_pos);
       gait->right_step_active = true;
       gait->right_locked = false;
     }
     if (!left_swing && left_was_swing) {
       gait->left_step_active = false;
-      l_lock_w = from_array(gait->left_step_pos);
-      to_array(l_lock_w, gait->left_lock_pos);
+      l_lock_e = from_array(gait->left_step_pos);
+      to_array(l_lock_e, gait->left_lock_pos);
       gait->left_locked = true;
     }
     if (!right_swing && right_was_swing) {
       gait->right_step_active = false;
-      r_lock_w = from_array(gait->right_step_pos);
-      to_array(r_lock_w, gait->right_lock_pos);
+      r_lock_e = from_array(gait->right_step_pos);
+      to_array(r_lock_e, gait->right_lock_pos);
       gait->right_locked = true;
     }
     if (left_stance && !gait->left_locked && !gait->left_step_active) {
-      l_lock_w = l_foot_w;
-      to_array(l_lock_w, gait->left_lock_pos);
+      l_lock_e = l_foot;
+      to_array(l_lock_e, gait->left_lock_pos);
       gait->left_locked = true;
     }
     if (right_stance && !gait->right_locked && !gait->right_step_active) {
-      r_lock_w = r_foot_w;
-      to_array(r_lock_w, gait->right_lock_pos);
+      r_lock_e = r_foot;
+      to_array(r_lock_e, gait->right_lock_pos);
       gait->right_locked = true;
     }
   }
@@ -992,56 +997,31 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     return out;
   };
 
-  Vec3 l_target_w = l_foot_w;
-  Vec3 r_target_w = r_foot_w;
+  Vec3 l_target_e = l_foot;
+  Vec3 r_target_e = r_foot;
   if (grounded) {
     if (left_stance) {
-      l_target_w = l_lock_w;
+      l_target_e = l_lock_e;
     } else if (left_swing) {
       const Vec3 start = from_array(gait->left_swing_start_pos);
       const Vec3 end = from_array(gait->left_step_pos);
-      l_target_w = swing_foot(start, end, left_swing_u);
+      l_target_e = swing_foot(start, end, left_swing_u);
     }
     if (right_stance) {
-      r_target_w = r_lock_w;
+      r_target_e = r_lock_e;
     } else if (right_swing) {
       const Vec3 start = from_array(gait->right_swing_start_pos);
       const Vec3 end = from_array(gait->right_step_pos);
-      r_target_w = swing_foot(start, end, right_swing_u);
+      r_target_e = swing_foot(start, end, right_swing_u);
     }
   }
 
-  Vec3 l_target = to_local_point(*transform, l_target_w);
-  Vec3 r_target = to_local_point(*transform, r_target_w);
-  to_array(l_target_w, gait->debug_left_target);
-  to_array(r_target_w, gait->debug_right_target);
-  to_array(forward, gait->debug_forward);
-  to_array(right, gait->debug_right);
-
-  // TEMP: gait diagnostics for play-session log (overwritten each Play). Remove when stable.
-  if (rkg::movement_log::enabled()) {
-    static float gait_log_accum = 0.0f;
-    gait_log_accum += dt;
-    if (gait_log_accum >= 0.2f) {
-      gait_log_accum = 0.0f;
-      const Vec3 l_target_w = to_world_point(*transform, l_target);
-      const Vec3 r_target_w = to_world_point(*transform, r_target);
-      std::ostringstream line;
-      line.setf(std::ios::fixed);
-      line.precision(3);
-      line << "gait entity=" << entity
-           << " speed=" << speed
-           << " phase=" << gait->phase
-           << " grounded=" << grounded
-           << " sprint=" << sprinting
-           << " left_lock=" << gait->left_locked
-           << " right_lock=" << gait->right_locked
-           << " l_target=(" << l_target_w.x << "," << l_target_w.y << "," << l_target_w.z << ")"
-           << " r_target=(" << r_target_w.x << "," << r_target_w.y << "," << r_target_w.z << ")"
-           << " pelvis_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[1] << "," << gait->pelvis_offset[2] << ")";
-      rkg::movement_log::write(line.str());
-    }
-  }
+  to_array(l_target_e, gait->debug_left_target);
+  to_array(r_target_e, gait->debug_right_target);
+  to_array(move_dir_world, gait->debug_forward);
+  to_array(side_world, gait->debug_right);
+  gait->debug_target_lat_l = dot(sub(l_target_e, hips_e), side_e);
+  gait->debug_target_lat_r = dot(sub(r_target_e, hips_e), side_e);
 
   if (gait->enable_ik) {
     const float landing_window = 0.25f;
@@ -1057,8 +1037,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
     const float ik_weight_l = grounded ? (left_stance ? 1.0f : w_swing_l) : 0.0f;
     const float ik_weight_r = grounded ? (right_stance ? 1.0f : w_swing_r) : 0.0f;
-    const Vec3 target_l = lerp(l_foot, l_target, ik_weight_l);
-    const Vec3 target_r = lerp(r_foot, r_target, ik_weight_r);
+    const Vec3 target_l = lerp(l_foot, l_target_e, ik_weight_l);
+    const Vec3 target_r = lerp(r_foot, r_target_e, ik_weight_r);
 
     const float max_pelvis_drop = leg_len_world * 0.12f;
     const float desired_drop = std::min(0.0f, std::min(target_l.y - l_foot.y, target_r.y - r_foot.y));
@@ -1077,37 +1057,44 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const Vec3 r_hip2 = safe_pos(gait->bone_r_thigh);
     const Vec3 r_knee2 = safe_pos(gait->bone_r_calf);
     const Vec3 r_foot2 = safe_pos(gait->bone_r_foot);
+    const Vec3 hips_e2 = safe_pos(gait->bone_hips);
 
-    Vec3 l_pole_local = normalize(from_array(gait->knee_plane_l));
-    Vec3 r_pole_local = normalize(from_array(gait->knee_plane_r));
-    if (length(l_pole_local) < 0.0001f) l_pole_local = v3(0.0f, 0.0f, 1.0f);
-    if (length(r_pole_local) < 0.0001f) r_pole_local = v3(0.0f, 0.0f, 1.0f);
+    const float pole_out = 0.45f * width_ref;
+    const float pole_fwd = 0.12f * leg_len_world;
+    const float pole_up = 0.05f * leg_len_world;
+    const Vec3 l_hip2_w = to_world_point(*transform, l_hip2);
+    const Vec3 r_hip2_w = to_world_point(*transform, r_hip2);
+    const Vec3 l_pole_w = add(l_hip2_w,
+                              add(mul(side_world, side_sign_l * pole_out),
+                                  add(mul(move_dir_world, pole_fwd), mul(up_axis(), pole_up))));
+    const Vec3 r_pole_w = add(r_hip2_w,
+                              add(mul(side_world, side_sign_r * pole_out),
+                                  add(mul(move_dir_world, pole_fwd), mul(up_axis(), pole_up))));
+    const Vec3 l_pole_e = to_local_point(*transform, l_pole_w);
+    const Vec3 r_pole_e = to_local_point(*transform, r_pole_w);
+    Vec3 l_prev_y = normalize(from_array(gait->knee_prev_y_l));
+    Vec3 r_prev_y = normalize(from_array(gait->knee_prev_y_r));
+    if (length(l_prev_y) < 0.0001f) l_prev_y = v3(0.0f, 0.0f, 1.0f);
+    if (length(r_prev_y) < 0.0001f) r_prev_y = v3(0.0f, 0.0f, 1.0f);
+    float cont_l = 1.0f;
+    float cont_r = 1.0f;
 
-    rkg::Mat4 l_thigh_rot = mat4_extract_rotation(world[gait->bone_l_thigh]);
-    rkg::Mat4 r_thigh_rot = mat4_extract_rotation(world[gait->bone_r_thigh]);
-    Vec3 l_pole_world = mat4_mul_vec3(l_thigh_rot, l_pole_local);
-    Vec3 r_pole_world = mat4_mul_vec3(r_thigh_rot, r_pole_local);
+    const Vec3 l_knee_target = solve_two_bone_ik_pole(l_hip2, l_knee2, l_foot2, target_l, l_pole_e,
+                                                      l_prev_y, &cont_l);
+    const Vec3 r_knee_target = solve_two_bone_ik_pole(r_hip2, r_knee2, r_foot2, target_r, r_pole_e,
+                                                      r_prev_y, &cont_r);
+    to_array(l_prev_y, gait->knee_prev_y_l);
+    to_array(r_prev_y, gait->knee_prev_y_r);
+    gait->debug_continuity_l = cont_l;
+    gait->debug_continuity_r = cont_r;
 
-    Vec3 right_axis = normalize(sub(r_hip2, l_hip2));
-    if (length(right_axis) < 0.0001f) right_axis = v3(1.0f, 0.0f, 0.0f);
-    Vec3 up_axis = v3(0.0f, 1.0f, 0.0f);
-    if (gait->bone_head != UINT32_MAX && gait->bone_head < world.size()) {
-      Vec3 head = safe_pos(gait->bone_head);
-      Vec3 hips = safe_pos(gait->bone_hips);
-      Vec3 up = normalize(sub(head, hips));
-      if (length(up) > 0.0001f) up_axis = up;
-    }
-    Vec3 forward_axis = normalize(cross(up_axis, right_axis));
-    if (length(forward_axis) < 0.0001f) forward_axis = v3(0.0f, 0.0f, 1.0f);
-    if (dot(l_pole_world, forward_axis) < 0.0f) l_pole_world = mul(l_pole_world, -1.0f);
-    if (dot(r_pole_world, forward_axis) < 0.0f) r_pole_world = mul(r_pole_world, -1.0f);
-    to_array(l_pole_world, gait->debug_left_pole);
-    to_array(r_pole_world, gait->debug_right_pole);
-    to_array(forward_axis, gait->debug_forward);
-    to_array(right_axis, gait->debug_right);
+    const Vec3 l_pole_dir_e = normalize(sub(l_pole_e, l_hip2));
+    const Vec3 r_pole_dir_e = normalize(sub(r_pole_e, r_hip2));
+    to_array(l_pole_dir_e, gait->debug_left_pole);
+    to_array(r_pole_dir_e, gait->debug_right_pole);
 
-    const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_pole_world);
-    const Vec3 r_knee_target = solve_two_bone_ik(r_hip2, r_knee2, r_foot2, target_r, r_pole_world);
+    gait->debug_knee_lat_l = dot(sub(l_knee_target, hips_e2), side_e);
+    gait->debug_knee_lat_r = dot(sub(r_knee_target, hips_e2), side_e);
     apply_bone_aim(*skeleton, world, gait->bone_l_thigh, gait->bone_l_calf, l_knee_target);
     apply_bone_aim(*skeleton, world, gait->bone_r_thigh, gait->bone_r_calf, r_knee_target);
 
@@ -1117,6 +1104,49 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     compute_world_matrices(*skeleton, locals, world);
     apply_bone_aim(*skeleton, world, gait->bone_l_calf, gait->bone_l_foot, target_l);
     apply_bone_aim(*skeleton, world, gait->bone_r_calf, gait->bone_r_foot, target_r);
+  }
+
+  if (rkg::movement_log::enabled()) {
+    const bool log_enabled = gait->debug_draw || (std::getenv("RKG_GAIT_LOG") != nullptr);
+    if (log_enabled) {
+      static float gait_log_accum = 0.0f;
+      gait_log_accum += dt;
+      if (gait_log_accum >= 0.1f) {
+        gait_log_accum = 0.0f;
+        const Vec3 hips_e_log = safe_pos(gait->bone_hips);
+        Vec3 rad_l = sub(l_target_e, hips_e_log);
+        Vec3 rad_r = sub(r_target_e, hips_e_log);
+        rad_l.y = 0.0f;
+        rad_r.y = 0.0f;
+        const float target_rad_l = length(rad_l);
+        const float target_rad_r = length(rad_r);
+        const Vec3 l_pole_e = from_array(gait->debug_left_pole);
+        const Vec3 r_pole_e = from_array(gait->debug_right_pole);
+        std::ostringstream line;
+        line.setf(std::ios::fixed);
+        line.precision(3);
+        line << "gait entity=" << entity
+             << " yaw=" << gait->yaw
+             << " yaw_rate=" << gait->yaw_rate
+             << " speed=" << speed
+             << " grounded=" << grounded
+             << " left_stance=" << left_stance
+             << " right_stance=" << right_stance
+             << " left_swing=" << left_swing
+             << " right_swing=" << right_swing
+             << " l_target_e=(" << l_target_e.x << "," << l_target_e.y << "," << l_target_e.z << ")"
+             << " r_target_e=(" << r_target_e.x << "," << r_target_e.y << "," << r_target_e.z << ")"
+             << " l_pole_e=(" << l_pole_e.x << "," << l_pole_e.y << "," << l_pole_e.z << ")"
+             << " r_pole_e=(" << r_pole_e.x << "," << r_pole_e.y << "," << r_pole_e.z << ")"
+             << " knee_lat=(" << gait->debug_knee_lat_l << "," << gait->debug_knee_lat_r << ")"
+             << " target_lat=(" << gait->debug_target_lat_l << "," << gait->debug_target_lat_r << ")"
+             << " target_rad=(" << target_rad_l << "," << target_rad_r << ")"
+             << " min_side=" << min_side
+             << " min_rad=" << min_rad
+             << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")";
+        rkg::movement_log::write(line.str());
+      }
+    }
   }
 }
 
@@ -1146,8 +1176,10 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
     Vec3 r_foot = safe_pos(gait.bone_r_foot);
     Vec3 l_foot_w = to_world_point(*transform, l_foot);
     Vec3 r_foot_w = to_world_point(*transform, r_foot);
-    Vec3 l_target_w = from_array(gait.debug_left_target);
-    Vec3 r_target_w = from_array(gait.debug_right_target);
+    Vec3 l_target_e = from_array(gait.debug_left_target);
+    Vec3 r_target_e = from_array(gait.debug_right_target);
+    Vec3 l_target_w = to_world_point(*transform, l_target_e);
+    Vec3 r_target_w = to_world_point(*transform, r_target_e);
     lines.add_line(l_foot_w, l_target_w, v3(0.2f, 0.8f, 0.2f));
     lines.add_line(r_foot_w, r_target_w, v3(0.2f, 0.8f, 0.2f));
     Vec3 l_hip = safe_pos(gait.bone_l_thigh);
@@ -1162,17 +1194,22 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
     lines.add_line(l_knee_w, l_foot_w, v3(0.8f, 0.6f, 0.1f));
     lines.add_line(r_hip_w, r_knee_w, v3(0.8f, 0.6f, 0.1f));
     lines.add_line(r_knee_w, r_foot_w, v3(0.8f, 0.6f, 0.1f));
-    Vec3 l_pole = from_array(gait.debug_left_pole);
-    Vec3 r_pole = from_array(gait.debug_right_pole);
-    lines.add_line(l_hip_w, add(l_hip_w, mul(l_pole, 0.2f)), v3(0.2f, 0.6f, 1.0f));
-    lines.add_line(r_hip_w, add(r_hip_w, mul(r_pole, 0.2f)), v3(0.2f, 0.6f, 1.0f));
+    Vec3 l_pole_e = from_array(gait.debug_left_pole);
+    Vec3 r_pole_e = from_array(gait.debug_right_pole);
+    Vec3 l_pole_w = to_world_dir(*transform, l_pole_e);
+    Vec3 r_pole_w = to_world_dir(*transform, r_pole_e);
+    lines.add_line(l_hip_w, add(l_hip_w, mul(l_pole_w, 0.2f)), v3(0.2f, 0.6f, 1.0f));
+    lines.add_line(r_hip_w, add(r_hip_w, mul(r_pole_w, 0.2f)), v3(0.2f, 0.6f, 1.0f));
     Vec3 hips_w = from_array(gait.debug_hips_world);
-    Vec3 home_l = from_array(gait.foot_home_l);
-    Vec3 home_r = from_array(gait.foot_home_r);
+    Vec3 home_l_off = from_array(gait.foot_home_l);
+    Vec3 home_r_off = from_array(gait.foot_home_r);
     Vec3 fwd = from_array(gait.debug_forward);
     Vec3 right = from_array(gait.debug_right);
-    Vec3 home_l_w = add(hips_w, add(mul(fwd, home_l.x), add(mul(up_axis(), home_l.y), mul(right, home_l.z))));
-    Vec3 home_r_w = add(hips_w, add(mul(fwd, home_r.x), add(mul(up_axis(), home_r.y), mul(right, home_r.z))));
+    Vec3 hips_e = safe_pos(gait.bone_hips);
+    Vec3 home_l_e = add(hips_e, home_l_off);
+    Vec3 home_r_e = add(hips_e, home_r_off);
+    Vec3 home_l_w = to_world_point(*transform, home_l_e);
+    Vec3 home_r_w = to_world_point(*transform, home_r_e);
     lines.add_line(hips_w, home_l_w, v3(0.9f, 0.5f, 0.1f));
     lines.add_line(hips_w, home_r_w, v3(0.9f, 0.5f, 0.1f));
     lines.add_line(hips_w, l_target_w, v3(0.4f, 0.9f, 0.4f));
@@ -1195,9 +1232,9 @@ ecs::Transform debug_solve_two_bone_ik(const ecs::Transform& hip,
   const Vec3 knee_p = from_array(knee.position);
   const Vec3 ankle_p = from_array(ankle.position);
   const Vec3 tgt = from_array(target.position);
-  Vec3 pole = normalize(from_array(plane_hint.position));
-  if (length(pole) < 0.0001f) pole = v3(0.0f, 0.0f, 1.0f);
-  const Vec3 knee_out = solve_two_bone_ik(hip_p, knee_p, ankle_p, tgt, pole);
+  const Vec3 pole_point = from_array(plane_hint.position);
+  Vec3 prev_y = v3(0.0f, 0.0f, 1.0f);
+  const Vec3 knee_out = solve_two_bone_ik_pole(hip_p, knee_p, ankle_p, tgt, pole_point, prev_y, nullptr);
   ecs::Transform out{};
   to_array(knee_out, out.position);
   return out;

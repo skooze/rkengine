@@ -62,3 +62,19 @@ Set `ProceduralGait.debug_draw = true` to render:
 - IK chain lines (hip->knee->foot).
 
 Use this to validate foot planting and IK stability.
+
+### Debug Toggle
+
+`RKG_GAIT_DEBUG=0` disables gait debug draw/logging at runtime. If unset, the
+default game mode enables debug draw for the player rig.
+
+### Regression Check
+
+After a play session (which writes `build_logs/rkg_play_movement.log`), run:
+
+```bash
+./scripts/check_gait_log.py build_logs/rkg_play_movement.log
+```
+
+The script fails on knee-plane flips, midline crossings, or foot targets collapsing
+inside the minimum radial clamp.

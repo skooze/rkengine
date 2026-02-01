@@ -162,6 +162,8 @@ struct ProceduralGait {
   float right_swing_start_pos[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_l[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_r[3] = {0.0f, 0.0f, 0.0f};
+  float knee_prev_y_l[3] = {0.0f, 0.0f, 1.0f};
+  float knee_prev_y_r[3] = {0.0f, 0.0f, 1.0f};
   float debug_left_target[3] = {0.0f, 0.0f, 0.0f};
   float debug_right_target[3] = {0.0f, 0.0f, 0.0f};
   float debug_left_pole[3] = {0.0f, 0.0f, 0.0f};
@@ -169,6 +171,12 @@ struct ProceduralGait {
   float debug_forward[3] = {0.0f, 0.0f, 0.0f};
   float debug_right[3] = {0.0f, 0.0f, 0.0f};
   float debug_hips_world[3] = {0.0f, 0.0f, 0.0f};
+  float debug_knee_lat_l = 0.0f;
+  float debug_knee_lat_r = 0.0f;
+  float debug_target_lat_l = 0.0f;
+  float debug_target_lat_r = 0.0f;
+  float debug_continuity_l = 1.0f;
+  float debug_continuity_r = 1.0f;
 
   uint32_t bone_root = UINT32_MAX;
   uint32_t bone_hips = UINT32_MAX;
