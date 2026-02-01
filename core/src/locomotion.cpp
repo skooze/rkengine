@@ -752,6 +752,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (rig_scale < 0.0001f) rig_scale = 1.0f;
   const float leg_len_world = gait->leg_length * rig_scale;
   const float hip_width_world = gait->hip_width * rig_scale;
+  const float width_ref = std::max(hip_width_world, 0.25f * leg_len_world);
+  const float step_half_walk = 0.14f * width_ref;
+  const float step_half_run = 0.10f * width_ref;
+  const float step_half = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
 
   const float walk_cadence = 1.8f;
   const float run_cadence = 2.8f;
@@ -816,19 +820,20 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float landing_alpha = (gait->landing_timer > 0.0f) ? (gait->landing_timer / 0.18f) : 0.0f;
   const float landing_drop = -gait->landing_compress * leg_len_world * landing_alpha;
 
-  const float sway_t = smoothstep01(stance_u);
   const float pelvis_bob = gait->pelvis_bob_scale * leg_len_world * speed_norm;
-  const float pelvis_sway = gait->pelvis_sway_scale * hip_width_world * speed_norm;
+  float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
+  pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
   const float pelvis_roll = gait->pelvis_roll_scale * speed_norm;
-  const float pelvis_x = pelvis_sway * stance_sign * (0.5f - 0.5f * std::cos(kPi * sway_t));
+  const float pelvis_x = pelvis_sway_amp * stance_sign * std::sin(kPi * stance_u);
   const float pelvis_y = -pelvis_bob * std::sin(kPi * stance_u);
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
-    add_rot(*skeleton, gait->bone_hips, -lean_fwd * 0.25f, 0.0f, -pelvis_roll * stance_sign);
+    const float pelvis_roll_term = -pelvis_roll * stance_sign * 0.25f;
+    add_rot(*skeleton, gait->bone_hips, -lean_fwd * 0.25f, 0.0f, pelvis_roll_term);
   }
 
-  const float torso_roll = -pelvis_roll * stance_sign * 0.4f;
+  const float torso_roll = -pelvis_roll * stance_sign * 0.1f;
   add_rot(*skeleton, gait->bone_spine, lean_fwd * 0.2f, 0.0f, lean_side * 0.2f + torso_roll);
   add_rot(*skeleton, gait->bone_chest, lean_fwd * 0.15f, 0.0f, lean_side * 0.15f + torso_roll * 0.6f);
   add_rot(*skeleton, gait->bone_neck, lean_fwd * 0.06f, 0.0f, lean_side * 0.04f + torso_roll * 0.3f);
@@ -883,9 +888,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float step_height = gait->step_height_scale * gait->leg_length;
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
-  const float width_ref = std::max(hip_width_world, 0.25f * leg_len_world);
-  const float width_boost = 0.25f * width_ref * std::abs(v_side / std::max(max_speed, 0.1f));
-  const float min_side = 0.20f * width_ref;
+  const float strafe_half = 0.18f * width_ref * std::abs(v_side / std::max(max_speed, 0.1f));
+  const float step_half_desired = step_half + strafe_half;
+  const float min_side = 0.65f * step_half_desired;
   const float min_rad = 0.45f * leg_len_world;
 
   auto side_sign_for = [&](const Vec3& hip_world, float fallback) {
@@ -898,9 +903,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float side_sign_r = side_sign_for(r_hip_w, 1.0f);
 
   auto compute_step_target = [&](float side_sign, const Vec3& base_w) {
-    Vec3 desired = base_w;
+    Vec3 base = base_w;
+    {
+      Vec3 off = sub(base, hips_w);
+      const float mid = dot(off, side_world);
+      const float desired_mid = side_sign * step_half;
+      base = add(base, mul(side_world, desired_mid - mid));
+    }
+    Vec3 desired = base;
     if (turn_in_place) {
-      Vec3 off = sub(base_w, hips_w);
+      Vec3 off = sub(base, hips_w);
       const float off_y = off.y;
       off.y = 0.0f;
       off = rotate_y(off, angle_step);
@@ -908,10 +920,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       desired = add(hips_w, off);
       desired = add(desired, mul(move_dir_world, step_len_small));
     } else {
-      desired = add(desired, add(mul(move_dir_world, step_len), mul(side_world, width_boost * side_sign)));
+      desired = add(desired, add(mul(move_dir_world, step_len), mul(side_world, step_half_desired * side_sign)));
     }
 
     float midline = dot(sub(desired, hips_w), side_world);
+    const float desired_mid = side_sign * step_half_desired;
+    desired = add(desired, mul(side_world, desired_mid - midline));
+    midline = dot(sub(desired, hips_w), side_world);
     if (side_sign < 0.0f && midline > -min_side) {
       desired = add(desired, mul(side_world, (-min_side - midline)));
     } else if (side_sign > 0.0f && midline < min_side) {
