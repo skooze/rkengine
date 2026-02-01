@@ -947,8 +947,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float min_side = 0.90f * step_half_desired;
   const float min_rad = 0.45f * leg_len_e;
 
-  const float side_sign_l = gait->side_sign_l;
-  const float side_sign_r = gait->side_sign_r;
+  // Ensure side axis points from left to right based on bind/home foot offsets.
+  if (dot(sub(home_r_e, home_l_e), side_e) < 0.0f) {
+    side_e = mul(side_e, -1.0f);
+    side_world = mul(side_world, -1.0f);
+    to_array(side_e, gait->frame_side_entity);
+    to_array(side_world, gait->frame_side_world);
+  }
+  const float side_sign_l = -1.0f;
+  const float side_sign_r = 1.0f;
 
   auto compute_step_target_e = [&](float side_sign, const Vec3& base_e) {
     Vec3 base = base_e;
