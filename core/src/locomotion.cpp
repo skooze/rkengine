@@ -892,6 +892,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       intent_mag = clampf(in_len, 0.0f, 1.0f);
     }
   }
+  const bool idle = grounded && !turn_in_place && speed < (0.15f * max_speed) && intent_mag < 0.05f;
   Vec3 frame_fwd_e = from_array(gait->frame_fwd_entity);
   if (length(frame_fwd_e) < 0.0001f) frame_fwd_e = v3(0.0f, 0.0f, 1.0f);
   const float frame_alpha = 1.0f - std::exp(-dt * 8.0f);
@@ -901,6 +902,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (length(intent_e) > 0.0001f) {
       desired_frame_e = intent_e;
     }
+  } else if (idle) {
+    Vec3 fwd_e = normalize(to_local_dir(*transform, forward));
+    if (length(fwd_e) > 0.0001f) desired_frame_e = fwd_e;
   }
   frame_fwd_e = normalize(lerp(frame_fwd_e, desired_frame_e, frame_alpha));
   to_array(frame_fwd_e, gait->frame_fwd_entity);
@@ -1010,6 +1014,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   Vec3 l_lock_w = from_array(gait->left_lock_pos);
   Vec3 r_lock_w = from_array(gait->right_lock_pos);
+  const bool left_swing_run = left_swing && !idle;
+  const bool right_swing_run = right_swing && !idle;
+  const bool left_stance_run = idle ? true : left_stance;
+  const bool right_stance_run = idle ? true : right_stance;
   const bool left_was_swing = gait->left_step_active;
   const bool right_was_swing = gait->right_step_active;
 
@@ -1019,7 +1027,21 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     gait->left_locked = false;
     gait->right_locked = false;
   } else {
-    if (left_swing && !left_was_swing) {
+    if (idle) {
+      Vec3 home_l_w = to_world_point(*transform, home_l_e);
+      Vec3 home_r_w = to_world_point(*transform, home_r_e);
+      to_array(home_l_w, gait->left_lock_pos);
+      to_array(home_r_w, gait->right_lock_pos);
+      to_array(home_l_e, gait->left_step_pos);
+      to_array(home_r_e, gait->right_step_pos);
+      to_array(home_l_e, gait->left_swing_start_pos);
+      to_array(home_r_e, gait->right_swing_start_pos);
+      gait->left_step_active = false;
+      gait->right_step_active = false;
+      gait->left_locked = true;
+      gait->right_locked = true;
+    }
+    if (left_swing_run && !left_was_swing) {
       Vec3 start_e = gait->left_locked ? to_local_point(*transform, l_lock_w) : l_foot;
       to_array(start_e, gait->left_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_l, home_l_e);
@@ -1027,7 +1049,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->left_step_active = true;
       gait->left_locked = false;
     }
-    if (right_swing && !right_was_swing) {
+    if (right_swing_run && !right_was_swing) {
       Vec3 start_e = gait->right_locked ? to_local_point(*transform, r_lock_w) : r_foot;
       to_array(start_e, gait->right_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_r, home_r_e);
@@ -1035,26 +1057,26 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->right_step_active = true;
       gait->right_locked = false;
     }
-    if (!left_swing && left_was_swing) {
+    if (!left_swing_run && left_was_swing) {
       gait->left_step_active = false;
       Vec3 end_e = from_array(gait->left_step_pos);
       l_lock_w = to_world_point(*transform, end_e);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
     }
-    if (!right_swing && right_was_swing) {
+    if (!right_swing_run && right_was_swing) {
       gait->right_step_active = false;
       Vec3 end_e = from_array(gait->right_step_pos);
       r_lock_w = to_world_point(*transform, end_e);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
     }
-    if (left_stance && !gait->left_locked && !gait->left_step_active) {
+    if (left_stance_run && !gait->left_locked && !gait->left_step_active) {
       l_lock_w = to_world_point(*transform, l_foot);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
     }
-    if (right_stance && !gait->right_locked && !gait->right_step_active) {
+    if (right_stance_run && !gait->right_locked && !gait->right_step_active) {
       r_lock_w = to_world_point(*transform, r_foot);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
@@ -1076,35 +1098,49 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   Vec3 l_target_w = to_world_point(*transform, l_foot);
   Vec3 r_target_w = to_world_point(*transform, r_foot);
   if (grounded) {
-    if (left_stance) {
+    if (left_stance_run) {
       l_target_w = l_lock_w;
       l_target_e = to_local_point(*transform, l_target_w);
-    } else if (left_swing) {
+    } else if (left_swing_run) {
       const Vec3 start_e = from_array(gait->left_swing_start_pos);
       const Vec3 end_e = from_array(gait->left_step_pos);
       l_target_e = swing_foot(start_e, end_e, left_swing_u);
     }
-    if (right_stance) {
+    if (right_stance_run) {
       r_target_w = r_lock_w;
       r_target_e = to_local_point(*transform, r_target_w);
-    } else if (right_swing) {
+    } else if (right_swing_run) {
       const Vec3 start_e = from_array(gait->right_swing_start_pos);
       const Vec3 end_e = from_array(gait->right_step_pos);
       r_target_e = swing_foot(start_e, end_e, right_swing_u);
     }
   }
-  if (left_stance) {
+  if (left_stance_run) {
     l_target_e = to_local_point(*transform, l_target_w);
   }
-  if (right_stance) {
+  if (right_stance_run) {
     r_target_e = to_local_point(*transform, r_target_w);
   }
-  if (left_swing) {
+  if (left_swing_run) {
     l_target_w = to_world_point(*transform, l_target_e);
   }
-  if (right_swing) {
+  if (right_swing_run) {
     r_target_w = to_world_point(*transform, r_target_e);
   }
+
+  const float target_alpha = 1.0f - std::exp(-dt * 12.0f);
+  Vec3 l_smooth = from_array(gait->smooth_left_target);
+  Vec3 r_smooth = from_array(gait->smooth_right_target);
+  if (length(l_smooth) < 0.0001f) l_smooth = l_target_e;
+  if (length(r_smooth) < 0.0001f) r_smooth = r_target_e;
+  l_smooth = lerp(l_smooth, l_target_e, target_alpha);
+  r_smooth = lerp(r_smooth, r_target_e, target_alpha);
+  to_array(l_smooth, gait->smooth_left_target);
+  to_array(r_smooth, gait->smooth_right_target);
+  l_target_e = l_smooth;
+  r_target_e = r_smooth;
+  l_target_w = to_world_point(*transform, l_target_e);
+  r_target_w = to_world_point(*transform, r_target_e);
 
   to_array(l_target_e, gait->debug_left_target);
   to_array(r_target_e, gait->debug_right_target);
@@ -1117,16 +1153,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float landing_window = 0.25f;
     float w_swing_l = 0.0f;
     float w_swing_r = 0.0f;
-    if (left_swing) {
+    if (left_swing_run) {
       const float w_land = smoothstep01((left_swing_u - (1.0f - landing_window)) / landing_window);
       w_swing_l = 0.2f + 0.8f * w_land;
     }
-    if (right_swing) {
+    if (right_swing_run) {
       const float w_land = smoothstep01((right_swing_u - (1.0f - landing_window)) / landing_window);
       w_swing_r = 0.2f + 0.8f * w_land;
     }
-    const float ik_weight_l = grounded ? (left_stance ? 1.0f : w_swing_l) : 0.0f;
-    const float ik_weight_r = grounded ? (right_stance ? 1.0f : w_swing_r) : 0.0f;
+    const float ik_weight_l = grounded ? (left_stance_run ? 1.0f : w_swing_l) : 0.0f;
+    const float ik_weight_r = grounded ? (right_stance_run ? 1.0f : w_swing_r) : 0.0f;
     const Vec3 target_l = lerp(l_foot, l_target_e, ik_weight_l);
     const Vec3 target_r = lerp(r_foot, r_target_e, ik_weight_r);
 
@@ -1215,10 +1251,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
              << " yaw_rate=" << gait->yaw_rate
              << " speed=" << speed
              << " grounded=" << grounded
-             << " left_stance=" << left_stance
-             << " right_stance=" << right_stance
-             << " left_swing=" << left_swing
-             << " right_swing=" << right_swing
+            << " left_stance=" << left_stance_run
+            << " right_stance=" << right_stance_run
+            << " left_swing=" << left_swing_run
+            << " right_swing=" << right_swing_run
              << " l_target_e=(" << l_target_e.x << "," << l_target_e.y << "," << l_target_e.z << ")"
              << " r_target_e=(" << r_target_e.x << "," << r_target_e.y << "," << r_target_e.z << ")"
              << " l_pole_e=(" << l_pole_e.x << "," << l_pole_e.y << "," << l_pole_e.z << ")"

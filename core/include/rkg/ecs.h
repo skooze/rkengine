@@ -160,6 +160,8 @@ struct ProceduralGait {
   float right_step_pos[3] = {0.0f, 0.0f, 0.0f};
   float left_swing_start_pos[3] = {0.0f, 0.0f, 0.0f};
   float right_swing_start_pos[3] = {0.0f, 0.0f, 0.0f};
+  float smooth_left_target[3] = {0.0f, 0.0f, 0.0f};
+  float smooth_right_target[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_l[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_r[3] = {0.0f, 0.0f, 0.0f};
   float side_sign_l = -1.0f;
