@@ -1211,31 +1211,35 @@ static rkg::Vec3 solve_two_bone_ik(const rkg::Vec3& hip,
                                    const rkg::Vec3& knee,
                                    const rkg::Vec3& ankle,
                                    const rkg::Vec3& target,
-                                   const rkg::Vec3& plane_normal) {
+                                   const rkg::Vec3& pole_dir) {
   const float l1 = vec3_len(rkg::vec3_sub(knee, hip));
   const float l2 = vec3_len(rkg::vec3_sub(ankle, knee));
-  rkg::Vec3 dir = rkg::vec3_sub(target, hip);
-  float d = vec3_len(dir);
-  if (d < 0.0001f) d = 0.0001f;
+  rkg::Vec3 to_t = rkg::vec3_sub(target, hip);
+  float d_raw = vec3_len(to_t);
+  if (d_raw < 0.0001f) d_raw = 0.0001f;
   const float min_d = std::max(0.001f, std::fabs(l1 - l2) + 0.001f);
   const float max_d = std::max(0.001f, l1 + l2 - 0.001f);
-  d = clampf(d, min_d, max_d);
-  dir = rkg::vec3_mul(dir, 1.0f / d);
+  const float d = clampf(d_raw, min_d, max_d);
+  rkg::Vec3 dir = rkg::vec3_mul(to_t, 1.0f / d_raw);
 
   const float x = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
   float h_sq = l1 * l1 - x * x;
   if (h_sq < 0.0f) h_sq = 0.0f;
   const float h = std::sqrt(h_sq);
 
-  rkg::Vec3 axis = rkg::vec3_cross(plane_normal, dir);
-  axis = vec3_normalize_safe(axis);
-  if (vec3_len(axis) < 0.0001f) {
-    axis = vec3_normalize_safe(rkg::vec3_cross({0.0f, 1.0f, 0.0f}, dir));
+  rkg::Vec3 pole = pole_dir;
+  pole = rkg::vec3_sub(pole, rkg::vec3_mul(dir, rkg::vec3_dot(pole, dir)));
+  float pole_len = vec3_len(pole);
+  if (pole_len < 0.0001f) {
+    pole = rkg::vec3_cross({0.0f, 1.0f, 0.0f}, dir);
+    if (vec3_len(pole) < 0.0001f) {
+      pole = rkg::vec3_cross({1.0f, 0.0f, 0.0f}, dir);
+    }
+    pole_len = vec3_len(pole);
   }
-  const float side = rkg::vec3_dot(rkg::vec3_sub(knee, hip), axis) >= 0.0f ? 1.0f : -1.0f;
-  axis = rkg::vec3_mul(axis, side);
+  pole = rkg::vec3_mul(pole, 1.0f / std::max(pole_len, 0.0001f));
 
-  return rkg::vec3_add(hip, rkg::vec3_add(rkg::vec3_mul(dir, x), rkg::vec3_mul(axis, h)));
+  return rkg::vec3_add(hip, rkg::vec3_add(rkg::vec3_mul(dir, x), rkg::vec3_mul(pole, h)));
 }
 
 static void apply_bone_aim(std::vector<BonePose>& posed,
@@ -1344,15 +1348,26 @@ static void apply_leg_ik(const SkeletonAsset& skel,
   const rkg::Vec3 r_knee = mat4_get_translation(world[g_state.bone_r_calf]);
   const rkg::Vec3 r_foot = mat4_get_translation(world[g_state.bone_r_foot]);
 
-  rkg::Vec3 l_plane = rkg::vec3_cross(rkg::vec3_sub(l_knee, l_hip), rkg::vec3_sub(l_foot, l_knee));
-  rkg::Vec3 r_plane = rkg::vec3_cross(rkg::vec3_sub(r_knee, r_hip), rkg::vec3_sub(r_foot, r_knee));
-  l_plane = vec3_normalize_safe(l_plane);
-  r_plane = vec3_normalize_safe(r_plane);
-  if (vec3_len(l_plane) < 0.0001f) l_plane = {0.0f, 0.0f, 1.0f};
-  if (vec3_len(r_plane) < 0.0001f) r_plane = {0.0f, 0.0f, 1.0f};
+  rkg::Vec3 l_dir = vec3_normalize_safe(rkg::vec3_sub(l_foot, l_hip));
+  rkg::Vec3 r_dir = vec3_normalize_safe(rkg::vec3_sub(r_foot, r_hip));
+  rkg::Vec3 l_pole = rkg::vec3_sub(rkg::vec3_sub(l_knee, l_hip),
+                                   rkg::vec3_mul(l_dir, rkg::vec3_dot(rkg::vec3_sub(l_knee, l_hip), l_dir)));
+  rkg::Vec3 r_pole = rkg::vec3_sub(rkg::vec3_sub(r_knee, r_hip),
+                                   rkg::vec3_mul(r_dir, rkg::vec3_dot(rkg::vec3_sub(r_knee, r_hip), r_dir)));
+  l_pole = vec3_normalize_safe(l_pole);
+  r_pole = vec3_normalize_safe(r_pole);
+  if (vec3_len(l_pole) < 0.0001f) l_pole = {0.0f, 0.0f, 1.0f};
+  if (vec3_len(r_pole) < 0.0001f) r_pole = {0.0f, 0.0f, 1.0f};
 
-  const rkg::Vec3 l_knee_target = solve_two_bone_ik(l_hip, l_knee, l_foot, target_l, l_plane);
-  const rkg::Vec3 r_knee_target = solve_two_bone_ik(r_hip, r_knee, r_foot, target_r, r_plane);
+  rkg::Vec3 right_dir = vec3_normalize_safe(rkg::vec3_sub(r_hip, l_hip));
+  if (vec3_len(right_dir) < 0.0001f) right_dir = {1.0f, 0.0f, 0.0f};
+  rkg::Vec3 left_out = rkg::vec3_mul(right_dir, -1.0f);
+  rkg::Vec3 right_out = right_dir;
+  if (rkg::vec3_dot(l_pole, left_out) < 0.0f) l_pole = rkg::vec3_mul(l_pole, -1.0f);
+  if (rkg::vec3_dot(r_pole, right_out) < 0.0f) r_pole = rkg::vec3_mul(r_pole, -1.0f);
+
+  const rkg::Vec3 l_knee_target = solve_two_bone_ik(l_hip, l_knee, l_foot, target_l, l_pole);
+  const rkg::Vec3 r_knee_target = solve_two_bone_ik(r_hip, r_knee, r_foot, target_r, r_pole);
 
   apply_bone_aim(posed, world, g_state.bone_l_thigh, g_state.bone_l_calf, l_knee_target);
   apply_bone_aim(posed, world, g_state.bone_r_thigh, g_state.bone_r_calf, r_knee_target);

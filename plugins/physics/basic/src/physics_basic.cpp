@@ -244,8 +244,8 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
     float dir_z = 0.0f;
     if (snapshot->forward.held) dir_z += 1.0f;
     if (snapshot->back.held) dir_z -= 1.0f;
-    if (snapshot->left.held) dir_x += 1.0f;
-    if (snapshot->right.held) dir_x -= 1.0f;
+    if (snapshot->left.held) dir_x -= 1.0f;
+    if (snapshot->right.held) dir_x += 1.0f;
 
     float len = std::sqrt(dir_x * dir_x + dir_z * dir_z);
     if (len > kEps) {

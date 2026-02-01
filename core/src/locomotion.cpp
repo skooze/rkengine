@@ -453,31 +453,35 @@ static Vec3 solve_two_bone_ik(const Vec3& hip,
                               const Vec3& knee,
                               const Vec3& ankle,
                               const Vec3& target,
-                              const Vec3& plane_normal) {
+                              const Vec3& pole_dir) {
   const float l1 = length(sub(knee, hip));
   const float l2 = length(sub(ankle, knee));
-  Vec3 dir = sub(target, hip);
-  float d = length(dir);
-  if (d < 0.0001f) d = 0.0001f;
+  Vec3 to_t = sub(target, hip);
+  float d_raw = length(to_t);
+  if (d_raw < 0.0001f) d_raw = 0.0001f;
   const float min_d = std::max(0.001f, std::fabs(l1 - l2) + 0.001f);
   const float max_d = std::max(0.001f, l1 + l2 - 0.001f);
-  d = clampf(d, min_d, max_d);
-  dir = mul(dir, 1.0f / d);
+  const float d = clampf(d_raw, min_d, max_d);
+  Vec3 dir = mul(to_t, 1.0f / d_raw);
 
   const float x = (l1 * l1 - l2 * l2 + d * d) / (2.0f * d);
   float h_sq = l1 * l1 - x * x;
   if (h_sq < 0.0f) h_sq = 0.0f;
   const float h = std::sqrt(h_sq);
 
-  Vec3 axis = cross(plane_normal, dir);
-  axis = normalize(axis);
-  if (length(axis) < 0.0001f) {
-    axis = normalize(cross(v3(0.0f, 1.0f, 0.0f), dir));
+  Vec3 pole = pole_dir;
+  pole = sub(pole, mul(dir, dot(pole, dir)));
+  float pole_len = length(pole);
+  if (pole_len < 0.0001f) {
+    pole = cross(v3(0.0f, 1.0f, 0.0f), dir);
+    if (length(pole) < 0.0001f) {
+      pole = cross(v3(1.0f, 0.0f, 0.0f), dir);
+    }
+    pole_len = length(pole);
   }
-  const float side = dot(sub(knee, hip), axis) >= 0.0f ? 1.0f : -1.0f;
-  axis = mul(axis, side);
+  pole = mul(pole, 1.0f / std::max(pole_len, 0.0001f));
 
-  return add(hip, add(mul(dir, x), mul(axis, h)));
+  return add(hip, add(mul(dir, x), mul(pole, h)));
 }
 
 static void apply_bone_aim(ecs::Skeleton& skel,
@@ -604,12 +608,24 @@ static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& 
   if (foot_len < kEps) foot_len = leg_len * 0.15f;
   gait.foot_length = foot_len;
 
-  Vec3 l_plane = normalize(cross(sub(l_knee, l_hip), sub(l_foot, l_knee)));
-  Vec3 r_plane = normalize(cross(sub(r_knee, r_hip), sub(r_foot, r_knee)));
-  if (length(l_plane) < kEps) l_plane = v3(0.0f, 0.0f, 1.0f);
-  if (length(r_plane) < kEps) r_plane = v3(0.0f, 0.0f, 1.0f);
-  to_array(l_plane, gait.knee_plane_l);
-  to_array(r_plane, gait.knee_plane_r);
+  Vec3 l_dir = normalize(sub(l_foot, l_hip));
+  Vec3 r_dir = normalize(sub(r_foot, r_hip));
+  Vec3 l_knee_off = sub(l_knee, l_hip);
+  Vec3 r_knee_off = sub(r_knee, r_hip);
+  Vec3 l_pole = sub(l_knee_off, mul(l_dir, dot(l_knee_off, l_dir)));
+  Vec3 r_pole = sub(r_knee_off, mul(r_dir, dot(r_knee_off, r_dir)));
+  l_pole = normalize(l_pole);
+  r_pole = normalize(r_pole);
+  if (length(l_pole) < kEps) l_pole = v3(0.0f, 0.0f, 1.0f);
+  if (length(r_pole) < kEps) r_pole = v3(0.0f, 0.0f, 1.0f);
+  rkg::Mat4 l_thigh_rot = mat4_extract_rotation(world[gait.bone_l_thigh]);
+  rkg::Mat4 r_thigh_rot = mat4_extract_rotation(world[gait.bone_r_thigh]);
+  rkg::Mat4 l_thigh_inv = mat4_transpose3x3(l_thigh_rot);
+  rkg::Mat4 r_thigh_inv = mat4_transpose3x3(r_thigh_rot);
+  Vec3 l_pole_local = mat4_mul_vec3(l_thigh_inv, l_pole);
+  Vec3 r_pole_local = mat4_mul_vec3(r_thigh_inv, r_pole);
+  to_array(l_pole_local, gait.knee_plane_l);
+  to_array(r_pole_local, gait.knee_plane_r);
 }
 
 static void add_rot(ecs::Skeleton& skel, uint32_t idx, float rx, float ry, float rz) {
@@ -721,9 +737,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float hip_width_world = gait->hip_width * rig_scale;
 
   float stride_world = leg_len_world * gait->stride_scale;
-  if (stride_world < 0.05f) stride_world = 0.05f;
+  if (stride_world < 0.6f) stride_world = 0.6f;
   float step_rate = turn_in_place ? gait->turn_step_rate : (speed / stride_world);
-  step_rate = clampf(step_rate, 0.0f, 4.0f);
+  step_rate = clampf(step_rate, 0.0f, 2.2f);
   if (speed > 0.01f || turn_in_place) {
     gait->phase += step_rate * dt * 2.0f * kPi;
     if (gait->phase > 2.0f * kPi) gait->phase = std::fmod(gait->phase, 2.0f * kPi);
@@ -832,8 +848,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       offset = rotate_y(mul(right, lateral_offset * side_sign), turn_dir * 0.4f);
     }
     Vec3 desired = add(hip_mid, offset);
-    const float ray_height = leg_len_world * 0.6f;
-    RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 2.0f);
+    const float ray_height = std::max(leg_len_world * 2.0f, 1.0f);
+    RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 2.5f);
     if (hit.hit) {
       desired.y = hit.point.y;
     }
@@ -946,25 +962,36 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const Vec3 r_knee2 = safe_pos(gait->bone_r_calf);
     const Vec3 r_foot2 = safe_pos(gait->bone_r_foot);
 
-    Vec3 l_plane = cross(sub(l_knee2, l_hip2), sub(l_foot2, l_knee2));
-    Vec3 r_plane = cross(sub(r_knee2, r_hip2), sub(r_foot2, r_knee2));
-    l_plane = normalize(l_plane);
-    r_plane = normalize(r_plane);
-    if (length(l_plane) < 0.0001f) l_plane = v3(0.0f, 0.0f, 1.0f);
-    if (length(r_plane) < 0.0001f) r_plane = v3(0.0f, 0.0f, 1.0f);
-    const Vec3 l_pref = normalize(from_array(gait->knee_plane_l));
-    const Vec3 r_pref = normalize(from_array(gait->knee_plane_r));
-    if (length(l_pref) > 0.0001f) {
-      l_plane = normalize(lerp(l_pref, l_plane, 1.0f - gait->knee_plane_bias));
-      if (dot(l_plane, l_pref) < 0.0f) l_plane = mul(l_plane, -1.0f);
-    }
-    if (length(r_pref) > 0.0001f) {
-      r_plane = normalize(lerp(r_pref, r_plane, 1.0f - gait->knee_plane_bias));
-      if (dot(r_plane, r_pref) < 0.0f) r_plane = mul(r_plane, -1.0f);
-    }
+    Vec3 l_pole_local = normalize(from_array(gait->knee_plane_l));
+    Vec3 r_pole_local = normalize(from_array(gait->knee_plane_r));
+    if (length(l_pole_local) < 0.0001f) l_pole_local = v3(0.0f, 0.0f, 1.0f);
+    if (length(r_pole_local) < 0.0001f) r_pole_local = v3(0.0f, 0.0f, 1.0f);
 
-    const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_plane);
-    const Vec3 r_knee_target = solve_two_bone_ik(r_hip2, r_knee2, r_foot2, target_r, r_plane);
+    rkg::Mat4 l_thigh_rot = mat4_extract_rotation(world[gait->bone_l_thigh]);
+    rkg::Mat4 r_thigh_rot = mat4_extract_rotation(world[gait->bone_r_thigh]);
+    Vec3 l_pole_world = mat4_mul_vec3(l_thigh_rot, l_pole_local);
+    Vec3 r_pole_world = mat4_mul_vec3(r_thigh_rot, r_pole_local);
+
+    Vec3 l_dir = normalize(sub(l_foot2, l_hip2));
+    Vec3 r_dir = normalize(sub(r_foot2, r_hip2));
+    Vec3 l_dyn = sub(sub(l_knee2, l_hip2), mul(l_dir, dot(sub(l_knee2, l_hip2), l_dir)));
+    Vec3 r_dyn = sub(sub(r_knee2, r_hip2), mul(r_dir, dot(sub(r_knee2, r_hip2), r_dir)));
+    l_dyn = normalize(l_dyn);
+    r_dyn = normalize(r_dyn);
+    if (length(l_dyn) < 0.0001f) l_dyn = l_pole_world;
+    if (length(r_dyn) < 0.0001f) r_dyn = r_pole_world;
+    l_pole_world = normalize(lerp(l_dyn, l_pole_world, gait->knee_plane_bias));
+    r_pole_world = normalize(lerp(r_dyn, r_pole_world, gait->knee_plane_bias));
+
+    Vec3 right_dir = normalize(sub(r_hip2, l_hip2));
+    if (length(right_dir) < 0.0001f) right_dir = v3(1.0f, 0.0f, 0.0f);
+    Vec3 left_out = mul(right_dir, -1.0f);
+    Vec3 right_out = right_dir;
+    if (dot(l_pole_world, left_out) < 0.0f) l_pole_world = mul(l_pole_world, -1.0f);
+    if (dot(r_pole_world, right_out) < 0.0f) r_pole_world = mul(r_pole_world, -1.0f);
+
+    const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_pole_world);
+    const Vec3 r_knee_target = solve_two_bone_ik(r_hip2, r_knee2, r_foot2, target_r, r_pole_world);
     apply_bone_aim(*skeleton, world, gait->bone_l_thigh, gait->bone_l_calf, l_knee_target);
     apply_bone_aim(*skeleton, world, gait->bone_r_thigh, gait->bone_r_calf, r_knee_target);
 
@@ -1035,8 +1062,9 @@ ecs::Transform debug_solve_two_bone_ik(const ecs::Transform& hip,
   const Vec3 knee_p = from_array(knee.position);
   const Vec3 ankle_p = from_array(ankle.position);
   const Vec3 tgt = from_array(target.position);
-  const Vec3 plane = normalize(from_array(plane_hint.position));
-  const Vec3 knee_out = solve_two_bone_ik(hip_p, knee_p, ankle_p, tgt, plane);
+  Vec3 pole = normalize(from_array(plane_hint.position));
+  if (length(pole) < 0.0001f) pole = v3(0.0f, 0.0f, 1.0f);
+  const Vec3 knee_out = solve_two_bone_ik(hip_p, knee_p, ankle_p, tgt, pole);
   ecs::Transform out{};
   to_array(knee_out, out.position);
   return out;
