@@ -1361,10 +1361,17 @@ static void apply_leg_ik(const SkeletonAsset& skel,
 
   rkg::Vec3 right_dir = vec3_normalize_safe(rkg::vec3_sub(r_hip, l_hip));
   if (vec3_len(right_dir) < 0.0001f) right_dir = {1.0f, 0.0f, 0.0f};
-  rkg::Vec3 left_out = rkg::vec3_mul(right_dir, -1.0f);
-  rkg::Vec3 right_out = right_dir;
-  if (rkg::vec3_dot(l_pole, left_out) < 0.0f) l_pole = rkg::vec3_mul(l_pole, -1.0f);
-  if (rkg::vec3_dot(r_pole, right_out) < 0.0f) r_pole = rkg::vec3_mul(r_pole, -1.0f);
+  rkg::Vec3 up_dir = {0.0f, 1.0f, 0.0f};
+  if (g_state.bone_head != UINT32_MAX && g_state.bone_head < world.size()) {
+    const rkg::Vec3 head = mat4_get_translation(world[g_state.bone_head]);
+    const rkg::Vec3 hips = mat4_get_translation(world[g_state.bone_hips]);
+    rkg::Vec3 up = vec3_normalize_safe(rkg::vec3_sub(head, hips));
+    if (vec3_len(up) > 0.0001f) up_dir = up;
+  }
+  rkg::Vec3 forward_dir = vec3_normalize_safe(rkg::vec3_cross(up_dir, right_dir));
+  if (vec3_len(forward_dir) < 0.0001f) forward_dir = {0.0f, 0.0f, 1.0f};
+  if (rkg::vec3_dot(l_pole, forward_dir) < 0.0f) l_pole = rkg::vec3_mul(l_pole, -1.0f);
+  if (rkg::vec3_dot(r_pole, forward_dir) < 0.0f) r_pole = rkg::vec3_mul(r_pole, -1.0f);
 
   const rkg::Vec3 l_knee_target = solve_two_bone_ik(l_hip, l_knee, l_foot, target_l, l_pole);
   const rkg::Vec3 r_knee_target = solve_two_bone_ik(r_hip, r_knee, r_foot, target_r, r_pole);
