@@ -835,6 +835,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
                             gait->foot_lock_in, gait->foot_lock_out, dt);
   update_foot_lock_internal(gait->right_locked, r_lock_w, r_foot_w, grounded, swing_r,
                             gait->foot_lock_in, gait->foot_lock_out, dt);
+  if (gait->left_locked && gait->right_locked) {
+    if (swing_l > swing_r) {
+      gait->left_locked = false;
+    } else {
+      gait->right_locked = false;
+    }
+  }
   to_array(l_lock_w, gait->left_lock_pos);
   to_array(r_lock_w, gait->right_lock_pos);
 
@@ -882,8 +889,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   }
 
   if (gait->enable_ik) {
-    const float ik_weight_l = grounded ? (1.0f - swing_l) : 0.0f;
-    const float ik_weight_r = grounded ? (1.0f - swing_r) : 0.0f;
+    const float ik_weight_l = grounded ? 1.0f : 0.0f;
+    const float ik_weight_r = grounded ? 1.0f : 0.0f;
     const Vec3 target_l = lerp(l_foot, l_target, ik_weight_l);
     const Vec3 target_r = lerp(r_foot, r_target, ik_weight_r);
 
@@ -914,10 +921,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const Vec3 l_pref = normalize(from_array(gait->knee_plane_l));
     const Vec3 r_pref = normalize(from_array(gait->knee_plane_r));
     if (length(l_pref) > 0.0001f) {
-      l_plane = normalize(lerp(l_plane, l_pref, gait->knee_plane_bias));
+      l_plane = normalize(lerp(l_pref, l_plane, 1.0f - gait->knee_plane_bias));
     }
     if (length(r_pref) > 0.0001f) {
-      r_plane = normalize(lerp(r_plane, r_pref, gait->knee_plane_bias));
+      r_plane = normalize(lerp(r_pref, r_plane, 1.0f - gait->knee_plane_bias));
     }
 
     const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_plane);

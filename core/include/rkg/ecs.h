@@ -135,8 +135,8 @@ struct ProceduralGait {
   float foot_lock_in = 0.25f;
   float foot_lock_out = 0.65f;
   float ik_blend_speed = 8.0f;
-  float lateral_step_scale = 0.75f;
-  float knee_plane_bias = 0.75f;
+  float lateral_step_scale = 0.6f;
+  float knee_plane_bias = 0.9f;
   float landing_compress = 0.04f;
   float landing_recover = 10.0f;
   float input_smooth_tau = 0.05f;
