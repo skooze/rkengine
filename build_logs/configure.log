@@ -5,5 +5,5 @@ CMake Warning at plugins/scripting/lua/CMakeLists.txt:50 (message):
 
 
 -- Configuring done (0.1s)
--- Generating done (0.0s)
--- Build files have been written to: /home/skooze/rkg/build
+-- Generating done (0.1s)
+-- Build files have been written to: /home/rkoasis/rkg/build
