@@ -1,18 +1,1 @@
-From github.com:skooze/rkengine
-   04bb95a..735e4a1  main       -> origin/main
-Updating 04bb95a..735e4a1
-Fast-forward
- build_logs/build.log                      |  118 +--
- build_logs/gitpull.log                    |    8 +-
- build_logs/rkg_editor_20260201_104635.log |  550 +++++++++++
- build_logs/rkg_editor_20260201_110451.log |  333 +++++++
- build_logs/rkg_editor_20260201_113015.log | 1539 +++++++++++++++++++++++++++++
- build_logs/rkg_editor_20260201_113548.log |  311 ++++++
- build_logs/rkg_play_movement.log          |  398 +++++---
- core/include/rkg/ecs.h                    |    2 +
- core/src/locomotion.cpp                   |  158 ++-
- 9 files changed, 3172 insertions(+), 245 deletions(-)
- create mode 100644 build_logs/rkg_editor_20260201_104635.log
- create mode 100644 build_logs/rkg_editor_20260201_110451.log
- create mode 100644 build_logs/rkg_editor_20260201_113015.log
- create mode 100644 build_logs/rkg_editor_20260201_113548.log
+Already up to date.
