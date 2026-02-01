@@ -863,29 +863,36 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (idx == UINT32_MAX || idx >= world.size()) return v3();
     return {world[idx].m[12], world[idx].m[13], world[idx].m[14]};
   };
-  const Vec3 l_hip = safe_pos(gait->bone_l_thigh);
   const Vec3 l_foot = safe_pos(gait->bone_l_foot);
-  const Vec3 r_hip = safe_pos(gait->bone_r_thigh);
   const Vec3 r_foot = safe_pos(gait->bone_r_foot);
 
   const Vec3 hips_e = safe_pos(gait->bone_hips);
   const Vec3 hips_w = to_world_point(*transform, hips_e);
   to_array(hips_w, gait->debug_hips_world);
-  const Vec3 l_hip_w = to_world_point(*transform, l_hip);
-  const Vec3 r_hip_w = to_world_point(*transform, r_hip);
   Vec3 intent_world = forward;
+  float intent_mag = 0.0f;
   if (controller) {
     Vec3 in{controller->smoothed_input[0], 0.0f, controller->smoothed_input[2]};
-    if (length(in) > 0.0001f) intent_world = normalize(in);
+    const float in_len = length(in);
+    if (in_len > 0.0001f) {
+      intent_world = mul(in, 1.0f / in_len);
+      intent_mag = clampf(in_len, 0.0f, 1.0f);
+    }
   }
-  Vec3 side_world = normalize(cross(up_axis(), intent_world));
+  Vec3 frame_fwd = from_array(gait->frame_fwd_world);
+  if (length(frame_fwd) < 0.0001f) frame_fwd = forward;
+  const float frame_alpha = 1.0f - std::exp(-dt * 8.0f);
+  if (intent_mag > 0.05f) {
+    frame_fwd = normalize(lerp(frame_fwd, intent_world, frame_alpha));
+  }
+  Vec3 side_world = normalize(cross(up_axis(), frame_fwd));
   if (length(side_world) < 0.0001f) side_world = right;
   const Vec3 prev_side = from_array(gait->frame_side_world);
   if (length(prev_side) > 0.0001f && dot(prev_side, side_world) < 0.0f) {
     side_world = mul(side_world, -1.0f);
   }
   to_array(side_world, gait->frame_side_world);
-  to_array(intent_world, gait->frame_fwd_world);
+  to_array(frame_fwd, gait->frame_fwd_world);
   Vec3 side_e = normalize(to_local_dir(*transform, side_world));
   if (length(side_e) < 0.0001f) side_e = v3(1.0f, 0.0f, 0.0f);
 
@@ -924,9 +931,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       off = rotate_y(off, angle_step);
       off.y = off_y;
       desired = add(hips_w, off);
-      desired = add(desired, mul(intent_world, step_len_small));
+      desired = add(desired, mul(frame_fwd, step_len_small));
     } else {
-      desired = add(desired, mul(intent_world, step_len));
+      desired = add(desired, mul(frame_fwd, step_len));
     }
 
     float midline = dot(sub(desired, hips_w), side_world);
@@ -1039,7 +1046,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   to_array(l_target_e, gait->debug_left_target);
   to_array(r_target_e, gait->debug_right_target);
-  to_array(intent_world, gait->debug_forward);
+  to_array(frame_fwd, gait->debug_forward);
   to_array(side_world, gait->debug_right);
   gait->debug_target_lat_l = dot(sub(l_target_e, hips_e), side_e);
   gait->debug_target_lat_r = dot(sub(r_target_e, hips_e), side_e);
@@ -1087,10 +1094,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const Vec3 r_hip2_w = to_world_point(*transform, r_hip2);
     const Vec3 l_pole_w = add(l_hip2_w,
                               add(mul(side_world, side_sign_l * pole_out),
-                                  add(mul(intent_world, pole_fwd), mul(up_axis(), pole_up))));
+                                  add(mul(frame_fwd, pole_fwd), mul(up_axis(), pole_up))));
     const Vec3 r_pole_w = add(r_hip2_w,
                               add(mul(side_world, side_sign_r * pole_out),
-                                  add(mul(intent_world, pole_fwd), mul(up_axis(), pole_up))));
+                                  add(mul(frame_fwd, pole_fwd), mul(up_axis(), pole_up))));
     const Vec3 l_pole_e = to_local_point(*transform, l_pole_w);
     const Vec3 r_pole_e = to_local_point(*transform, r_pole_w);
     Vec3 l_prev_y = normalize(from_array(gait->knee_prev_y_l));
