@@ -1181,8 +1181,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   Vec3 r_smooth = from_array(gait->smooth_right_target);
   if (length(l_smooth) < 0.0001f) l_smooth = l_target_e;
   if (length(r_smooth) < 0.0001f) r_smooth = r_target_e;
-  l_smooth = lerp(l_smooth, l_target_e, target_alpha);
-  r_smooth = lerp(r_smooth, r_target_e, target_alpha);
+  if (left_swing_run) {
+    l_smooth = l_target_e;
+  } else {
+    l_smooth = lerp(l_smooth, l_target_e, target_alpha);
+  }
+  if (right_swing_run) {
+    r_smooth = r_target_e;
+  } else {
+    r_smooth = lerp(r_smooth, r_target_e, target_alpha);
+  }
   to_array(l_smooth, gait->smooth_left_target);
   to_array(r_smooth, gait->smooth_right_target);
   l_target_e = clamp_target_e(l_smooth, side_sign_l);
