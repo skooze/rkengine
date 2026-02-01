@@ -753,9 +753,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float leg_len_world = gait->leg_length * rig_scale;
   const float hip_width_world = gait->hip_width * rig_scale;
   const float width_ref = std::max(hip_width_world, 0.25f * leg_len_world);
-  const float step_half_walk = 0.14f * width_ref;
-  const float step_half_run = 0.10f * width_ref;
-  const float step_half = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
+  float step_half_walk = 0.45f * hip_width_world;
+  float step_half_run = 0.35f * hip_width_world;
+  float step_half = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
+  step_half = std::max(step_half, 0.10f * leg_len_world);
+  step_half = std::min(step_half, 0.22f * leg_len_world);
 
   const float walk_cadence = 1.8f;
   const float run_cadence = 2.8f;
@@ -888,19 +890,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float step_height = gait->step_height_scale * gait->leg_length;
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
-  const float strafe_half = 0.18f * width_ref * std::abs(v_side / std::max(max_speed, 0.1f));
+  const float strafe_half = 0.20f * hip_width_world * std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half + strafe_half;
-  const float min_side = 0.65f * step_half_desired;
+  const float min_side = 0.90f * step_half_desired;
   const float min_rad = 0.45f * leg_len_world;
 
-  auto side_sign_for = [&](const Vec3& hip_world, float fallback) {
-    const float s = dot(sub(hip_world, hips_w), side_world);
-    if (s > 0.001f) return 1.0f;
-    if (s < -0.001f) return -1.0f;
-    return fallback;
-  };
-  const float side_sign_l = side_sign_for(l_hip_w, -1.0f);
-  const float side_sign_r = side_sign_for(r_hip_w, 1.0f);
+  const float side_sign_l = -1.0f;
+  const float side_sign_r = 1.0f;
 
   auto compute_step_target = [&](float side_sign, const Vec3& base_w) {
     Vec3 base = base_w;
@@ -920,7 +916,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       desired = add(hips_w, off);
       desired = add(desired, mul(move_dir_world, step_len_small));
     } else {
-      desired = add(desired, add(mul(move_dir_world, step_len), mul(side_world, step_half_desired * side_sign)));
+      desired = add(desired, mul(move_dir_world, step_len));
     }
 
     float midline = dot(sub(desired, hips_w), side_world);
