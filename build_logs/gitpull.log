@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   a86606f..b2bd586  main       -> origin/main
-Updating a86606f..b2bd586
+   9e1cdcc..dbb8609  main       -> origin/main
+Updating 9e1cdcc..dbb8609
 Fast-forward
- core/src/locomotion.cpp | 58 +++++++++++++++++++++++++++++++------------------
- 1 file changed, 37 insertions(+), 21 deletions(-)
+ core/src/locomotion.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
