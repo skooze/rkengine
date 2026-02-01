@@ -1,174 +1,219 @@
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.000 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.367,-0.000,1.879) pelvis_off=(0.000,-1.661,0.000)
+gait entity=2 speed=0.000 phase=0.008 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.078,-0.000,-0.021) pelvis_off=(0.000,-1.661,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.000 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.367,-0.000,1.879) pelvis_off=(0.000,-2.766,0.000)
+gait entity=2 speed=0.000 phase=0.015 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.079,-0.000,0.016) pelvis_off=(0.000,-2.768,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.008 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.348,-0.000,1.952) pelvis_off=(0.000,-2.989,0.000)
+gait entity=2 speed=0.000 phase=0.030 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.066,0.000,0.046) pelvis_off=(0.000,-2.996,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.015 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.328,-0.000,2.026) pelvis_off=(0.000,-3.039,0.000)
+gait entity=2 speed=0.000 phase=0.038 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.062,0.000,0.051) pelvis_off=(0.000,-3.046,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.045 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.403,0.000,1.731) pelvis_off=(0.000,-3.053,0.000)
+gait entity=2 speed=0.000 phase=0.045 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.069,0.000,0.042) pelvis_off=(0.000,-3.058,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.106 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.539,0.000,0.983) pelvis_off=(0.000,-3.072,0.000)
+gait entity=2 speed=0.000 phase=0.045 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.072,0.000,0.037) pelvis_off=(0.000,-3.061,0.000)
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
 entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=0.121 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-7.548,0.000,0.908) pelvis_off=(0.000,-3.086,0.000)
-entity=2 pos=(0.000,0.000,0.000) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.006,0.000,-0.049) vel=(-0.165,0.000,-1.370) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.578 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.469 phase=0.122 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-8.090,0.000,-3.595) pelvis_off=(0.000,-2.918,0.000)
-entity=2 pos=(-0.035,0.000,-0.287) vel=(-0.404,0.000,-3.356) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.879 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.079,0.000,-0.657) vel=(-0.461,0.000,-3.834) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.965 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.251 phase=0.154 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-11.342,0.000,-30.641) pelvis_off=(0.000,-4.430,0.000)
-entity=2 pos=(-0.126,0.000,-1.046) vel=(-0.473,0.000,-3.932) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.990 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.173,0.000,-1.441) vel=(-0.476,0.000,-3.960) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.910 phase=0.214 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-12.186,0.000,-37.679) pelvis_off=(0.000,-7.409,0.000)
-entity=2 pos=(-0.221,0.000,-1.837) vel=(-0.477,0.000,-3.968) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.269,0.000,-2.234) vel=(-0.478,0.000,-3.970) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.990 phase=0.279 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-12.364,0.000,-39.204) pelvis_off=(0.000,-8.826,0.000)
-entity=2 pos=(-0.316,0.000,-2.631) vel=(-0.478,0.000,-3.971) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.119,0.000,-0.993) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.365,0.000,-3.028) vel=(-0.545,0.000,-3.961) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.136,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.999 phase=0.345 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-13.024,0.001,-39.436) pelvis_off=(0.000,-9.115,0.000)
-entity=2 pos=(-0.441,0.000,-3.420) vel=(-0.986,0.000,-3.863) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.247,0.000,-0.969) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.558,0.000,-3.801) vel=(-1.317,0.000,-3.766) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(-0.330,0.000,-0.944) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.990 phase=0.411 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-20.160,0.002,-36.949) pelvis_off=(0.000,-9.174,0.000)
-entity=2 pos=(-0.702,0.000,-4.174) vel=(-1.580,0.000,-3.666) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(-0.396,0.000,-0.918) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.883,0.000,-4.528) vel=(-2.043,0.000,-3.417) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.995 input_dir=(-0.513,0.000,-0.858) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.987 phase=0.476 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-26.391,0.003,-32.563) pelvis_off=(0.000,-9.185,0.000)
-entity=2 pos=(-1.112,0.000,-4.853) vel=(-2.532,0.000,-3.061) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.993 input_dir=(-0.637,0.000,-0.771) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-1.414,0.000,-5.127) vel=(-3.271,0.000,-2.147) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.978 input_dir=(-0.836,0.000,-0.549) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.945 phase=0.543 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-35.752,0.005,-18.790) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-1.767,0.000,-5.293) vel=(-3.731,0.000,-1.122) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.974 input_dir=(-0.958,0.000,-0.288) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-2.155,0.000,-5.311) vel=(-3.655,0.000,0.800) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.935 input_dir=(-0.976,0.000,0.219) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.833 phase=0.608 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-33.417,0.008,8.764) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-2.461,0.000,-5.151) vel=(-2.283,0.000,2.247) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.841 input_dir=(-0.524,0.000,0.852) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-2.606,0.000,-4.867) vel=(-0.542,0.000,3.238) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.881 input_dir=(0.131,0.000,0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.326 phase=0.666 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-0.900,0.012,22.698) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-2.560,0.000,-4.520) vel=(1.279,0.000,3.614) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.958 input_dir=(0.334,0.000,0.943) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-2.400,0.000,-4.166) vel=(1.894,0.000,3.443) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.982 input_dir=(0.482,0.000,0.876) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.793 phase=0.724 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(20.322,0.016,22.127) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-2.192,0.000,-3.830) vel=(2.197,0.000,3.312) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.994 input_dir=(0.553,0.000,0.833) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-1.968,0.000,-3.501) vel=(2.283,0.000,3.275) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(0.572,0.000,0.820) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.965 phase=0.788 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(24.334,0.023,21.714) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-1.739,0.000,-3.173) vel=(2.249,0.000,3.304) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(0.563,0.000,0.827) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-1.523,0.000,-2.837) vel=(2.087,0.000,3.409) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(0.522,0.000,0.853) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.994 phase=0.854 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(22.887,0.031,23.623) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-1.318,0.000,-2.494) vel=(2.036,0.000,3.442) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.509,0.000,0.861) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-1.123,0.000,-2.145) vel=(1.803,0.000,3.563) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(0.451,0.000,0.892) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.996 phase=0.919 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(20.643,0.041,25.766) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-0.944,0.000,-1.766) vel=(1.631,0.000,3.648) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(0.408,0.000,0.913) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.997 phase=0.985 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(18.277,0.053,26.794) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-0.785,0.000,-1.398) vel=(1.549,0.000,3.686) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.387,0.000,0.922) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.632,0.000,-1.029) vel=(1.524,0.000,3.698) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.381,0.000,0.925) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.999 phase=1.050 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(17.668,0.067,26.754) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-0.480,0.000,-0.659) vel=(1.517,0.000,3.701) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.379,0.000,0.925) keys[F:1 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(-0.327,0.000,-0.290) vel=(1.641,0.000,3.648) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.938 input_dir=(0.570,0.000,0.822) keys[F:1 B:0 L:1 R:0 J:0 S:1]
-gait entity=2 speed=4.000 phase=1.116 grounded=1 sprint=1 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(17.980,0.065,10.184) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(-0.105,0.000,0.040) vel=(2.890,0.000,2.765) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.825 input_dir=(0.985,0.000,0.171) keys[F:0 B:0 L:1 R:0 J:0 S:1]
-entity=2 pos=(0.254,0.000,0.232) vel=(3.893,0.000,0.920) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.831 input_dir=(0.873,0.000,-0.487) keys[F:0 B:1 L:1 R:0 J:0 S:1]
-gait entity=2 speed=4.000 phase=1.182 grounded=1 sprint=1 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(22.230,0.074,-6.469) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(0.649,0.000,0.215) vel=(3.810,0.000,-1.218) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.913 input_dir=(0.530,0.000,-0.848) keys[F:0 B:1 L:1 R:0 J:0 S:1]
-entity=2 pos=(0.957,0.000,0.015) vel=(2.342,0.000,-2.713) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.916 input_dir=(0.276,0.000,-0.961) keys[F:0 B:1 L:0 R:0 J:0 S:0]
-gait entity=2 speed=3.565 phase=1.244 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(10.514,0.100,-26.983) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(1.096,0.000,-0.299) vel=(0.431,0.000,-3.393) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.867 input_dir=(-0.341,0.000,-0.940) keys[F:0 B:1 L:0 R:1 J:0 S:0]
-entity=2 pos=(1.037,0.000,-0.615) vel=(-1.542,0.000,-2.814) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.901 input_dir=(-0.825,0.000,-0.566) keys[F:0 B:1 L:0 R:1 J:0 S:0]
-gait entity=2 speed=3.515 phase=1.300 grounded=1 sprint=1 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(-4.347,0.105,-11.086) pelvis_off=(0.000,-9.188,0.000)
-entity=2 pos=(0.793,0.000,-0.867) vel=(-3.039,0.000,-2.601) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.913 input_dir=(-0.707,0.000,-0.707) keys[F:0 B:1 L:1 R:1 J:0 S:1]
-entity=2 pos=(0.539,0.000,-1.132) vel=(-1.580,0.000,-1.974) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.361 input_dir=(-0.625,0.000,-0.781) keys[F:0 B:0 L:1 R:1 J:0 S:1]
-gait entity=2 speed=1.770 phase=1.353 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(5.504,0.105,8.078) pelvis_off=(0.000,-9.041,0.000)
-entity=2 pos=(0.467,0.000,-1.216) vel=(0.068,0.000,0.342) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.341 input_dir=(0.336,0.000,0.942) keys[F:1 B:0 L:1 R:1 J:0 S:0]
-entity=2 pos=(0.518,0.000,-1.092) vel=(1.104,0.000,2.017) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.748 input_dir=(0.681,0.000,0.732) keys[F:1 B:0 L:1 R:0 J:0 S:1]
-gait entity=2 speed=2.752 phase=1.383 grounded=1 sprint=1 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(12.593,0.104,2.683) pelvis_off=(0.000,-7.794,0.000)
-entity=2 pos=(0.726,0.000,-0.859) vel=(3.020,0.000,2.196) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=1 input_mag=0.598 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:1]
-entity=2 pos=(0.873,0.000,-0.785) vel=(0.658,0.000,0.188) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.171 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.782 phase=1.414 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(9.576,0.105,-1.416) pelvis_off=(0.000,-8.317,0.000)
-entity=2 pos=(0.911,0.000,-0.774) vel=(0.189,0.000,0.054) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.049 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.921,0.000,-0.771) vel=(0.054,0.000,0.015) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.014 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.106 phase=1.668 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.099,0.085,0.098) r_target=(3.052,0.127,-3.144) pelvis_off=(0.000,-4.077,0.000)
-entity=2 pos=(0.925,0.000,-0.771) vel=(0.015,0.000,0.004) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.004 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.001 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.009 phase=3.161 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-4.258,0.000,4.792) r_target=(0.799,0.114,-0.745) pelvis_off=(0.000,-1.513,0.000)
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.001 phase=4.669 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.793,0.118,2.155) r_target=(0.799,0.114,-0.745) pelvis_off=(0.000,-1.075,0.000)
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.962,0.000,0.275) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=5.294 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(6.983,0.041,-3.403) pelvis_off=(0.000,-1.461,0.000)
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.925,0.000,-0.770) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.615 phase=5.567 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(2.567,0.014,-0.888) pelvis_off=(0.000,-1.515,0.000)
-entity=2 pos=(0.860,0.000,-0.742) vel=(-1.524,0.000,0.659) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.646 input_dir=(-0.918,0.000,0.397) keys[F:0 B:0 L:0 R:1 J:0 S:0]
-entity=2 pos=(0.615,0.000,-0.636) vel=(-3.299,0.000,1.426) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.898 input_dir=(-0.918,0.000,0.397) keys[F:0 B:0 L:0 R:1 J:0 S:0]
-gait entity=2 speed=3.311 phase=5.602 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(-22.193,0.015,5.555) pelvis_off=(0.000,-2.155,0.000)
-entity=2 pos=(0.269,0.000,-0.494) vel=(-3.538,0.000,1.009) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.912 input_dir=(-0.980,0.000,0.197) keys[F:0 B:1 L:0 R:1 J:0 S:0]
-entity=2 pos=(-0.083,0.000,-0.494) vel=(-2.258,0.000,-0.748) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.656 input_dir=(-0.777,0.000,-0.629) keys[F:0 B:1 L:1 R:0 J:0 S:0]
-gait entity=2 speed=2.409 phase=5.654 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(0.042,0.011,-25.156) pelvis_off=(0.000,-2.357,0.000)
-entity=2 pos=(-0.225,0.000,-0.632) vel=(-0.401,0.000,-1.712) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.643 input_dir=(0.706,0.000,-0.708) keys[F:0 B:0 L:1 R:0 J:0 S:0]
-entity=2 pos=(-0.151,0.000,-0.810) vel=(1.765,0.000,-1.559) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.806 input_dir=(0.983,0.000,-0.184) keys[F:1 B:0 L:1 R:0 J:0 S:0]
-gait entity=2 speed=2.229 phase=5.690 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(27.618,0.008,-1.710) pelvis_off=(0.000,-1.493,0.000)
-entity=2 pos=(0.063,0.000,-0.875) vel=(1.884,0.000,0.371) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.603 input_dir=(0.179,0.000,0.984) keys[F:1 B:0 L:0 R:1 J:0 S:0]
-entity=2 pos=(0.175,0.000,-0.754) vel=(0.194,0.000,1.761) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.760 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:1 J:0 S:0]
-gait entity=2 speed=1.602 phase=5.722 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(-3.460,0.006,7.319) pelvis_off=(0.000,-1.281,0.000)
-entity=2 pos=(0.120,0.000,-0.620) vel=(-0.605,0.000,0.626) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.218 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.086,0.000,-0.584) vel=(-0.173,0.000,0.179) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.062 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.328 phase=5.736 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(4.835,0.005,-1.242) pelvis_off=(0.000,-0.973,0.000)
-entity=2 pos=(0.076,0.000,-0.574) vel=(-0.050,0.000,0.051) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.018 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.073,0.000,-0.571) vel=(-0.014,0.000,0.015) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.005 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.040 phase=0.367 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(7.650,0.001,-0.537) pelvis_off=(0.000,-0.603,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.001 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.003 phase=1.844 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(1.023,0.114,-0.853) r_target=(2.282,0.132,-0.549) pelvis_off=(0.000,-0.753,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.695,0.000,0.719) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.352 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.528,0.000,-0.604) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.687,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.405 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-6.900,0.000,2.445) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.492,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.405 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-6.900,0.000,2.444) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.453,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.420 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-6.898,0.000,2.444) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.449,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.443 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.010,0.000,2.161) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.450,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.473 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.157,0.001,1.730) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.462,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.473 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.156,0.001,1.730) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.469,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.473 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.156,0.001,1.730) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.470,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.473 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.156,0.001,1.730) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.471,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=3.541 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-7.412,0.001,0.555) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-0.484,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=4.197 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(4.142,0.050,-5.485) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-1.027,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=4.468 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(4.531,0.092,-3.083) r_target=(-0.055,0.114,-0.556) pelvis_off=(0.000,-1.249,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=5.041 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(1.375,0.132,0.882) r_target=(-3.755,0.080,-4.620) pelvis_off=(0.000,-0.894,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=5.102 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(1.190,0.130,0.641) r_target=(-3.973,0.071,-4.776) pelvis_off=(0.000,-1.309,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=5.463 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.013,0.114,-0.666) r_target=(-0.475,0.022,-7.630) pelvis_off=(0.000,-1.491,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
-gait entity=2 speed=0.000 phase=5.471 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.013,0.114,-0.666) r_target=(-0.517,0.021,-7.644) pelvis_off=(0.000,-1.483,0.000)
-entity=2 pos=(0.072,0.000,-0.571) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.045 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(0.074,0.000,0.032) pelvis_off=(0.000,-3.062,0.000)
+entity=2 pos=(-0.028,0.000,0.065) vel=(-0.650,0.000,1.527) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.646 input_dir=(-0.392,0.000,0.920) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=2.220 phase=1.278 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.094,0.085,-0.103) r_target=(-0.165,0.088,0.462) pelvis_off=(0.000,-5.093,0.000)
+entity=2 pos=(-0.132,0.000,0.311) vel=(-1.407,0.000,3.307) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.898 input_dir=(-0.392,0.000,0.920) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.282,0.000,0.662) vel=(-1.521,0.000,3.575) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.971 input_dir=(-0.392,0.000,0.920) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.771 phase=6.015 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.318,0.215,1.375) r_target=(-0.508,0.000,1.399) pelvis_off=(0.000,-5.650,0.000)
+entity=2 pos=(-0.436,0.000,1.024) vel=(-1.553,0.000,3.650) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.992 input_dir=(-0.392,0.000,0.920) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.592,0.000,1.390) vel=(-1.562,0.000,3.672) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(-0.392,0.000,0.920) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.974 phase=4.759 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.805,0.184,1.892) r_target=(-0.979,0.229,1.654) pelvis_off=(0.000,-5.990,0.000)
+entity=2 pos=(-0.748,0.000,1.758) vel=(-1.559,0.000,3.681) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.390,0.000,0.921) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.902,0.000,2.127) vel=(-1.515,0.000,3.701) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.379,0.000,0.925) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.050,0.000,2.498) vel=(-1.447,0.000,3.728) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.362,0.000,0.932) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.997 phase=3.552 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.270,0.002,2.844) r_target=(-1.361,0.233,2.592) pelvis_off=(0.000,-4.913,0.000)
+entity=2 pos=(-1.192,0.000,2.872) vel=(-1.399,0.000,3.747) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.350,0.000,0.937) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.331,0.000,3.247) vel=(-1.386,0.000,3.752) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.346,0.000,0.938) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=4.000 phase=2.295 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.511,0.038,3.562) r_target=(-1.709,0.233,3.536) pelvis_off=(0.000,-6.572,0.000)
+entity=2 pos=(-1.469,0.000,3.622) vel=(-1.382,0.000,3.754) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.345,0.000,0.938) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.600,0.000,3.978) vel=(-0.850,0.000,2.310) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.679 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.724 phase=1.064 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.405,0.232,4.181) r_target=(-1.645,0.067,4.264) pelvis_off=(0.000,-5.353,0.000)
+entity=2 pos=(-1.653,0.000,4.123) vel=(-0.269,0.000,0.730) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.194 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.669,0.000,4.164) vel=(-0.077,0.000,0.209) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.056 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.860 phase=4.308 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.726,0.071,4.204) r_target=(-1.942,0.159,4.234) pelvis_off=(0.000,-3.879,0.000)
+entity=2 pos=(-1.673,0.000,4.176) vel=(-0.022,0.000,0.060) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.016 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.179) vel=(-0.006,0.000,0.017) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.005 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.116 phase=5.055 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(-1.599,0.131,4.184) r_target=(-1.687,0.087,4.217) pelvis_off=(0.000,-0.966,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.001 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.010 phase=0.280 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.550,0.113,4.144) r_target=(-1.595,0.000,4.171) pelvis_off=(0.000,-0.737,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(-0.345,0.000,0.939) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.001 phase=1.757 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.550,0.113,4.144) r_target=(-1.717,0.132,4.206) pelvis_off=(0.000,-0.826,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=2.443 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.687,0.012,4.252) r_target=(-1.753,0.114,4.281) pelvis_off=(0.000,-1.172,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=2.443 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.642,0.012,4.245) r_target=(-1.753,0.114,4.281) pelvis_off=(0.000,-1.195,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=2.443 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.630,0.012,4.238) r_target=(-1.753,0.114,4.281) pelvis_off=(0.000,-1.200,0.000)
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.674,0.000,4.180) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=2.459 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.605,0.011,4.204) r_target=(-1.753,0.114,4.281) pelvis_off=(0.000,-1.174,0.000)
+entity=2 pos=(-1.673,0.000,4.176) vel=(0.110,0.000,-0.364) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.211 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.633,0.000,4.042) vel=(0.689,0.000,-2.278) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.774 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=1.156 phase=2.866 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.522,0.000,3.954) r_target=(-1.753,0.114,4.281) pelvis_off=(0.000,-0.918,0.000)
+entity=2 pos=(-1.538,0.000,3.729) vel=(1.084,0.000,-3.581) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.935 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.426,0.000,3.360) vel=(1.137,0.000,-3.757) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.981 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.554 phase=0.566 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.614,0.189,3.183) r_target=(-1.402,0.006,3.007) pelvis_off=(0.000,-3.659,0.000)
+entity=2 pos=(-1.309,0.000,2.974) vel=(1.153,0.000,-3.809) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.995 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.948 phase=5.592 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.329,0.227,2.171) r_target=(-1.156,0.018,2.220) pelvis_off=(0.000,-6.265,0.000)
+entity=2 pos=(-1.194,0.000,2.592) vel=(1.157,0.000,-3.823) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.077,0.000,2.206) vel=(1.158,0.000,-3.827) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.995 phase=4.336 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.842,0.095,1.586) r_target=(-0.699,0.232,1.836) pelvis_off=(0.000,-5.552,0.000)
+entity=2 pos=(-0.956,0.000,1.808) vel=(1.159,0.000,-3.828) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.841,0.000,1.425) vel=(1.159,0.000,-3.828) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.290,0.000,-0.957) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.990 phase=3.079 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.539,0.000,0.706) r_target=(-0.409,0.232,0.878) pelvis_off=(0.000,-5.514,0.000)
+entity=2 pos=(-0.726,0.000,1.046) vel=(1.006,0.000,-3.322) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.861 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.670,0.000,0.860) vel=(0.286,0.000,-0.944) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.247 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=1.092 phase=0.505 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.823,0.145,0.593) r_target=(-0.698,0.004,0.683) pelvis_off=(0.000,-3.391,0.000)
+entity=2 pos=(-0.653,0.000,0.807) vel=(0.082,0.000,-0.270) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.071 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.649,0.000,0.791) vel=(0.023,0.000,-0.077) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.020 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.153 phase=1.258 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.823,0.145,0.593) r_target=(-0.671,0.081,0.774) pelvis_off=(0.000,-1.763,0.000)
+entity=2 pos=(-0.647,0.000,0.787) vel=(0.007,0.000,-0.022) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.006 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.002 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.014 phase=1.353 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.823,0.145,0.593) r_target=(-0.660,0.095,0.791) pelvis_off=(0.000,-0.953,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.001 phase=2.689 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.577,0.002,0.824) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.954,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.290,0.000,-0.957) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.572 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.575,0.002,0.753) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.557,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.594 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.617,0.002,0.713) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.539,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.647 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.692,0.004,0.721) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.603,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.655 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.725,0.004,0.787) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.649,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.655 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.708,0.004,0.834) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.672,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.662 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.692,0.004,0.850) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.677,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.670 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.602,0.004,0.849) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.704,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.692 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.570,0.005,0.781) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.747,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=3.692 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.570,0.005,0.781) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.765,0.000)
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,0.786) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.516 phase=3.802 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.587,0.010,0.672) r_target=(-0.528,0.114,0.833) pelvis_off=(0.000,-0.787,0.000)
+entity=2 pos=(-0.655,0.000,0.726) vel=(-0.204,0.000,-1.526) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.618 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.689,0.000,0.472) vel=(-0.470,0.000,-3.509) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.891 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.281 phase=0.641 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.951,0.166,0.106) r_target=(-0.855,0.010,-0.185) pelvis_off=(0.000,-3.561,0.000)
+entity=2 pos=(-0.739,0.000,0.100) vel=(-0.514,0.000,-3.840) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.969 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.791,0.000,-0.289) vel=(-0.526,0.000,-3.929) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.991 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.917 phase=5.743 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.137,0.225,-0.988) r_target=(-0.971,0.007,-1.052) pelvis_off=(0.000,-6.189,0.000)
+entity=2 pos=(-0.844,0.000,-0.684) vel=(-0.529,0.000,-3.954) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.897,0.000,-1.080) vel=(-0.530,0.000,-3.962) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.951,0.000,-1.488) vel=(-0.530,0.000,-3.964) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.991 phase=4.587 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.956,0.154,-1.688) r_target=(-0.704,0.231,-1.556) pelvis_off=(0.000,-5.652,0.000)
+entity=2 pos=(-1.005,0.000,-1.888) vel=(-0.531,0.000,-3.964) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.999 phase=3.330 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.032,0.000,-2.693) r_target=(-0.836,0.232,-2.549) pelvis_off=(0.000,-5.069,0.000)
+entity=2 pos=(-1.058,0.000,-2.285) vel=(-0.531,0.000,-3.965) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.111,0.000,-2.677) vel=(-0.458,0.000,-3.425) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.905 input_dir=(-0.133,0.000,-0.991) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=2.426 phase=1.924 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(-1.166,0.106,-3.084) r_target=(-1.085,0.183,-2.949) pelvis_off=(0.000,-6.363,0.000)
+entity=2 pos=(-1.137,0.000,-2.878) vel=(-0.138,0.000,-1.028) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.259 input_dir=(-0.133,0.000,-0.991) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.145,0.000,-2.936) vel=(-0.039,0.000,-0.294) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.074 input_dir=(-0.133,0.000,-0.991) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.413 phase=3.758 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.077,0.008,-3.001) r_target=(-0.957,0.132,-3.092) pelvis_off=(0.000,-2.046,0.000)
+entity=2 pos=(-1.147,0.000,-2.953) vel=(-0.011,0.000,-0.084) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.021 input_dir=(-0.133,0.000,-0.991) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.148,0.000,-2.957) vel=(-0.003,0.000,-0.024) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.006 input_dir=(-0.133,0.000,-0.991) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.378 phase=4.082 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.098,0.034,-3.031) r_target=(-0.957,0.132,-3.092) pelvis_off=(0.000,-1.508,0.000)
+entity=2 pos=(-1.153,0.000,-2.992) vel=(-0.153,0.000,-1.144) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.511 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.182,0.000,-3.208) vel=(-0.418,0.000,-3.126) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.860 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.155 phase=0.600 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.429,0.153,-3.534) r_target=(-1.347,0.008,-3.860) pelvis_off=(0.000,-2.741,0.000)
+entity=2 pos=(-1.230,0.000,-3.570) vel=(-0.509,0.000,-3.806) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.960 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.282,0.000,-3.958) vel=(-0.524,0.000,-3.919) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.989 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.898 phase=5.623 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-1.630,0.223,-4.672) r_target=(-1.456,0.015,-4.708) pelvis_off=(0.000,-6.126,0.000)
+entity=2 pos=(-1.335,0.000,-4.352) vel=(-0.528,0.000,-3.952) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.133,0.000,-0.991) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.386,0.000,-4.748) vel=(-0.502,0.000,-3.965) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.126,0.000,-0.992) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.986 phase=4.367 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-1.391,0.102,-5.396) r_target=(-1.190,0.221,-5.234) pelvis_off=(0.000,-5.541,0.000)
+entity=2 pos=(-1.427,0.000,-5.145) vel=(-0.190,0.000,-3.983) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.048,0.000,-0.999) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-1.370,0.000,-5.546) vel=(1.173,0.000,-3.714) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.974 input_dir=(0.301,0.000,-0.954) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.908 phase=3.211 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.926,0.000,-6.166) r_target=(-0.817,0.240,-5.948) pelvis_off=(0.000,-5.330,0.000)
+entity=2 pos=(-1.202,0.000,-5.897) vel=(2.181,0.000,-3.221) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.972 input_dir=(0.561,0.000,-0.828) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.901,0.000,-6.155) vel=(3.379,0.000,-1.561) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.930 input_dir=(0.913,0.000,-0.408) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.555 phase=1.954 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(-0.350,0.104,-6.193) r_target=(-0.501,0.219,-6.009) pelvis_off=(0.000,-5.979,0.000)
+entity=2 pos=(-0.562,0.000,-6.211) vel=(3.383,0.000,0.419) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.883 input_dir=(0.958,0.000,0.285) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.232,0.000,-6.066) vel=(3.040,0.000,2.248) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.945 input_dir=(0.804,0.000,0.595) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.752 phase=0.697 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.299,0.217,-5.847) r_target=(0.284,0.015,-5.524) pelvis_off=(0.000,-4.467,0.000)
+entity=2 pos=(0.029,0.000,-5.792) vel=(1.953,0.000,3.220) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.939 input_dir=(0.506,0.000,0.862) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(0.122,0.000,-5.462) vel=(0.013,0.000,3.550) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.910 input_dir=(-0.100,0.000,0.995) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.686 phase=5.724 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(0.118,0.223,-4.708) r_target=(-0.002,0.008,-4.753) pelvis_off=(0.000,-5.912,0.000)
+entity=2 pos=(0.039,0.000,-5.100) vel=(-1.313,0.000,3.623) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.963 input_dir=(-0.341,0.000,0.940) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.113,0.000,-4.739) vel=(-1.657,0.000,3.588) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.988 input_dir=(-0.419,0.000,0.908) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.938 phase=4.467 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.405,0.124,-4.216) r_target=(-0.522,0.226,-4.476) pelvis_off=(0.000,-5.576,0.000)
+entity=2 pos=(-0.292,0.000,-4.367) vel=(-1.742,0.000,3.586) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.437,0.000,0.899) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.452,0.000,-4.002) vel=(-1.452,0.000,3.716) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.364,0.000,0.931) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.987 phase=3.211 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.779,0.000,-3.314) r_target=(-0.890,0.231,-3.508) pelvis_off=(0.000,-5.260,0.000)
+entity=2 pos=(-0.587,0.000,-3.626) vel=(-1.278,0.000,3.785) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.320,0.000,0.947) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.712,0.000,-3.246) vel=(-1.222,0.000,3.807) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(-0.306,0.000,0.952) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.996 phase=1.954 grounded=1 sprint=0 left_lock=0 right_lock=0 l_target=(-0.895,0.103,-2.620) r_target=(-0.882,0.224,-2.831) pelvis_off=(0.000,-6.297,0.000)
+entity=2 pos=(-0.827,0.000,-2.847) vel=(-0.902,0.000,3.887) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.997 input_dir=(-0.226,0.000,0.974) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.890,0.000,-2.438) vel=(-0.390,0.000,3.965) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.996 input_dir=(-0.098,0.000,0.995) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.988 phase=0.697 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.662,0.230,-1.950) r_target=(-0.861,0.016,-1.738) pelvis_off=(0.000,-4.915,0.000)
+entity=2 pos=(-0.919,0.000,-2.020) vel=(-0.210,0.000,3.989) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.053,0.000,0.999) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.937,0.000,-1.621) vel=(-0.122,0.000,3.995) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.999 input_dir=(-0.031,0.000,1.000) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.992 phase=5.850 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.633,0.231,-0.996) r_target=(-0.827,0.003,-0.910) pelvis_off=(0.000,-6.368,0.000)
+entity=2 pos=(-0.923,0.000,-1.206) vel=(0.391,0.000,3.965) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.996 input_dir=(0.098,0.000,0.995) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.855,0.000,-0.814) vel=(0.894,0.000,3.880) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.995 input_dir=(0.225,0.000,0.974) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.986 phase=4.593 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.746,0.154,-0.319) r_target=(-1.032,0.218,-0.436) pelvis_off=(0.000,-5.878,0.000)
+entity=2 pos=(-0.756,0.000,-0.428) vel=(1.058,0.000,3.851) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.998 input_dir=(0.265,0.000,0.964) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.647,0.000,-0.044) vel=(1.104,0.000,3.842) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.276,0.000,0.961) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=3.997 phase=3.336 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.527,0.000,0.660) r_target=(-0.746,0.218,0.536) pelvis_off=(0.000,-5.071,0.000)
+entity=2 pos=(-0.536,0.000,0.341) vel=(1.118,0.000,3.840) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=1.000 input_dir=(0.279,0.000,0.960) keys[F:1 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.446,0.000,0.651) vel=(0.536,0.000,1.837) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.478 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=1.962 phase=1.696 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.136,0.182,0.797) r_target=(-0.422,0.161,0.818) pelvis_off=(0.000,-6.552,0.000)
+entity=2 pos=(-0.415,0.000,0.755) vel=(0.153,0.000,0.526) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.137 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.406,0.000,0.785) vel=(0.044,0.000,0.151) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.039 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.312 phase=3.131 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.473,-0.000,0.845) r_target=(-0.562,0.117,0.899) pelvis_off=(0.000,-2.117,0.000)
+entity=2 pos=(-0.404,0.000,0.794) vel=(0.013,0.000,0.043) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.011 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.004,0.000,0.012) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.003 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.035 phase=4.225 grounded=1 sprint=0 left_lock=0 right_lock=1 l_target=(-0.451,0.054,0.775) r_target=(-0.562,0.117,0.899) pelvis_off=(0.000,-1.148,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.001 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.003 phase=5.703 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.327,0.006,0.805) pelvis_off=(0.000,-1.128,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.280,0.000,0.960) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.800 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.339,0.020,0.774) pelvis_off=(0.000,-0.810,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.800 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.339,0.020,0.775) pelvis_off=(0.000,-1.247,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.800 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.339,0.020,0.775) pelvis_off=(0.000,-1.336,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.800 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.339,0.020,0.775) pelvis_off=(0.000,-1.353,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.905 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.388,0.030,0.857) pelvis_off=(0.000,-1.432,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.950 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.440,0.035,0.841) pelvis_off=(0.000,-1.521,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.950 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.447,0.035,0.834) pelvis_off=(0.000,-1.549,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]
+gait entity=2 speed=0.000 phase=0.958 grounded=1 sprint=0 left_lock=1 right_lock=0 l_target=(-0.295,0.114,0.728) r_target=(-0.443,0.036,0.838) pelvis_off=(0.000,-1.557,0.000)
+entity=2 pos=(-0.403,0.000,0.796) vel=(0.000,0.000,0.000) grounded=1 mode=0 gdist=0.000 jump_buf=0.000 just_jump=0.000 sprint=0 input_mag=0.000 input_dir=(0.000,0.000,0.000) keys[F:0 B:0 L:0 R:0 J:0 S:0]

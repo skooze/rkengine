@@ -1,1 +1,6 @@
-Already up to date.
+From github.com:skooze/rkengine
+   0fc059f..b31a02e  main       -> origin/main
+Updating 0fc059f..b31a02e
+Fast-forward
+ core/src/locomotion.cpp | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
