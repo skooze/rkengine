@@ -1,7 +1,6 @@
 From github.com:skooze/rkengine
-   1274cbc..63fffe5  main       -> origin/main
-Updating 1274cbc..63fffe5
+   32864b8..6188722  main       -> origin/main
+Updating 32864b8..6188722
 Fast-forward
- core/include/rkg/ecs.h  |  1 +
- core/src/locomotion.cpp | 22 ++++++++++++----------
- 2 files changed, 13 insertions(+), 10 deletions(-)
+ core/src/locomotion.cpp | 90 ++++++++++++++++++++++++++-----------------------
+ 1 file changed, 48 insertions(+), 42 deletions(-)
