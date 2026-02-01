@@ -591,7 +591,7 @@ static bool build_bone_map(ecs::ProceduralGait& gait, const ecs::Skeleton& skel)
 static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& skel) {
   std::vector<ecs::Transform> locals(skel.bones.size());
   for (size_t i = 0; i < skel.bones.size(); ++i) {
-    locals[i] = skel.bones[i].bind_local;
+    locals[i] = skel.bones[i].local_pose;
   }
   std::vector<rkg::Mat4> world;
   compute_world_matrices(skel, locals, world);
