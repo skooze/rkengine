@@ -894,20 +894,19 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       intent_mag = clampf(in_len, 0.0f, 1.0f);
     }
   }
-  Vec3 frame_fwd_w = from_array(gait->frame_fwd_world);
-  if (length(frame_fwd_w) < 0.0001f) frame_fwd_w = forward;
-  const float frame_alpha = 1.0f - std::exp(-dt * 8.0f);
-  Vec3 desired_frame = frame_fwd_w;
-  if (intent_mag > 0.05f) {
-    desired_frame = intent_world;
-  } else if (std::abs(gait->yaw_rate) > 0.2f || speed > 0.05f) {
-    desired_frame = forward;
-  }
-  frame_fwd_w = normalize(lerp(frame_fwd_w, desired_frame, frame_alpha));
-  to_array(frame_fwd_w, gait->frame_fwd_world);
-
-  Vec3 frame_fwd_e = normalize(to_local_dir(*transform, frame_fwd_w));
+  Vec3 frame_fwd_e = from_array(gait->frame_fwd_entity);
   if (length(frame_fwd_e) < 0.0001f) frame_fwd_e = v3(0.0f, 0.0f, 1.0f);
+  const float frame_alpha = 1.0f - std::exp(-dt * 8.0f);
+  Vec3 desired_frame_e = frame_fwd_e;
+  if (intent_mag > 0.05f) {
+    Vec3 intent_e = normalize(to_local_dir(*transform, intent_world));
+    if (length(intent_e) > 0.0001f) {
+      desired_frame_e = intent_e;
+    }
+  }
+  frame_fwd_e = normalize(lerp(frame_fwd_e, desired_frame_e, frame_alpha));
+  to_array(frame_fwd_e, gait->frame_fwd_entity);
+
   Vec3 desired_side_e = normalize(cross(v3(0.0f, 1.0f, 0.0f), frame_fwd_e));
   if (length(desired_side_e) < 0.0001f) desired_side_e = v3(1.0f, 0.0f, 0.0f);
   Vec3 prev_side_e = from_array(gait->frame_side_entity);
@@ -923,6 +922,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   Vec3 side_world = normalize(to_world_dir(*transform, side_e));
   if (length(side_world) < 0.0001f) side_world = right;
   to_array(side_world, gait->frame_side_world);
+  Vec3 frame_fwd_w = normalize(to_world_dir(*transform, frame_fwd_e));
+  if (length(frame_fwd_w) < 0.0001f) frame_fwd_w = forward;
+  to_array(frame_fwd_w, gait->frame_fwd_world);
 
   const float v_side = dot(planar, side_world);
   float step_len = 0.5f * stride_len_e;
