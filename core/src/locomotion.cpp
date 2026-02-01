@@ -701,9 +701,17 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
                              speed < gait->turn_in_place_speed &&
                              std::abs(gait->yaw_rate) > 0.35f;
 
-  float stride = gait->leg_length * gait->stride_scale;
-  if (stride < 0.05f) stride = 0.05f;
-  float step_rate = turn_in_place ? gait->turn_step_rate : (speed / stride);
+  const float sx = std::abs(transform->scale[0]);
+  const float sy = std::abs(transform->scale[1]);
+  const float sz = std::abs(transform->scale[2]);
+  float rig_scale = (sx + sy + sz) * (1.0f / 3.0f);
+  if (rig_scale < 0.0001f) rig_scale = 1.0f;
+  const float leg_len_world = gait->leg_length * rig_scale;
+  const float hip_width_world = gait->hip_width * rig_scale;
+
+  float stride_world = leg_len_world * gait->stride_scale;
+  if (stride_world < 0.05f) stride_world = 0.05f;
+  float step_rate = turn_in_place ? gait->turn_step_rate : (speed / stride_world);
   step_rate = clampf(step_rate, 0.0f, 4.0f);
   if (speed > 0.01f || turn_in_place) {
     gait->phase += step_rate * dt * 2.0f * kPi;
@@ -790,8 +798,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 r_foot_w = to_world_point(*transform, r_foot);
   Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
   Vec3 lateral = right;
-  const float step_len = stride * 0.5f * speed_norm;
-  const float lateral_offset = gait->hip_width * 0.5f;
+  const float step_len = stride_world * 0.5f * speed_norm;
+  const float lateral_offset = hip_width_world * 0.5f;
   const float step_height = gait->step_height_scale * gait->leg_length;
 
   auto compute_step_target = [&](float side_sign) {
@@ -801,7 +809,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       offset = rotate_y(mul(right, lateral_offset * side_sign), turn_dir * 0.4f);
     }
     Vec3 desired = add(root_pos, offset);
-    const float ray_height = gait->leg_length * 0.6f;
+    const float ray_height = leg_len_world * 0.6f;
     RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 2.0f);
     if (hit.hit) {
       desired.y = hit.point.y;
