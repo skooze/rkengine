@@ -691,6 +691,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (max_speed < 0.01f) max_speed = gait->walk_speed;
 
   const float speed_norm = saturate(speed / std::max(max_speed, 0.01f));
+  float gait_speed_ref = gait->walk_speed;
+  if (sprinting) gait_speed_ref = gait->sprint_speed;
+  if (gait_speed_ref < 0.01f) gait_speed_ref = max_speed;
+  const float speed_gait_norm = saturate(speed / std::max(gait_speed_ref, 0.01f));
   gait->yaw = transform->rotation[1];
   gait->yaw_rate = wrap_pi(gait->yaw - gait->last_yaw) / std::max(dt, 0.0001f);
   gait->last_yaw = gait->yaw;
@@ -805,7 +809,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 r_foot_w = to_world_point(*transform, r_foot);
   Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
   Vec3 lateral = right;
-  const float step_len = stride_world * 0.5f * speed_norm;
+  float step_len = stride_world * 0.6f * speed_gait_norm;
+  if (speed_gait_norm > 0.05f && step_len < stride_world * 0.12f) {
+    step_len = stride_world * 0.12f;
+  }
   const float lateral_offset = hip_width_world * 0.5f * gait->lateral_step_scale;
   const float step_height = gait->step_height_scale * gait->leg_length;
 
@@ -835,7 +842,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
                             gait->foot_lock_in, gait->foot_lock_out, dt);
   update_foot_lock_internal(gait->right_locked, r_lock_w, r_foot_w, grounded, swing_r,
                             gait->foot_lock_in, gait->foot_lock_out, dt);
-  if (gait->left_locked && gait->right_locked) {
+  if (speed > 0.1f && gait->left_locked && gait->right_locked) {
     if (swing_l > swing_r) {
       gait->left_locked = false;
     } else {
@@ -922,9 +929,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const Vec3 r_pref = normalize(from_array(gait->knee_plane_r));
     if (length(l_pref) > 0.0001f) {
       l_plane = normalize(lerp(l_pref, l_plane, 1.0f - gait->knee_plane_bias));
+      if (dot(l_plane, l_pref) < 0.0f) l_plane = mul(l_plane, -1.0f);
     }
     if (length(r_pref) > 0.0001f) {
       r_plane = normalize(lerp(r_pref, r_plane, 1.0f - gait->knee_plane_bias));
+      if (dot(r_plane, r_pref) < 0.0f) r_plane = mul(r_plane, -1.0f);
     }
 
     const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_plane);

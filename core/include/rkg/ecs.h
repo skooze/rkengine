@@ -64,13 +64,13 @@ struct CharacterController {
   float radius = 0.35f;
   float half_height = 0.9f;
   float center_offset = 0.0f;
-  float max_speed = 4.0f;
-  float sprint_multiplier = 1.75f;
+  float max_speed = 1.8f;
+  float sprint_multiplier = 1.6f;
   float accel = 20.0f;
   float friction = 8.0f;
   float braking_deceleration = 16.0f;
   float braking_friction_factor = 2.0f;
-  float max_air_speed = 4.0f;
+  float max_air_speed = 1.8f;
   float max_air_accel = 12.0f;
   float air_control = 0.35f;
   float air_control_boost_multiplier = 2.0f;
