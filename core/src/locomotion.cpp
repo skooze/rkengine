@@ -767,11 +767,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float leg_len_e = gait->leg_length;
   const float hip_width_e = gait->hip_width;
   const float leg_len_world = leg_len_e * rig_scale;
-  float step_half_walk = 0.45f * hip_width_e;
-  float step_half_run = 0.35f * hip_width_e;
-  float step_half = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
-  step_half = std::max(step_half, 0.10f * leg_len_e);
-  step_half = std::min(step_half, 0.22f * leg_len_e);
 
   const float walk_cadence = 1.8f;
   const float run_cadence = 2.8f;
@@ -926,21 +921,28 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (length(frame_fwd_w) < 0.0001f) frame_fwd_w = forward;
   to_array(frame_fwd_w, gait->frame_fwd_world);
 
+  const Vec3 home_l_e = add(hips_e, from_array(gait->foot_home_l));
+  const Vec3 home_r_e = add(hips_e, from_array(gait->foot_home_r));
+  const Vec3 home_l_w = to_world_point(*transform, home_l_e);
+  const Vec3 home_r_w = to_world_point(*transform, home_r_e);
+
   const float v_side = dot(planar, side_world);
   float step_len = 0.5f * stride_len_e * rig_scale;
   const float step_len_small = 0.05f * leg_len_e * rig_scale;
   const float step_height_e = gait->step_height_scale * leg_len_e;
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
-  const float strafe_half = 0.20f * hip_width_e * std::abs(v_side / std::max(max_speed, 0.1f));
+  const float home_width_e = 0.5f * std::abs(dot(sub(home_r_e, home_l_e), side_e));
+  const float width_ref_e = std::max(std::max(gait->hip_width, home_width_e), 0.20f * leg_len_e);
+  float step_half_walk = 0.45f * width_ref_e;
+  float step_half_run = 0.35f * width_ref_e;
+  float step_half = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
+  step_half = std::max(step_half, 0.10f * leg_len_e);
+  step_half = std::min(step_half, 0.22f * leg_len_e);
+  const float strafe_half = 0.20f * width_ref_e * std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = (step_half + strafe_half) * rig_scale;
   const float min_side = 0.90f * step_half_desired;
   const float min_rad = 0.45f * leg_len_world;
-
-  const Vec3 home_l_e = add(hips_e, from_array(gait->foot_home_l));
-  const Vec3 home_r_e = add(hips_e, from_array(gait->foot_home_r));
-  const Vec3 home_l_w = to_world_point(*transform, home_l_e);
-  const Vec3 home_r_w = to_world_point(*transform, home_r_e);
 
   const float side_sign_l = gait->side_sign_l;
   const float side_sign_r = gait->side_sign_r;
