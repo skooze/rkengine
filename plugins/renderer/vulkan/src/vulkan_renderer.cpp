@@ -1,4 +1,5 @@
 #include "rkg/host_context.h"
+#include "rkg/ecs.h"
 #include "rkg/log.h"
 #include "rkg/plugin_api.h"
 #include "rkg/renderer_hooks.h"
@@ -1426,13 +1427,53 @@ static void apply_live_pose(const SkeletonAsset& skel,
 }
 
 static void update_skinned_live_pose() {
+  if (!g_state.skinned_ready) return;
+  if (g_state.skinned_skeleton.bones.empty() || g_state.skinned_joint_count == 0) return;
+  if (g_state.skinned_joint_memory == VK_NULL_HANDLE) return;
+
+  if (const rkg::ecs::Skeleton* external_pose = rkg::get_vulkan_viewport_skinned_pose()) {
+    if (external_pose->bones.empty()) {
+      return;
+    }
+    if (external_pose->bones.size() != g_state.skinned_skeleton.inverse_bind.size()) {
+      static bool mismatch_logged = false;
+      if (!mismatch_logged) {
+        rkg::log::warn("renderer:vulkan skinned live: external pose bone count mismatch");
+        mismatch_logged = true;
+      }
+      return;
+    }
+    std::vector<BonePose> posed;
+    posed.reserve(external_pose->bones.size());
+    for (const auto& bone : external_pose->bones) {
+      BonePose out{};
+      out.parent = bone.parent_index;
+      out.name = bone.name;
+      out.pos[0] = bone.local_pose.position[0];
+      out.pos[1] = bone.local_pose.position[1];
+      out.pos[2] = bone.local_pose.position[2];
+      out.rot[0] = bone.local_pose.rotation[0];
+      out.rot[1] = bone.local_pose.rotation[1];
+      out.rot[2] = bone.local_pose.rotation[2];
+      out.scale[0] = bone.local_pose.scale[0];
+      out.scale[1] = bone.local_pose.scale[1];
+      out.scale[2] = bone.local_pose.scale[2];
+      posed.push_back(out);
+    }
+    if (g_state.skinned_joint_mats.size() != posed.size()) {
+      g_state.skinned_joint_mats.resize(posed.size());
+    }
+    compute_skin_matrices_from_bones(posed, g_state.skinned_skeleton.inverse_bind, g_state.skinned_joint_mats);
+    const size_t byte_count = g_state.skinned_joint_mats.size() * sizeof(rkg::Mat4);
+    update_host_buffer(g_state.skinned_joint_mats.data(), byte_count, g_state.skinned_joint_memory);
+    return;
+  }
+
   g_state.skinned_live_enabled = env_flag_enabled("RKG_SKIN_LIVE") ||
                                  env_flag_enabled("RKG_SKIN_TEST_WALK") ||
                                  rkg::get_vulkan_viewport_skinned_live_enabled() ||
                                  rkg::get_vulkan_viewport_skinned_test_walk_enabled();
-  if (!g_state.skinned_live_enabled || !g_state.skinned_ready) return;
-  if (g_state.skinned_skeleton.bones.empty() || g_state.skinned_joint_count == 0) return;
-  if (g_state.skinned_joint_memory == VK_NULL_HANDLE) return;
+  if (!g_state.skinned_live_enabled) return;
 
   float fwd = 0.0f;
   float strafe = 0.0f;

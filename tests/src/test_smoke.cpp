@@ -14,6 +14,7 @@
 #include "rkg/renderer_hooks.h"
 #include "rkg/asset_import.h"
 #include "rkg/asset_cache.h"
+#include "rkg/locomotion.h"
 #include "rkgctl/cli_api.h"
 
 #include <nlohmann/json.hpp>
@@ -259,6 +260,49 @@ int main(int argc, char** argv) {
         rkg::asset::import_glb("does_not_exist.glb", "build/test_import_missing", options);
     if (result.ok || result.error.empty()) {
       std::cerr << "asset import missing-file should fail\n";
+      ++failures;
+    }
+  }
+
+  // Test: two-bone IK stability (knee stays near expected for trivial target).
+  {
+    rkg::ecs::Transform hip{};
+    rkg::ecs::Transform knee{};
+    rkg::ecs::Transform ankle{};
+    rkg::ecs::Transform target{};
+    rkg::ecs::Transform plane{};
+    hip.position[0] = 0.0f; hip.position[1] = 1.0f; hip.position[2] = 0.0f;
+    knee.position[0] = 0.0f; knee.position[1] = 0.5f; knee.position[2] = 0.0f;
+    ankle.position[0] = 0.0f; ankle.position[1] = 0.0f; ankle.position[2] = 0.0f;
+    target.position[0] = 0.0f; target.position[1] = 0.0f; target.position[2] = 0.0f;
+    plane.position[0] = 0.0f; plane.position[1] = 0.0f; plane.position[2] = 1.0f;
+    const auto solved = rkg::locomotion::debug_solve_two_bone_ik(hip, knee, ankle, target, plane);
+    const float dx = solved.position[0] - knee.position[0];
+    const float dy = solved.position[1] - knee.position[1];
+    const float dz = solved.position[2] - knee.position[2];
+    const float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist > 0.05f) {
+      std::cerr << "ik solve deviated from expected knee position\n";
+      ++failures;
+    }
+  }
+
+  // Test: foot lock holds position during stance.
+  {
+    bool locked = false;
+    float lock_pos[3] = {0.0f, 0.0f, 0.0f};
+    float foot_pos[3] = {1.0f, 0.0f, 0.0f};
+    const bool now_locked = rkg::locomotion::debug_update_foot_lock(
+        locked, lock_pos, foot_pos, true, 0.0f, 0.2f, 0.8f, 1.0f / 60.0f);
+    if (!now_locked) {
+      std::cerr << "foot lock failed to engage\n";
+      ++failures;
+    }
+    foot_pos[0] = 2.0f;
+    rkg::locomotion::debug_update_foot_lock(
+        locked, lock_pos, foot_pos, true, 0.1f, 0.2f, 0.8f, 1.0f / 60.0f);
+    if (std::abs(lock_pos[0] - 1.0f) > 0.05f) {
+      std::cerr << "foot lock drifted during stance\n";
       ++failures;
     }
   }

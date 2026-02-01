@@ -91,6 +91,7 @@ struct CharacterController {
   float turn_boost_factor = 0.5f;
   float turn_speed_threshold = 1.0f;
   float input_smooth_tau = 0.08f;
+  bool enable_procedural_gait = true;
   bool grounded = false;
   MovementMode mode = MovementMode::Falling;
   bool is_sprinting = false;
@@ -108,6 +109,73 @@ struct CharacterController {
   bool use_desired_input = false;
   float smoothed_input[3] = {0.0f, 0.0f, 0.0f};
   float external_base_velocity[3] = {0.0f, 0.0f, 0.0f};
+};
+
+struct ProceduralGait {
+  bool enabled = true;
+  bool debug_draw = false;
+  bool enable_ik = true;
+  bool enable_foot_lock = true;
+  bool enable_arm_swing = true;
+  bool enable_pelvis_motion = true;
+  bool enable_turn_in_place = true;
+
+  float walk_speed = 2.2f;
+  float sprint_speed = 4.0f;
+  float stride_scale = 1.0f;
+  float step_height_scale = 0.08f;
+  float pelvis_bob_scale = 0.03f;
+  float pelvis_sway_scale = 0.02f;
+  float pelvis_roll_scale = 0.15f;
+  float pelvis_lean_scale = 0.25f;
+  float arm_swing_scale = 0.45f;
+  float arm_tuck = -0.2f;
+  float turn_in_place_speed = 0.15f;
+  float turn_step_rate = 1.2f;
+  float foot_lock_in = 0.25f;
+  float foot_lock_out = 0.65f;
+  float ik_blend_speed = 8.0f;
+  float landing_compress = 0.04f;
+  float landing_recover = 10.0f;
+  float input_smooth_tau = 0.05f;
+
+  float phase = 0.0f;
+  float speed_smoothed = 0.0f;
+  float yaw = 0.0f;
+  float last_yaw = 0.0f;
+  float yaw_rate = 0.0f;
+  float landing_timer = 0.0f;
+  bool was_grounded = false;
+  float last_velocity[3] = {0.0f, 0.0f, 0.0f};
+  float pelvis_offset[3] = {0.0f, 0.0f, 0.0f};
+  bool left_locked = false;
+  bool right_locked = false;
+  float left_lock_pos[3] = {0.0f, 0.0f, 0.0f};
+  float right_lock_pos[3] = {0.0f, 0.0f, 0.0f};
+
+  uint32_t bone_root = UINT32_MAX;
+  uint32_t bone_hips = UINT32_MAX;
+  uint32_t bone_spine = UINT32_MAX;
+  uint32_t bone_chest = UINT32_MAX;
+  uint32_t bone_neck = UINT32_MAX;
+  uint32_t bone_head = UINT32_MAX;
+  uint32_t bone_l_thigh = UINT32_MAX;
+  uint32_t bone_l_calf = UINT32_MAX;
+  uint32_t bone_l_foot = UINT32_MAX;
+  uint32_t bone_l_toe = UINT32_MAX;
+  uint32_t bone_r_thigh = UINT32_MAX;
+  uint32_t bone_r_calf = UINT32_MAX;
+  uint32_t bone_r_foot = UINT32_MAX;
+  uint32_t bone_r_toe = UINT32_MAX;
+  uint32_t bone_l_upper_arm = UINT32_MAX;
+  uint32_t bone_l_lower_arm = UINT32_MAX;
+  uint32_t bone_r_upper_arm = UINT32_MAX;
+  uint32_t bone_r_lower_arm = UINT32_MAX;
+
+  bool map_valid = false;
+  float leg_length = 1.0f;
+  float hip_width = 0.3f;
+  float foot_length = 0.25f;
 };
 
 struct Bone {
@@ -163,6 +231,10 @@ class Registry {
   SkeletonRef* get_skeleton_ref(Entity entity);
   const SkeletonRef* get_skeleton_ref(Entity entity) const;
   void remove_skeleton_ref(Entity entity);
+  void set_procedural_gait(Entity entity, const ProceduralGait& gait);
+  ProceduralGait* get_procedural_gait(Entity entity);
+  const ProceduralGait* get_procedural_gait(Entity entity) const;
+  void remove_procedural_gait(Entity entity);
   size_t entity_count() const;
   std::vector<Entity> entities() const;
   std::unordered_map<Entity, Velocity>& velocities();
@@ -177,6 +249,8 @@ class Registry {
   const std::unordered_map<Entity, Skeleton>& skeletons() const;
   std::unordered_map<Entity, SkeletonRef>& skeleton_refs();
   const std::unordered_map<Entity, SkeletonRef>& skeleton_refs() const;
+  std::unordered_map<Entity, ProceduralGait>& procedural_gaits();
+  const std::unordered_map<Entity, ProceduralGait>& procedural_gaits() const;
 
  private:
   Entity next_id_ = 1;
@@ -188,6 +262,7 @@ class Registry {
   std::unordered_map<Entity, CharacterController> character_controllers_;
   std::unordered_map<Entity, Skeleton> skeletons_;
   std::unordered_map<Entity, SkeletonRef> skeleton_refs_;
+  std::unordered_map<Entity, ProceduralGait> procedural_gaits_;
 };
 
 } // namespace rkg::ecs

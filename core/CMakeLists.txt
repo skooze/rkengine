@@ -8,6 +8,7 @@ rkg_add_library(rkg_core
   src/paths.cpp
   src/input.cpp
   src/math.cpp
+  src/locomotion.cpp
   src/renderer_hooks.cpp
   src/renderer_select.cpp
   src/renderer_util.cpp

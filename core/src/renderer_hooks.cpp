@@ -24,6 +24,7 @@ bool g_viewport_skinned_live_enabled = false;
 float g_viewport_skinned_live_fwd = 0.0f;
 float g_viewport_skinned_live_strafe = 0.0f;
 bool g_viewport_skinned_live_grounded = false;
+const rkg::ecs::Skeleton* g_viewport_skinned_pose = nullptr;
 } // namespace
 
 void register_vulkan_hooks(const VulkanHooks* hooks) {
@@ -221,6 +222,14 @@ void get_vulkan_viewport_skinned_live_params(float& forward_speed,
   forward_speed = g_viewport_skinned_live_fwd;
   strafe_speed = g_viewport_skinned_live_strafe;
   grounded = g_viewport_skinned_live_grounded;
+}
+
+void set_vulkan_viewport_skinned_pose(const ecs::Skeleton* skeleton) {
+  g_viewport_skinned_pose = skeleton;
+}
+
+const ecs::Skeleton* get_vulkan_viewport_skinned_pose() {
+  return g_viewport_skinned_pose;
 }
 
 } // namespace rkg

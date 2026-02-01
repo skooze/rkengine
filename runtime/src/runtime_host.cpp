@@ -3,6 +3,7 @@
 #include "rkg/content_pack.h"
 #include "rkg/instructions.h"
 #include "rkg/log.h"
+#include "rkg/locomotion.h"
 #include "rkg/plugin_api.h"
 #include "rkg/renderer_hooks.h"
 #include "rkg/renderer_select.h"
@@ -69,6 +70,25 @@ struct CookStatus {
   fs::path content_index_path;
   fs::path content_pack_path;
 };
+
+static void apply_gait_env_overrides(rkg::ecs::ProceduralGait& gait) {
+  auto read_f = [](const char* name, float& out) {
+    if (const char* val = std::getenv(name); val && *val) {
+      out = std::strtof(val, nullptr);
+    }
+  };
+  read_f("RKG_GAIT_WALK_SPEED", gait.walk_speed);
+  read_f("RKG_GAIT_SPRINT_SPEED", gait.sprint_speed);
+  read_f("RKG_GAIT_STRIDE_SCALE", gait.stride_scale);
+  read_f("RKG_GAIT_STEP_HEIGHT", gait.step_height_scale);
+  read_f("RKG_GAIT_PELVIS_BOB", gait.pelvis_bob_scale);
+  read_f("RKG_GAIT_PELVIS_SWAY", gait.pelvis_sway_scale);
+  read_f("RKG_GAIT_PELVIS_ROLL", gait.pelvis_roll_scale);
+  read_f("RKG_GAIT_PELVIS_LEAN", gait.pelvis_lean_scale);
+  read_f("RKG_GAIT_ARM_SWING", gait.arm_swing_scale);
+  read_f("RKG_GAIT_ARM_TUCK", gait.arm_tuck);
+  read_f("RKG_GAIT_IK_BLEND", gait.ik_blend_speed);
+}
 
 bool load_cook_status(const fs::path& path, CookStatus& out, std::string& error) {
 #if !RKG_ENABLE_DATA_JSON
@@ -1029,6 +1049,14 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
     }
     host_.update_plugin(name, dt);
   }
+  if (params.run_simulation) {
+    rkg::locomotion::update_procedural_gaits(registry_, sim_dt);
+  }
+  const rkg::ecs::Skeleton* viewport_skeleton = nullptr;
+  if (player_ != rkg::ecs::kInvalidEntity) {
+    viewport_skeleton = registry_.get_skeleton(player_);
+  }
+  rkg::set_vulkan_viewport_skinned_pose(viewport_skeleton);
   if (!renderer_plugin_.empty()) {
     if (first_tick) {
       rkg::log::info("tick: renderer update");
@@ -1056,86 +1084,6 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
     }
   }
 
-  // Feed live/procedural rig drive params to the renderer (LLM-friendly control surface).
-  if (params.run_simulation) {
-    float forward_speed = 0.0f;
-    float strafe_speed = 0.0f;
-    bool grounded = false;
-    if (player_ != rkg::ecs::kInvalidEntity) {
-      const auto* transform = registry_.get_transform(player_);
-      const auto* velocity = registry_.get_velocity(player_);
-      const auto* controller = registry_.get_character_controller(player_);
-      if (controller) {
-        grounded = controller->grounded;
-      }
-      float vx = 0.0f;
-      float vz = 0.0f;
-      if (velocity) {
-        vx = velocity->linear[0];
-        vz = velocity->linear[2];
-      } else {
-        float dir_x = 0.0f;
-        float dir_z = 0.0f;
-        if (action_state("MoveForward").held) dir_z += 1.0f;
-        if (action_state("MoveBack").held) dir_z -= 1.0f;
-        if (action_state("MoveLeft").held) dir_x += 1.0f;
-        if (action_state("MoveRight").held) dir_x -= 1.0f;
-        const float len = std::sqrt(dir_x * dir_x + dir_z * dir_z);
-        if (len > 0.0001f) {
-          dir_x /= len;
-          dir_z /= len;
-        }
-        const float yaw = transform ? transform->rotation[1] : 0.0f;
-        const float cos_y = std::cos(yaw);
-        const float sin_y = std::sin(yaw);
-        const float world_x = dir_x * cos_y + dir_z * sin_y;
-        const float world_z = -dir_x * sin_y + dir_z * cos_y;
-        float max_speed = controller ? controller->max_speed : 2.0f;
-        if (controller && controller->is_sprinting) {
-          max_speed *= controller->sprint_multiplier;
-        }
-        vx = world_x * max_speed;
-        vz = world_z * max_speed;
-      }
-      const float yaw = transform ? transform->rotation[1] : 0.0f;
-      const float cos_y = std::cos(yaw);
-      const float sin_y = std::sin(yaw);
-      const float local_x = vx * cos_y - vz * sin_y;
-      const float local_z = vx * sin_y + vz * cos_y;
-      forward_speed = local_z;
-      strafe_speed = local_x;
-
-      float max_speed = controller ? controller->max_speed : 2.0f;
-      if (controller && controller->is_sprinting) {
-        max_speed *= controller->sprint_multiplier;
-      }
-      const float speed_mag = std::sqrt(forward_speed * forward_speed + strafe_speed * strafe_speed);
-      if (speed_mag > max_speed && speed_mag > 0.0001f) {
-        const float scale = max_speed / speed_mag;
-        forward_speed *= scale;
-        strafe_speed *= scale;
-      }
-    }
-    // Smooth the drive signals so procedural rigs don't jitter at high FPS.
-    static float smooth_fwd = 0.0f;
-    static float smooth_strafe = 0.0f;
-    const float smooth_dt = (sim_dt > 0.0f) ? sim_dt : frame_dt;
-    const float alpha = std::min(1.0f, std::max(0.0f, smooth_dt * 6.0f));
-    smooth_fwd += (forward_speed - smooth_fwd) * alpha;
-    smooth_strafe += (strafe_speed - smooth_strafe) * alpha;
-
-    // DEBUG: keep sparse logging to tune rig drive. Remove once tuned.
-    static float live_log_accum = 0.0f;
-    live_log_accum += smooth_dt;
-    if (live_log_accum > 0.5f) {
-      live_log_accum = 0.0f;
-      rkg::log::info("runtime: live_rig fwd=" + std::to_string(smooth_fwd) +
-                     " strafe=" + std::to_string(smooth_strafe) +
-                     " grounded=" + std::to_string(grounded));
-    }
-
-    rkg::set_vulkan_viewport_skinned_live_params(smooth_fwd, smooth_strafe, grounded);
-  }
 }
 
 void RuntimeHost::request_reload(const std::string& reason) {
@@ -1427,6 +1375,17 @@ void RuntimeHost::load_initial_level() {
       registry_.set_skeleton(player_, skeleton);
       rkg::log::info("runtime: attached skeleton from asset " + rig_asset->name +
                      " joints=" + std::to_string(skeleton.bones.size()));
+      if (auto* controller = registry_.get_character_controller(player_)) {
+        if (controller->enable_procedural_gait &&
+            registry_.get_procedural_gait(player_) == nullptr) {
+          rkg::ecs::ProceduralGait gait{};
+          gait.walk_speed = controller->max_speed;
+          gait.sprint_speed = controller->max_speed * controller->sprint_multiplier;
+          gait.input_smooth_tau = controller->input_smooth_tau;
+          apply_gait_env_overrides(gait);
+          registry_.set_procedural_gait(player_, gait);
+        }
+      }
     } else {
       rkg::ecs::Skeleton skeleton{};
       rkg::ecs::Bone root{};
@@ -1455,6 +1414,17 @@ void RuntimeHost::load_initial_level() {
 
       registry_.set_skeleton(player_, skeleton);
       rkg::log::info("runtime: attached fallback skeleton (3 bones)");
+      if (auto* controller = registry_.get_character_controller(player_)) {
+        if (controller->enable_procedural_gait &&
+            registry_.get_procedural_gait(player_) == nullptr) {
+          rkg::ecs::ProceduralGait gait{};
+          gait.walk_speed = controller->max_speed;
+          gait.sprint_speed = controller->max_speed * controller->sprint_multiplier;
+          gait.input_smooth_tau = controller->input_smooth_tau;
+          apply_gait_env_overrides(gait);
+          registry_.set_procedural_gait(player_, gait);
+        }
+      }
     }
   }
 }

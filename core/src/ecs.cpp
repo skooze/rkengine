@@ -19,6 +19,7 @@ void Registry::destroy_entity(Entity entity) {
   character_controllers_.erase(entity);
   skeletons_.erase(entity);
   skeleton_refs_.erase(entity);
+  procedural_gaits_.erase(entity);
 }
 
 void Registry::set_transform(Entity entity, const Transform& transform) {
@@ -157,6 +158,26 @@ const SkeletonRef* Registry::get_skeleton_ref(Entity entity) const {
 
 void Registry::remove_skeleton_ref(Entity entity) {
   skeleton_refs_.erase(entity);
+}
+
+void Registry::set_procedural_gait(Entity entity, const ProceduralGait& gait) {
+  procedural_gaits_[entity] = gait;
+}
+
+ProceduralGait* Registry::get_procedural_gait(Entity entity) {
+  auto it = procedural_gaits_.find(entity);
+  if (it == procedural_gaits_.end()) return nullptr;
+  return &it->second;
+}
+
+const ProceduralGait* Registry::get_procedural_gait(Entity entity) const {
+  auto it = procedural_gaits_.find(entity);
+  if (it == procedural_gaits_.end()) return nullptr;
+  return &it->second;
+}
+
+void Registry::remove_procedural_gait(Entity entity) {
+  procedural_gaits_.erase(entity);
 }
 
 void Registry::set_velocity(Entity entity, const Velocity& velocity) {
@@ -338,6 +359,14 @@ std::unordered_map<Entity, SkeletonRef>& Registry::skeleton_refs() {
 
 const std::unordered_map<Entity, SkeletonRef>& Registry::skeleton_refs() const {
   return skeleton_refs_;
+}
+
+std::unordered_map<Entity, ProceduralGait>& Registry::procedural_gaits() {
+  return procedural_gaits_;
+}
+
+const std::unordered_map<Entity, ProceduralGait>& Registry::procedural_gaits() const {
+  return procedural_gaits_;
 }
 
 } // namespace rkg::ecs

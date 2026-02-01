@@ -3,6 +3,9 @@
 #include <cstdint>
 
 namespace rkg {
+namespace ecs {
+struct Skeleton;
+}
 
 struct VulkanHooks {
   void* instance = nullptr;
@@ -96,5 +99,9 @@ void set_vulkan_viewport_skinned_live_params(float forward_speed,
 void get_vulkan_viewport_skinned_live_params(float& forward_speed,
                                              float& strafe_speed,
                                              bool& grounded);
+
+// External skinned pose override (preferred locomotion path).
+void set_vulkan_viewport_skinned_pose(const ecs::Skeleton* skeleton);
+const ecs::Skeleton* get_vulkan_viewport_skinned_pose();
 
 } // namespace rkg
