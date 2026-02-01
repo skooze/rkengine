@@ -1211,11 +1211,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     float w_swing_r = 0.0f;
     if (left_swing_run) {
       const float w_land = smoothstep01((left_swing_u - (1.0f - landing_window)) / landing_window);
-      w_swing_l = 0.2f + 0.8f * w_land;
+      w_swing_l = 0.7f + 0.3f * w_land;
     }
     if (right_swing_run) {
       const float w_land = smoothstep01((right_swing_u - (1.0f - landing_window)) / landing_window);
-      w_swing_r = 0.2f + 0.8f * w_land;
+      w_swing_r = 0.7f + 0.3f * w_land;
     }
     const float ik_weight_l = grounded ? (left_stance_run ? 1.0f : w_swing_l) : 0.0f;
     const float ik_weight_r = grounded ? (right_stance_run ? 1.0f : w_swing_r) : 0.0f;
