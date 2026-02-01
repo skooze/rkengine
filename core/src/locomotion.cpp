@@ -594,6 +594,7 @@ static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& 
   Vec3 r_hip = safe_pos(gait.bone_r_thigh);
   Vec3 r_knee = safe_pos(gait.bone_r_calf);
   Vec3 r_foot = safe_pos(gait.bone_r_foot);
+  Vec3 hips_pos = safe_pos(gait.bone_hips);
 
   float l_leg = length(sub(l_knee, l_hip)) + length(sub(l_foot, l_knee));
   float r_leg = length(sub(r_knee, r_hip)) + length(sub(r_foot, r_knee));
@@ -628,12 +629,18 @@ static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& 
   Vec3 up_axis = v3(0.0f, 1.0f, 0.0f);
   if (gait.bone_head != UINT32_MAX && gait.bone_head < world.size()) {
     Vec3 head = safe_pos(gait.bone_head);
-    Vec3 hips = safe_pos(gait.bone_hips);
-    Vec3 up = normalize(sub(head, hips));
+    Vec3 up = normalize(sub(head, hips_pos));
     if (length(up) > kEps) up_axis = up;
   }
   Vec3 forward_axis = normalize(cross(up_axis, right_axis));
   if (length(forward_axis) < kEps) forward_axis = v3(0.0f, 0.0f, 1.0f);
+
+  Vec3 dl = sub(l_foot, hips_pos);
+  Vec3 dr = sub(r_foot, hips_pos);
+  Vec3 home_l = v3(dot(dl, forward_axis), dot(dl, up_axis), dot(dl, right_axis));
+  Vec3 home_r = v3(dot(dr, forward_axis), dot(dr, up_axis), dot(dr, right_axis));
+  to_array(home_l, gait.foot_home_l);
+  to_array(home_r, gait.foot_home_r);
 
   if (dot(l_pole, forward_axis) < 0.0f) l_pole = mul(l_pole, -1.0f);
   if (dot(r_pole, forward_axis) < 0.0f) r_pole = mul(r_pole, -1.0f);
@@ -869,30 +876,55 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 root_pos = from_array(transform->position);
   const Vec3 l_hip_w = to_world_point(*transform, l_hip);
   const Vec3 r_hip_w = to_world_point(*transform, r_hip);
-  const Vec3 hip_mid = mul(add(l_hip_w, r_hip_w), 0.5f);
+  const Vec3 hips_model = safe_pos(gait->bone_hips);
+  const Vec3 hips_w = to_world_point(*transform, hips_model);
+  to_array(hips_w, gait->debug_hips_world);
   const Vec3 l_foot_w = to_world_point(*transform, l_foot);
   const Vec3 r_foot_w = to_world_point(*transform, r_foot);
   const float v_side = dot(planar, right);
   Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
-  const float base_width = 0.45f * hip_width_world;
   const float strafe_width_boost = 0.25f * hip_width_world * std::abs(v_side / std::max(max_speed, 0.1f));
-  const float step_width = base_width + strafe_width_boost;
   float step_len = 0.5f * stride_len_world;
   const float step_len_small = 0.05f * leg_len_world;
   const float angle_step = clampf(gait->yaw_rate * (1.0f / std::max(cadence, 0.1f)) * 0.6f, -0.6f, 0.6f);
   const float step_height = gait->step_height_scale * leg_len_world;
+  const Vec3 home_l = from_array(gait->foot_home_l);
+  const Vec3 home_r = from_array(gait->foot_home_r);
+  const Vec3 home_l_w = add(hips_w, add(mul(forward, home_l.x), add(mul(up_axis(), home_l.y), mul(right, home_l.z))));
+  const Vec3 home_r_w = add(hips_w, add(mul(forward, home_r.x), add(mul(up_axis(), home_r.y), mul(right, home_r.z))));
 
-  auto compute_step_target = [&](float side_sign) {
-    Vec3 desired = hip_mid;
+  auto compute_step_target = [&](float side_sign, const Vec3& base_w, const Vec3& home_bind) {
+    Vec3 desired = base_w;
     if (turn_in_place) {
-      Vec3 radial = mul(right, step_width * side_sign);
-      Vec3 rotated = rotate_y(radial, angle_step);
-      desired = add(desired, add(rotated, mul(forward, step_len_small)));
+      Vec3 home_xz = add(mul(forward, home_bind.x), mul(right, home_bind.z));
+      Vec3 rotated = rotate_y(home_xz, angle_step);
+      desired = add(hips_w, add(rotated, mul(up_axis(), home_bind.y)));
+      desired = add(desired, mul(forward, step_len_small));
     } else {
-      desired = add(desired, add(mul(move_dir, step_len), mul(right, step_width * side_sign)));
+      desired = add(desired, add(mul(move_dir, step_len), mul(right, strafe_width_boost * side_sign)));
     }
+
+    const float min_side = 0.15f * hip_width_world;
+    float midline = dot(sub(desired, hips_w), right);
+    if (side_sign < 0.0f && midline > -min_side) {
+      desired = add(desired, mul(right, (-min_side - midline)));
+    } else if (side_sign > 0.0f && midline < min_side) {
+      desired = add(desired, mul(right, (min_side - midline)));
+    }
+
+    Vec3 rad = sub(desired, hips_w);
+    rad.y = 0.0f;
+    const float min_rad = 0.35f * leg_len_world;
+    float rad_len = length(rad);
+    if (rad_len < min_rad) {
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(right, side_sign);
+      Vec3 xz = add(hips_w, mul(rad_dir, min_rad));
+      desired.x = xz.x;
+      desired.z = xz.z;
+    }
+
     const float ray_height = std::max(leg_len_world * 0.8f, 0.2f);
-    RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 2.0f);
+    RayHit hit = raycast_down(registry, add(desired, mul(up_axis(), ray_height)), ray_height * 1.6f);
     if (hit.hit) {
       desired.y = hit.point.y;
     }
@@ -913,7 +945,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (left_swing && !left_was_swing) {
       Vec3 start = gait->left_locked ? l_lock_w : l_foot_w;
       to_array(start, gait->left_swing_start_pos);
-      Vec3 end = compute_step_target(-1.0f);
+      Vec3 end = compute_step_target(-1.0f, home_l_w, home_l);
       to_array(end, gait->left_step_pos);
       gait->left_step_active = true;
       gait->left_locked = false;
@@ -921,7 +953,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (right_swing && !right_was_swing) {
       Vec3 start = gait->right_locked ? r_lock_w : r_foot_w;
       to_array(start, gait->right_swing_start_pos);
-      Vec3 end = compute_step_target(1.0f);
+      Vec3 end = compute_step_target(1.0f, home_r_w, home_r);
       to_array(end, gait->right_step_pos);
       gait->right_step_active = true;
       gait->right_locked = false;
@@ -1134,11 +1166,19 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
     Vec3 r_pole = from_array(gait.debug_right_pole);
     lines.add_line(l_hip_w, add(l_hip_w, mul(l_pole, 0.2f)), v3(0.2f, 0.6f, 1.0f));
     lines.add_line(r_hip_w, add(r_hip_w, mul(r_pole, 0.2f)), v3(0.2f, 0.6f, 1.0f));
-    Vec3 hip_mid = mul(add(l_hip_w, r_hip_w), 0.5f);
+    Vec3 hips_w = from_array(gait.debug_hips_world);
+    Vec3 home_l = from_array(gait.foot_home_l);
+    Vec3 home_r = from_array(gait.foot_home_r);
     Vec3 fwd = from_array(gait.debug_forward);
     Vec3 right = from_array(gait.debug_right);
-    lines.add_line(hip_mid, add(hip_mid, mul(fwd, 0.3f)), v3(0.2f, 0.9f, 0.9f));
-    lines.add_line(hip_mid, add(hip_mid, mul(right, 0.3f)), v3(0.9f, 0.2f, 0.2f));
+    Vec3 home_l_w = add(hips_w, add(mul(fwd, home_l.x), add(mul(up_axis(), home_l.y), mul(right, home_l.z))));
+    Vec3 home_r_w = add(hips_w, add(mul(fwd, home_r.x), add(mul(up_axis(), home_r.y), mul(right, home_r.z))));
+    lines.add_line(hips_w, home_l_w, v3(0.9f, 0.5f, 0.1f));
+    lines.add_line(hips_w, home_r_w, v3(0.9f, 0.5f, 0.1f));
+    lines.add_line(hips_w, l_target_w, v3(0.4f, 0.9f, 0.4f));
+    lines.add_line(hips_w, r_target_w, v3(0.4f, 0.9f, 0.4f));
+    lines.add_line(hips_w, add(hips_w, mul(fwd, 0.3f)), v3(0.2f, 0.9f, 0.9f));
+    lines.add_line(hips_w, add(hips_w, mul(right, 0.3f)), v3(0.9f, 0.2f, 0.2f));
   }
 
   if (lines.count > 0) {
