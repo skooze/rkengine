@@ -2,12 +2,14 @@
 
 #include "rkg/log.h"
 #include "rkg/math.h"
+#include "rkg/movement_log.h"
 #include "rkg/renderer_hooks.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <functional>
+#include <sstream>
 #include <vector>
 
 namespace rkg::locomotion {
@@ -837,6 +839,31 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (!grounded) {
     l_target = l_foot;
     r_target = r_foot;
+  }
+
+  // TEMP: gait diagnostics for play-session log (overwritten each Play). Remove when stable.
+  if (rkg::movement_log::enabled()) {
+    static float gait_log_accum = 0.0f;
+    gait_log_accum += dt;
+    if (gait_log_accum >= 0.2f) {
+      gait_log_accum = 0.0f;
+      const Vec3 l_target_w = to_world_point(*transform, l_target);
+      const Vec3 r_target_w = to_world_point(*transform, r_target);
+      std::ostringstream line;
+      line.setf(std::ios::fixed);
+      line.precision(3);
+      line << "gait entity=" << entity
+           << " speed=" << speed
+           << " phase=" << gait->phase
+           << " grounded=" << grounded
+           << " sprint=" << sprinting
+           << " left_lock=" << gait->left_locked
+           << " right_lock=" << gait->right_locked
+           << " l_target=(" << l_target_w.x << "," << l_target_w.y << "," << l_target_w.z << ")"
+           << " r_target=(" << r_target_w.x << "," << r_target_w.y << "," << r_target_w.z << ")"
+           << " pelvis_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[1] << "," << gait->pelvis_offset[2] << ")";
+      rkg::movement_log::write(line.str());
+    }
   }
 
   if (gait->enable_ik) {

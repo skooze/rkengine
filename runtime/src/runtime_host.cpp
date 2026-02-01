@@ -4,6 +4,7 @@
 #include "rkg/instructions.h"
 #include "rkg/log.h"
 #include "rkg/locomotion.h"
+#include "rkg/movement_log.h"
 #include "rkg/plugin_api.h"
 #include "rkg/renderer_hooks.h"
 #include "rkg/renderer_select.h"
@@ -1010,6 +1011,7 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
   const float frame_dt = params.frame_dt;
   const float sim_dt = params.run_simulation ? params.sim_dt : 0.0f;
   static bool logged_tick = false;
+  static bool was_simulating = false;
   const bool first_tick = !logged_tick;
   if (first_tick) {
     rkg::log::info("tick: begin");
@@ -1050,8 +1052,17 @@ void RuntimeHost::tick(const FrameParams& params, const ActionStateProvider& act
     host_.update_plugin(name, dt);
   }
   if (params.run_simulation) {
+    if (!was_simulating) {
+      const auto log_dir = paths_.root / "build_logs";
+      std::error_code ec;
+      std::filesystem::create_directories(log_dir, ec);
+      rkg::movement_log::open(log_dir / "rkg_play_movement.log");
+    }
     rkg::locomotion::update_procedural_gaits(registry_, sim_dt);
+  } else if (was_simulating) {
+    rkg::movement_log::close();
   }
+  was_simulating = params.run_simulation;
   const rkg::ecs::Skeleton* viewport_skeleton = nullptr;
   if (player_ != rkg::ecs::kInvalidEntity) {
     viewport_skeleton = registry_.get_skeleton(player_);
