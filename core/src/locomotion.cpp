@@ -603,6 +603,13 @@ static void compute_rig_metrics(ecs::ProceduralGait& gait, const ecs::Skeleton& 
   if (foot_len < kEps) foot_len = length(sub(r_toe, r_foot));
   if (foot_len < kEps) foot_len = leg_len * 0.15f;
   gait.foot_length = foot_len;
+
+  Vec3 l_plane = normalize(cross(sub(l_knee, l_hip), sub(l_foot, l_knee)));
+  Vec3 r_plane = normalize(cross(sub(r_knee, r_hip), sub(r_foot, r_knee)));
+  if (length(l_plane) < kEps) l_plane = v3(0.0f, 0.0f, 1.0f);
+  if (length(r_plane) < kEps) r_plane = v3(0.0f, 0.0f, 1.0f);
+  to_array(l_plane, gait.knee_plane_l);
+  to_array(r_plane, gait.knee_plane_r);
 }
 
 static void add_rot(ecs::Skeleton& skel, uint32_t idx, float rx, float ry, float rz) {
@@ -799,7 +806,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   Vec3 move_dir = (speed > 0.05f) ? normalize(planar) : forward;
   Vec3 lateral = right;
   const float step_len = stride_world * 0.5f * speed_norm;
-  const float lateral_offset = hip_width_world * 0.5f;
+  const float lateral_offset = hip_width_world * 0.5f * gait->lateral_step_scale;
   const float step_height = gait->step_height_scale * gait->leg_length;
 
   auto compute_step_target = [&](float side_sign) {
@@ -904,6 +911,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     r_plane = normalize(r_plane);
     if (length(l_plane) < 0.0001f) l_plane = v3(0.0f, 0.0f, 1.0f);
     if (length(r_plane) < 0.0001f) r_plane = v3(0.0f, 0.0f, 1.0f);
+    const Vec3 l_pref = normalize(from_array(gait->knee_plane_l));
+    const Vec3 r_pref = normalize(from_array(gait->knee_plane_r));
+    if (length(l_pref) > 0.0001f) {
+      l_plane = normalize(lerp(l_plane, l_pref, gait->knee_plane_bias));
+    }
+    if (length(r_pref) > 0.0001f) {
+      r_plane = normalize(lerp(r_plane, r_pref, gait->knee_plane_bias));
+    }
 
     const Vec3 l_knee_target = solve_two_bone_ik(l_hip2, l_knee2, l_foot2, target_l, l_plane);
     const Vec3 r_knee_target = solve_two_bone_ik(r_hip2, r_knee2, r_foot2, target_r, r_plane);
