@@ -832,8 +832,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float landing_drop = -gait->landing_compress * leg_len_e * landing_alpha;
 
   const float pelvis_bob = gait->pelvis_bob_scale * leg_len_e * speed_norm;
-  const float width_ref_e = std::max(gait->hip_width, 0.20f * leg_len_e);
-  float step_half = 0.45f * width_ref_e + (0.35f * width_ref_e - 0.45f * width_ref_e) * speed_gait_norm;
+  const float pelvis_width_ref_e = std::max(gait->hip_width, 0.20f * leg_len_e);
+  float step_half = 0.45f * pelvis_width_ref_e + (0.35f * pelvis_width_ref_e - 0.45f * pelvis_width_ref_e) * speed_gait_norm;
   step_half = std::max(step_half, 0.10f * leg_len_e);
   step_half = std::min(step_half, 0.22f * leg_len_e);
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
