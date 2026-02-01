@@ -171,6 +171,8 @@ struct ProceduralGait {
   float debug_forward[3] = {0.0f, 0.0f, 0.0f};
   float debug_right[3] = {0.0f, 0.0f, 0.0f};
   float debug_hips_world[3] = {0.0f, 0.0f, 0.0f};
+  float frame_side_world[3] = {1.0f, 0.0f, 0.0f};
+  float frame_fwd_world[3] = {0.0f, 0.0f, 1.0f};
   float debug_knee_lat_l = 0.0f;
   float debug_knee_lat_r = 0.0f;
   float debug_target_lat_l = 0.0f;
