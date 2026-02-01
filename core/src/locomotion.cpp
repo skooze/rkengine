@@ -831,11 +831,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     return desired;
   };
 
-  Vec3 l_step_w = compute_step_target(-1.0f);
-  Vec3 r_step_w = compute_step_target(1.0f);
-  Vec3 l_step = to_local_point(*transform, l_step_w);
-  Vec3 r_step = to_local_point(*transform, r_step_w);
-
   Vec3 l_lock_w = from_array(gait->left_lock_pos);
   Vec3 r_lock_w = from_array(gait->right_lock_pos);
   update_foot_lock_internal(gait->left_locked, l_lock_w, l_foot_w, grounded, swing_l,
@@ -854,6 +849,29 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   Vec3 l_lock = to_local_point(*transform, l_lock_w);
   Vec3 r_lock = to_local_point(*transform, r_lock_w);
+
+  const bool left_swinging = grounded && (swing_l >= gait->foot_lock_out);
+  const bool right_swinging = grounded && (swing_r >= gait->foot_lock_out);
+  if (left_swinging && !gait->left_step_active) {
+    Vec3 step = compute_step_target(-1.0f);
+    to_array(step, gait->left_step_pos);
+    gait->left_step_active = true;
+  }
+  if (right_swinging && !gait->right_step_active) {
+    Vec3 step = compute_step_target(1.0f);
+    to_array(step, gait->right_step_pos);
+    gait->right_step_active = true;
+  }
+  if (!left_swinging) {
+    gait->left_step_active = false;
+  }
+  if (!right_swinging) {
+    gait->right_step_active = false;
+  }
+  Vec3 l_step_w = left_swinging ? from_array(gait->left_step_pos) : l_lock_w;
+  Vec3 r_step_w = right_swinging ? from_array(gait->right_step_pos) : r_lock_w;
+  Vec3 l_step = to_local_point(*transform, l_step_w);
+  Vec3 r_step = to_local_point(*transform, r_step_w);
 
   auto blend_foot = [&](const Vec3& lock_pos, const Vec3& step_pos, float swing) {
     const float t = smoothstep01(swing);

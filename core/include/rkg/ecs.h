@@ -154,6 +154,10 @@ struct ProceduralGait {
   bool right_locked = false;
   float left_lock_pos[3] = {0.0f, 0.0f, 0.0f};
   float right_lock_pos[3] = {0.0f, 0.0f, 0.0f};
+  bool left_step_active = false;
+  bool right_step_active = false;
+  float left_step_pos[3] = {0.0f, 0.0f, 0.0f};
+  float right_step_pos[3] = {0.0f, 0.0f, 0.0f};
 
   uint32_t bone_root = UINT32_MAX;
   uint32_t bone_hips = UINT32_MAX;
