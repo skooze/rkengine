@@ -949,7 +949,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float strafe_half = 0.20f * width_ref_e * std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half_local + strafe_half;
   const float min_side = 0.90f * step_half_desired;
-  const float min_rad = 0.45f * leg_len_e;
+  const Vec3 home_l_rad = sub(home_l_e, hips_e);
+  const Vec3 home_r_rad = sub(home_r_e, hips_e);
+  const float home_rad_l = length(Vec3{home_l_rad.x, 0.0f, home_l_rad.z});
+  const float home_rad_r = length(Vec3{home_r_rad.x, 0.0f, home_r_rad.z});
+  const float home_rad_e = 0.5f * (home_rad_l + home_rad_r);
+  const float min_rad = std::max(0.60f * home_rad_e, 0.25f * leg_len_e);
 
   // Ensure side axis points from left to right based on bind/home foot offsets.
   if (dot(sub(home_r_e, home_l_e), side_e) < 0.0f) {
@@ -961,14 +966,49 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float side_sign_l = -1.0f;
   const float side_sign_r = 1.0f;
 
+  auto clamp_target_e = [&](const Vec3& target, float side_sign) {
+    Vec3 out = target;
+    float midline = dot(sub(out, hips_e), side_e);
+    if (side_sign < 0.0f && midline > -min_side) {
+      out = add(out, mul(side_e, (-min_side - midline)));
+    } else if (side_sign > 0.0f && midline < min_side) {
+      out = add(out, mul(side_e, (min_side - midline)));
+    }
+    Vec3 rad = sub(out, hips_e);
+    rad.y = 0.0f;
+    float rad_len = length(rad);
+    if (rad_len < min_rad) {
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_e, side_sign);
+      Vec3 xz = add(hips_e, mul(rad_dir, min_rad));
+      out.x = xz.x;
+      out.z = xz.z;
+    }
+    return out;
+  };
+
+  auto recenter_home = [&](const Vec3& base_e, float side_sign) {
+    Vec3 out = base_e;
+    Vec3 off = sub(out, hips_e);
+    const float mid = dot(off, side_e);
+    const float desired_mid = side_sign * step_half_local;
+    out = add(out, mul(side_e, desired_mid - mid));
+    Vec3 rad = sub(out, hips_e);
+    rad.y = 0.0f;
+    float rad_len = length(rad);
+    if (rad_len < min_rad) {
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_e, side_sign);
+      Vec3 xz = add(hips_e, mul(rad_dir, min_rad));
+      out.x = xz.x;
+      out.z = xz.z;
+    }
+    return out;
+  };
+
+  const Vec3 home_l_e_adj = recenter_home(home_l_e, side_sign_l);
+  const Vec3 home_r_e_adj = recenter_home(home_r_e, side_sign_r);
+
   auto compute_step_target_e = [&](float side_sign, const Vec3& base_e) {
     Vec3 base = base_e;
-    {
-      Vec3 off = sub(base, hips_e);
-      const float mid = dot(off, side_e);
-      const float desired_mid = side_sign * step_half_local;
-      base = add(base, mul(side_e, desired_mid - mid));
-    }
     Vec3 desired = base;
     if (turn_in_place) {
       Vec3 off = sub(base, hips_e);
@@ -1028,14 +1068,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     gait->right_locked = false;
   } else {
     if (idle) {
-      Vec3 home_l_w = to_world_point(*transform, home_l_e);
-      Vec3 home_r_w = to_world_point(*transform, home_r_e);
+      Vec3 home_l_w = to_world_point(*transform, home_l_e_adj);
+      Vec3 home_r_w = to_world_point(*transform, home_r_e_adj);
       to_array(home_l_w, gait->left_lock_pos);
       to_array(home_r_w, gait->right_lock_pos);
-      to_array(home_l_e, gait->left_step_pos);
-      to_array(home_r_e, gait->right_step_pos);
-      to_array(home_l_e, gait->left_swing_start_pos);
-      to_array(home_r_e, gait->right_swing_start_pos);
+      to_array(home_l_e_adj, gait->left_step_pos);
+      to_array(home_r_e_adj, gait->right_step_pos);
+      to_array(home_l_e_adj, gait->left_swing_start_pos);
+      to_array(home_r_e_adj, gait->right_swing_start_pos);
       gait->left_step_active = false;
       gait->right_step_active = false;
       gait->left_locked = true;
@@ -1043,16 +1083,18 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
     if (left_swing_run && !left_was_swing) {
       Vec3 start_e = gait->left_locked ? to_local_point(*transform, l_lock_w) : l_foot;
+      start_e = recenter_home(start_e, side_sign_l);
       to_array(start_e, gait->left_swing_start_pos);
-      Vec3 end_e = compute_step_target_e(side_sign_l, home_l_e);
+      Vec3 end_e = compute_step_target_e(side_sign_l, home_l_e_adj);
       to_array(end_e, gait->left_step_pos);
       gait->left_step_active = true;
       gait->left_locked = false;
     }
     if (right_swing_run && !right_was_swing) {
       Vec3 start_e = gait->right_locked ? to_local_point(*transform, r_lock_w) : r_foot;
+      start_e = recenter_home(start_e, side_sign_r);
       to_array(start_e, gait->right_swing_start_pos);
-      Vec3 end_e = compute_step_target_e(side_sign_r, home_r_e);
+      Vec3 end_e = compute_step_target_e(side_sign_r, home_r_e_adj);
       to_array(end_e, gait->right_step_pos);
       gait->right_step_active = true;
       gait->right_locked = false;
@@ -1060,6 +1102,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (!left_swing_run && left_was_swing) {
       gait->left_step_active = false;
       Vec3 end_e = from_array(gait->left_step_pos);
+      end_e = clamp_target_e(end_e, side_sign_l);
       l_lock_w = to_world_point(*transform, end_e);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
@@ -1067,17 +1110,22 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (!right_swing_run && right_was_swing) {
       gait->right_step_active = false;
       Vec3 end_e = from_array(gait->right_step_pos);
+      end_e = clamp_target_e(end_e, side_sign_r);
       r_lock_w = to_world_point(*transform, end_e);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
     }
     if (left_stance_run && !gait->left_locked && !gait->left_step_active) {
       l_lock_w = to_world_point(*transform, l_foot);
+      Vec3 clamp_e = clamp_target_e(to_local_point(*transform, l_lock_w), side_sign_l);
+      l_lock_w = to_world_point(*transform, clamp_e);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
     }
     if (right_stance_run && !gait->right_locked && !gait->right_step_active) {
       r_lock_w = to_world_point(*transform, r_foot);
+      Vec3 clamp_e = clamp_target_e(to_local_point(*transform, r_lock_w), side_sign_r);
+      r_lock_w = to_world_point(*transform, clamp_e);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
     }
@@ -1137,8 +1185,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   r_smooth = lerp(r_smooth, r_target_e, target_alpha);
   to_array(l_smooth, gait->smooth_left_target);
   to_array(r_smooth, gait->smooth_right_target);
-  l_target_e = l_smooth;
-  r_target_e = r_smooth;
+  l_target_e = clamp_target_e(l_smooth, side_sign_l);
+  r_target_e = clamp_target_e(r_smooth, side_sign_r);
   l_target_w = to_world_point(*transform, l_target_e);
   r_target_w = to_world_point(*transform, r_target_e);
 
