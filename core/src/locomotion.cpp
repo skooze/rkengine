@@ -1177,27 +1177,55 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     r_target_w = to_world_point(*transform, r_target_e);
   }
 
+  const bool left_locked_now =
+      grounded && gait->enable_foot_lock && left_stance_run && gait->left_locked;
+  const bool right_locked_now =
+      grounded && gait->enable_foot_lock && right_stance_run && gait->right_locked;
+
+  if (left_locked_now) {
+    l_target_w = l_lock_w;
+    l_target_e = to_local_point(*transform, l_target_w);
+  }
+  if (right_locked_now) {
+    r_target_w = r_lock_w;
+    r_target_e = to_local_point(*transform, r_target_w);
+  }
+
   const float target_alpha = 1.0f - std::exp(-dt * 12.0f);
   Vec3 l_smooth = from_array(gait->smooth_left_target);
   Vec3 r_smooth = from_array(gait->smooth_right_target);
   if (length(l_smooth) < 0.0001f) l_smooth = l_target_e;
   if (length(r_smooth) < 0.0001f) r_smooth = r_target_e;
-  if (left_swing_run) {
+  if (left_swing_run || left_locked_now) {
     l_smooth = l_target_e;
   } else {
     l_smooth = lerp(l_smooth, l_target_e, target_alpha);
   }
-  if (right_swing_run) {
+  if (right_swing_run || right_locked_now) {
     r_smooth = r_target_e;
   } else {
     r_smooth = lerp(r_smooth, r_target_e, target_alpha);
   }
   to_array(l_smooth, gait->smooth_left_target);
   to_array(r_smooth, gait->smooth_right_target);
-  l_target_e = clamp_target_e(l_smooth, side_sign_l);
-  r_target_e = clamp_target_e(r_smooth, side_sign_r);
+  if (!left_locked_now) {
+    l_target_e = clamp_target_e(l_smooth, side_sign_l);
+  } else {
+    l_target_e = l_smooth;
+  }
+  if (!right_locked_now) {
+    r_target_e = clamp_target_e(r_smooth, side_sign_r);
+  } else {
+    r_target_e = r_smooth;
+  }
   l_target_w = to_world_point(*transform, l_target_e);
   r_target_w = to_world_point(*transform, r_target_e);
+  if (left_locked_now) {
+    l_target_w = l_lock_w;
+  }
+  if (right_locked_now) {
+    r_target_w = r_lock_w;
+  }
 
   to_array(l_target_e, gait->debug_left_target);
   to_array(r_target_e, gait->debug_right_target);
