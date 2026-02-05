@@ -1380,6 +1380,24 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait_log_accum += dt;
       if (gait_log_accum >= 0.1f) {
         gait_log_accum = 0.0f;
+        std::vector<ecs::Transform> log_locals(skeleton->bones.size());
+        for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+          log_locals[i] = skeleton->bones[i].local_pose;
+        }
+        std::vector<rkg::Mat4> log_world;
+        compute_world_matrices(*skeleton, log_locals, log_world);
+        auto safe_world_pos = [&](uint32_t idx) -> Vec3 {
+          if (idx == UINT32_MAX || idx >= log_world.size()) return v3();
+          return {log_world[idx].m[12], log_world[idx].m[13], log_world[idx].m[14]};
+        };
+        const Vec3 l_foot_e_log = safe_world_pos(gait->bone_l_foot);
+        const Vec3 r_foot_e_log = safe_world_pos(gait->bone_r_foot);
+        const Vec3 l_foot_w_log = to_world_point(*transform, l_foot_e_log);
+        const Vec3 r_foot_w_log = to_world_point(*transform, r_foot_e_log);
+        const Vec3 l_lock_w_log = from_array(gait->left_lock_pos);
+        const Vec3 r_lock_w_log = from_array(gait->right_lock_pos);
+        const Vec3 l_err = sub(l_lock_w_log, l_foot_w_log);
+        const Vec3 r_err = sub(r_lock_w_log, r_foot_w_log);
         const Vec3 hips_e_log = safe_pos(gait->bone_hips);
         Vec3 rad_l = sub(l_target_e, hips_e_log);
         Vec3 rad_r = sub(r_target_e, hips_e_log);
@@ -1410,7 +1428,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
              << " target_rad=(" << target_rad_l << "," << target_rad_r << ")"
              << " min_side=" << min_side
              << " min_rad=" << min_rad
-             << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")";
+             << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")"
+             << " lockL=" << gait->left_locked
+             << " lockR=" << gait->right_locked
+             << " l_foot_w=(" << l_foot_w_log.x << "," << l_foot_w_log.y << "," << l_foot_w_log.z << ")"
+             << " r_foot_w=(" << r_foot_w_log.x << "," << r_foot_w_log.y << "," << r_foot_w_log.z << ")"
+             << " l_lock_w=(" << l_lock_w_log.x << "," << l_lock_w_log.y << "," << l_lock_w_log.z << ")"
+             << " r_lock_w=(" << r_lock_w_log.x << "," << r_lock_w_log.y << "," << r_lock_w_log.z << ")"
+             << " l_err=(" << l_err.x << "," << l_err.y << "," << l_err.z << ")"
+             << " r_err=(" << r_err.x << "," << r_err.y << "," << r_err.z << ")"
+             << " root_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[2] << ")";
         rkg::movement_log::write(line.str());
       }
     }
