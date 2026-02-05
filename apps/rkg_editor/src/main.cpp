@@ -4144,7 +4144,7 @@ void update_camera_and_draw_list(EditorState& state) {
       if (always_look) {
         state.runtime->platform().consume_mouse_delta(&look_dx, &look_dy);
       }
-      state.camera_yaw -= look_dx * 0.01f;
+      state.camera_yaw += look_dx * 0.01f;
       state.camera_pitch -= look_dy * 0.01f;
       if (state.camera_pitch > 1.4f) state.camera_pitch = 1.4f;
       if (state.camera_pitch < -1.4f) state.camera_pitch = -1.4f;
@@ -4360,7 +4360,7 @@ void update_camera_and_draw_list(EditorState& state) {
     };
   };
 
-  const float grid_lift = 0.02f;
+  const float grid_lift = 0.06f;
   const float world_grid_color[4] = {0.22f, 0.22f, 0.26f, 1.0f};
   const float character_grid_color[4] = {0.28f, 0.34f, 0.5f, 1.0f};
   const float axis_x_color[4] = {0.85f, 0.2f, 0.2f, 1.0f};
@@ -4368,7 +4368,10 @@ void update_camera_and_draw_list(EditorState& state) {
   const float axis_z_color[4] = {0.2f, 0.35f, 0.9f, 1.0f};
   const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
 
-  if (state.show_world_grid) {
+  const bool show_world_grid = state.show_world_grid || state.play_state == PlayState::Play;
+  const bool show_character_grid = state.show_character_grid || state.play_state == PlayState::Play;
+
+  if (show_world_grid) {
     const float extent = state.grid_half_extent;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
     for (int i = -steps; i <= steps; ++i) {
@@ -4378,7 +4381,7 @@ void update_camera_and_draw_list(EditorState& state) {
     }
   }
 
-  if (state.show_character_grid) {
+  if (show_character_grid) {
     rkg::ecs::Entity rig_entity = player;
     if (rig_entity == rkg::ecs::kInvalidEntity || !registry.get_transform(rig_entity)) {
       rig_entity = state.selected_entity;
