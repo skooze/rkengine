@@ -1,0 +1,17 @@
+From github.com:skooze/rkengine
+   08020b2..f71e142  main       -> origin/main
+Updating 08020b2..f71e142
+Fast-forward
+ build_logs/build.log                      |     93 -
+ build_logs/configure.log                  |      9 -
+ build_logs/gitpull.log                    |      1 -
+ build_logs/rkg_editor_20260205_155530.log |    250 -
+ build_logs/rkg_play_movement.log          | 328179 ---------------------------
+ core/include/rkg/ecs.h                    |      2 +-
+ core/src/locomotion.cpp                   |     28 +-
+ 7 files changed, 24 insertions(+), 328538 deletions(-)
+ delete mode 100644 build_logs/build.log
+ delete mode 100644 build_logs/configure.log
+ delete mode 100644 build_logs/gitpull.log
+ delete mode 100644 build_logs/rkg_editor_20260205_155530.log
+ delete mode 100644 build_logs/rkg_play_movement.log
