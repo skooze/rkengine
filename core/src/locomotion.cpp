@@ -1069,6 +1069,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const bool right_stance_run = idle ? true : right_stance;
   const bool left_was_swing = gait->left_step_active;
   const bool right_was_swing = gait->right_step_active;
+  const bool left_just_landed = grounded && left_was_swing && !left_swing_run;
+  const bool right_just_landed = grounded && right_was_swing && !right_swing_run;
 
   if (!grounded) {
     gait->left_step_active = false;
@@ -1350,6 +1352,25 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     compute_world_matrices(*skeleton, locals, world);
     apply_bone_aim(*skeleton, world, gait->bone_l_calf, gait->bone_l_foot, target_l);
     apply_bone_aim(*skeleton, world, gait->bone_r_calf, gait->bone_r_foot, target_r);
+
+    if (left_just_landed || right_just_landed) {
+      for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+        locals[i] = skeleton->bones[i].local_pose;
+      }
+      compute_world_matrices(*skeleton, locals, world);
+      if (left_just_landed) {
+        const Vec3 foot_e = safe_pos(gait->bone_l_foot);
+        const Vec3 foot_w = to_world_point(*transform, foot_e);
+        to_array(foot_w, gait->left_lock_pos);
+        gait->left_locked = true;
+      }
+      if (right_just_landed) {
+        const Vec3 foot_e = safe_pos(gait->bone_r_foot);
+        const Vec3 foot_w = to_world_point(*transform, foot_e);
+        to_array(foot_w, gait->right_lock_pos);
+        gait->right_locked = true;
+      }
+    }
   }
 
   if (rkg::movement_log::enabled()) {
