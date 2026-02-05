@@ -56,8 +56,8 @@ Vec3 vec3_normalize(const Vec3& v) {
 
 Mat4 mat4_look_at(const Vec3& eye, const Vec3& target, const Vec3& up) {
   const Vec3 f = vec3_normalize(vec3_sub(target, eye));
-  const Vec3 s = vec3_normalize(vec3_cross(f, up));
-  const Vec3 u = vec3_cross(s, f);
+  const Vec3 s = vec3_normalize(vec3_cross(up, f));
+  const Vec3 u = vec3_cross(f, s);
 
   Mat4 out = mat4_identity();
   out.m[0] = s.x;
