@@ -957,11 +957,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       intent_world = mul(in, 1.0f / in_len);
       intent_mag = clampf(in_len, 0.0f, 1.0f);
     }
+    if (in_len < 0.02f) {
+      intent_mag = 0.0f;
+    }
   }
   const bool idle = grounded && !turn_in_place && speed < (0.15f * max_speed) && intent_mag < 0.05f;
   Vec3 frame_fwd_e = from_array(gait->frame_fwd_entity);
   if (length(frame_fwd_e) < 0.0001f) frame_fwd_e = v3(0.0f, 0.0f, 1.0f);
-  const float frame_alpha = 1.0f - std::exp(-dt * 8.0f);
+  const float frame_rate = (intent_mag > 0.05f) ? 8.0f : 20.0f;
+  const float frame_alpha = 1.0f - std::exp(-dt * frame_rate);
   Vec3 desired_frame_e = frame_fwd_e;
   if (intent_mag > 0.05f) {
     Vec3 intent_e = normalize(to_local_dir(*transform, intent_world));
@@ -1001,9 +1005,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float v_side = dot(planar, side_world);
   const float step_len = 0.5f * stride_len_e;
-  const float step_len_small = 0.08f * leg_len_e;
-  const float step_height_e = gait->step_height_scale * leg_len_e *
-                              (0.6f + 0.4f * speed_gait_norm);
+  const float step_len_small = 0.12f * leg_len_e;
+  const float step_height_e = gait->step_height_scale * leg_len_e;
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
   const float home_width_e = 0.5f * std::abs(dot(sub(home_r_e, home_l_e), side_e));
