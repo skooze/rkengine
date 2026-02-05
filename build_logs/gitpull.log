@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   cb007df..8f2e1ec  main       -> origin/main
-Updating cb007df..8f2e1ec
+   5373238..1ab3ca3  main       -> origin/main
+Updating 5373238..1ab3ca3
 Fast-forward
- core/src/locomotion.cpp | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ core/src/locomotion.cpp | 226 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 136 insertions(+), 90 deletions(-)
