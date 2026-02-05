@@ -1237,28 +1237,24 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (gait->enable_ik) {
     Vec3 lock_offset_e = v3();
     int lock_count = 0;
-    const float max_reach = leg_len_e * 0.98f;
     if (left_locked_now) {
-      const Vec3 lock_e = to_local_point(*transform, l_lock_w);
-      const Vec3 to_lock = sub(lock_e, hips_e);
-      const float dist = length(to_lock);
-      if (dist > max_reach && dist > kEps) {
-        lock_offset_e = add(lock_offset_e, mul(to_lock, (dist - max_reach) / dist));
-        ++lock_count;
-      }
+      const Vec3 foot_w = to_world_point(*transform, l_foot);
+      const Vec3 delta_w = sub(l_lock_w, foot_w);
+      const Vec3 delta_e = to_local_dir(*transform, delta_w);
+      lock_offset_e = add(lock_offset_e, delta_e);
+      ++lock_count;
     }
     if (right_locked_now) {
-      const Vec3 lock_e = to_local_point(*transform, r_lock_w);
-      const Vec3 to_lock = sub(lock_e, hips_e);
-      const float dist = length(to_lock);
-      if (dist > max_reach && dist > kEps) {
-        lock_offset_e = add(lock_offset_e, mul(to_lock, (dist - max_reach) / dist));
-        ++lock_count;
-      }
+      const Vec3 foot_w = to_world_point(*transform, r_foot);
+      const Vec3 delta_w = sub(r_lock_w, foot_w);
+      const Vec3 delta_e = to_local_dir(*transform, delta_w);
+      lock_offset_e = add(lock_offset_e, delta_e);
+      ++lock_count;
     }
     if (lock_count > 0) {
       lock_offset_e = mul(lock_offset_e, 1.0f / static_cast<float>(lock_count));
-      const float max_offset = leg_len_e * 0.35f;
+      lock_offset_e.y = 0.0f;
+      const float max_offset = leg_len_e * 0.5f;
       const float off_len = length(lock_offset_e);
       if (off_len > max_offset && off_len > kEps) {
         lock_offset_e = mul(lock_offset_e, max_offset / off_len);
@@ -1290,8 +1286,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     gait->pelvis_offset[0] += (lock_offset_e.x - gait->pelvis_offset[0]) * pelvis_alpha;
     gait->pelvis_offset[1] += (clamped_drop - gait->pelvis_offset[1]) * pelvis_alpha;
     gait->pelvis_offset[2] += (lock_offset_e.z - gait->pelvis_offset[2]) * pelvis_alpha;
-    add_pos(*skeleton, gait->bone_hips, gait->pelvis_offset[0],
-            gait->pelvis_offset[1], gait->pelvis_offset[2]);
+    const uint32_t root_idx = (gait->bone_root != UINT32_MAX) ? gait->bone_root : gait->bone_hips;
+    add_pos(*skeleton, root_idx, gait->pelvis_offset[0], 0.0f, gait->pelvis_offset[2]);
+    add_pos(*skeleton, gait->bone_hips, 0.0f, gait->pelvis_offset[1], 0.0f);
 
     for (size_t i = 0; i < skeleton->bones.size(); ++i) {
       locals[i] = skeleton->bones[i].local_pose;
