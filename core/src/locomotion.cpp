@@ -1278,6 +1278,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   gait->debug_target_lat_l = dot(sub(l_target_e, hips_e), side_e);
   gait->debug_target_lat_r = dot(sub(r_target_e, hips_e), side_e);
 
+  float debug_lock_off_len = 0.0f;
+  float debug_lock_max = 0.0f;
   if (gait->enable_ik) {
     Vec3 lock_offset_e = v3();
     int lock_count = 0;
@@ -1295,13 +1297,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       lock_offset_e = add(lock_offset_e, delta_e);
       ++lock_count;
     }
+    debug_lock_max = leg_len_e * 0.5f;
     if (lock_count > 0) {
       lock_offset_e = mul(lock_offset_e, 1.0f / static_cast<float>(lock_count));
       lock_offset_e.y = 0.0f;
-      const float max_offset = leg_len_e * 0.5f;
+      debug_lock_max = leg_len_e * (0.45f + 0.55f * speed_gait_norm);
       const float off_len = length(lock_offset_e);
-      if (off_len > max_offset && off_len > kEps) {
-        lock_offset_e = mul(lock_offset_e, max_offset / off_len);
+      debug_lock_off_len = off_len;
+      if (off_len > debug_lock_max && off_len > kEps) {
+        lock_offset_e = mul(lock_offset_e, debug_lock_max / off_len);
       }
     } else {
       lock_offset_e = v3();
@@ -1493,6 +1497,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
              << " r_err=(" << r_err.x << "," << r_err.y << "," << r_err.z << ")"
              << " l_err_len=" << l_err_len
              << " r_err_len=" << r_err_len
+             << " lock_off=" << debug_lock_off_len
+             << " lock_max=" << debug_lock_max
              << " root_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[2] << ")";
         rkg::movement_log::write(line.str());
       }
