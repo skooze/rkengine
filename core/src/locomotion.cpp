@@ -1096,6 +1096,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       Vec3 xz = add(hips_e, mul(rad_dir, min_rad));
       desired.x = xz.x;
       desired.z = xz.z;
+      rad = sub(desired, hips_e);
+      rad.y = 0.0f;
+      rad_len = length(rad);
+    }
+    const float max_rad = std::max(min_rad, 0.95f * leg_len_e);
+    if (rad_len > max_rad) {
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_e, side_sign);
+      Vec3 xz = add(hips_e, mul(rad_dir, max_rad));
+      desired.x = xz.x;
+      desired.z = xz.z;
     }
 
     const float ray_height = std::max(leg_len_world * 0.8f, 0.2f);
@@ -1141,7 +1151,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
     if (left_swing_run && !left_was_swing) {
       Vec3 start_e = gait->left_locked ? to_local_point_root(l_lock_w) : l_foot;
-      start_e = recenter_home(start_e, side_sign_l);
       to_array(start_e, gait->left_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_l, home_l_e_adj);
       to_array(end_e, gait->left_step_pos);
@@ -1150,7 +1159,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
     if (right_swing_run && !right_was_swing) {
       Vec3 start_e = gait->right_locked ? to_local_point_root(r_lock_w) : r_foot;
-      start_e = recenter_home(start_e, side_sign_r);
       to_array(start_e, gait->right_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_r, home_r_e_adj);
       to_array(end_e, gait->right_step_pos);

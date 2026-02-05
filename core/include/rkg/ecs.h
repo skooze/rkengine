@@ -122,7 +122,7 @@ struct ProceduralGait {
 
   float walk_speed = 2.2f;
   float sprint_speed = 4.0f;
-  float stride_scale = 1.0f;
+  float stride_scale = 0.9f;
   float step_height_scale = 0.08f;
   float pelvis_bob_scale = 0.03f;
   float pelvis_sway_scale = 0.02f;
