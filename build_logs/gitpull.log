@@ -1,1 +1,7 @@
-Already up to date.
+From github.com:skooze/rkengine
+   6b2f6fb..8976969  main       -> origin/main
+Updating 6b2f6fb..8976969
+Fast-forward
+ core/include/rkg/ecs.h  |  4 ++--
+ core/src/locomotion.cpp | 11 +++++++----
+ 2 files changed, 9 insertions(+), 6 deletions(-)
