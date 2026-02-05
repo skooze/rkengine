@@ -1,0 +1,422 @@
+[2026-02-05 14:03:42][INFO] log init
+[2026-02-05 14:03:42][INFO] log file: /home/skooze/rkg/build_logs/rkg_editor_20260205_140342.log
+[2026-02-05 14:03:42][INFO] platform: linux
+[2026-02-05 14:03:42][INFO] build: debug
+[2026-02-05 14:03:42][INFO] git: 8f2e1ec
+[2026-02-05 14:03:42][INFO] runtime: input map file=/home/skooze/rkg/projects/demo_game/config/input.yaml loaded=1 bindings=9
+[2026-02-05 14:03:42][INFO] asset_cache: manny source -> /home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb
+[2026-02-05 14:03:42][INFO] asset_cache: auto-importing manny into build/content_cache/generated_assets/manny
+[2026-02-05 14:03:42][INFO] asset_cache: auto-imported manny.glb into build/content_cache/generated_assets/manny
+[2026-02-05 14:03:42][INFO] asset_cache: loaded testmanny (verts=69772 idx=418608 mats=0 tex=0 joints=24 scale=1.000000,1.000000,1.000000)
+[2026-02-05 14:03:42][INFO] asset_cache: loaded manny (verts=33592 idx=156288 mats=1 tex=2 joints=24 scale=0.010000,0.010000,0.010000)
+[2026-02-05 14:03:42][WARN] cooked content missing; using raw content (dev_mode)
+[2026-02-05 14:03:42][INFO] RLIMIT_NOFILE: 1024/524288
+[2026-02-05 14:03:42][INFO] RLIMIT_NPROC: 127047/127047
+[2026-02-05 14:03:42][INFO] Wayland socket: /run/user/1000/wayland-0 mode=srwxr-xr-x uid=1000 gid=1000
+[2026-02-05 14:03:42][INFO] Wayland socket connect ok: /run/user/1000/wayland-0
+[2026-02-05 14:03:42][INFO] Wayland wl_display_connect ok: wayland-0
+[2026-02-05 14:03:42][INFO] X11 socket: /tmp/.X11-unix/X1 mode=srwxr-xr-x uid=1000 gid=1000
+[2026-02-05 14:03:42][INFO] X11 socket connect ok: /tmp/.X11-unix/X1
+[2026-02-05 14:03:42][INFO] X11 XOpenDisplay ok: :1
+[2026-02-05 14:03:42][INFO] SDL system/info: App name: SDL Application
+[2026-02-05 14:03:42][INFO] SDL system/info: App version: <unspecified>
+[2026-02-05 14:03:42][INFO] SDL system/info: App ID: <unspecified>
+[2026-02-05 14:03:42][INFO] SDL system/info: SDL revision: SDL-release-3.4.0-0-ga962f40bb
+[2026-02-05 14:03:42][INFO] SDL system/debug: SDL chose video backend 'wayland'
+[2026-02-05 14:03:42][INFO] SDL current video driver: wayland
+[2026-02-05 14:03:42][INFO] renderer:vulkan skinned demo: joints=24
+[2026-02-05 14:03:42][INFO] renderer:vulkan textured demo: using asset manny dir=/home/skooze/rkg/build/content_cache/generated_assets/manny
+[2026-02-05 14:03:42][INFO] renderer:vulkan init
+[2026-02-05 14:03:42][INFO] renderer:vulkan dynamic rendering: enabled
+[2026-02-05 14:03:42][INFO] renderer: renderer_vulkan
+[2026-02-05 14:03:42][INFO] renderer caps: DrawPrimitive | DebugUiSupported
+[2026-02-05 14:03:42][WARN] script:lua not available (Lua not found)
+[2026-02-05 14:03:42][WARN] script:js not available (QuickJS/Duktape not found)
+[2026-02-05 14:03:42][INFO] debug_ui: swapchain_format=50
+[2026-02-05 14:03:42][INFO] debug_ui: backend caps api=pipeline_info_main render_pass=yes dynamic=yes color_format=no pipeline_rendering=yes msaa=yes
+[2026-02-05 14:03:42][INFO] debug_ui: render path render_pass
+[2026-02-05 14:03:42][INFO] debug_ui: init
+[2026-02-05 14:03:42][INFO] debug_ui enabled
+[2026-02-05 14:03:42][INFO] physics_basic: init
+[2026-02-05 14:03:42][INFO] level entity spawned: player_spawn
+[2026-02-05 14:03:42][INFO] level entity spawned: ground_plane_1
+[2026-02-05 14:03:42][INFO] level entity spawned: demo_quad_1
+[2026-02-05 14:03:42][INFO] runtime: player rig scale set to 1.058824 (mesh height=1.700000, mesh scale=0.010000, root scale=1.000000, final scale=0.010588,0.010588,0.010588)
+[2026-02-05 14:03:42][INFO] runtime: rig mesh bounds min=(-0.553406,-0.000000,-0.173289) max=(0.553406,1.700000,0.173289)
+[2026-02-05 14:03:42][INFO] runtime: rig skeleton min y=0.040637
+[2026-02-05 14:03:42][INFO] runtime: player rig offset set to 0.000000 (grounded by mesh bounds)
+[2026-02-05 14:03:42][INFO] runtime: controller size set (radius=0.150000, half_height=0.100000, center_offset=0.250000, mesh height=0.018000, mesh bottom=0.000000)
+[2026-02-05 14:03:42][INFO] runtime: player rig asset = manny (source=/home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb)
+[2026-02-05 14:03:42][INFO] runtime: attached skeleton from asset manny joints=24
+[2026-02-05 14:03:42][INFO] content watcher: inotify
+[2026-02-05 14:03:42][INFO] tick: begin
+[2026-02-05 14:03:42][INFO] tick: renderer update
+[2026-02-05 14:03:42][INFO] renderer:vulkan update begin
+[2026-02-05 14:03:42][WARN] renderer:vulkan swapchain rebuild requested
+[2026-02-05 14:03:42][INFO] renderer:vulkan update end
+[2026-02-05 14:03:42][INFO] debug_ui: new_frame begin
+[2026-02-05 14:03:42][INFO] debug_ui: new_frame end
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 0: draw_frame: wait fence
+[2026-02-05 14:03:42][INFO] renderer:vulkan swapchain=93835217236304
+[2026-02-05 14:03:42][INFO] renderer:vulkan swapchain images=3 views=3 framebuffers=3 cmd_buffers=3
+[2026-02-05 14:03:42][INFO] renderer:vulkan extent=1600x900
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 1: vkAcquireNextImageKHR
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 2: vkResetCommandBuffer
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 3: vkBeginCommandBuffer
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 4: swapchain: barrier to color attachment
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 5: swapchain: begin render pass
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 6: swapchain: clear attachments
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 7: imgui: render inside pass
+[2026-02-05 14:03:42][INFO] debug_ui: draw_data textures=1
+[2026-02-05 14:03:42][INFO] debug_ui: texture 0 status=0 tex_empty=false
+[2026-02-05 14:03:42][INFO] debug_ui: render draw_data lists=1 vtx=4 idx=6
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 8: swapchain: end render pass
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 9: vkEndCommandBuffer
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 10: vkQueueSubmit
+[2026-02-05 14:03:42][INFO] renderer:vulkan step 11: vkQueuePresentKHR
+[2026-02-05 14:03:44][INFO] event: mouse type=1024 x=1400 y=896
+[2026-02-05 14:03:44][INFO] event: mouse type=1024 x=1410 y=881
+[2026-02-05 14:03:49][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:49][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:49][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:50][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:50][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:51][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:51][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:52][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:53][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:53][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:54][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:54][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] input: action=MoveForward key=1 down=1
+[2026-02-05 14:03:54][INFO] platform: key_down scancode=26 code=1
+[2026-02-05 14:03:54][INFO] platform: key_up scancode=26 code=1
+[2026-02-05 14:03:54][INFO] platform: key_down scancode=41 code=7
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] input: action=Quit key=7 down=1
+[2026-02-05 14:03:54][INFO] platform: key_up scancode=41 code=7
+[2026-02-05 14:03:55][INFO] level entity spawned: player_spawn
+[2026-02-05 14:03:55][INFO] level entity spawned: ground_plane_1
+[2026-02-05 14:03:55][INFO] level entity spawned: demo_quad_1
+[2026-02-05 14:03:55][INFO] runtime: player rig scale set to 1.058824 (mesh height=1.700000, mesh scale=0.010000, root scale=1.000000, final scale=0.010588,0.010588,0.010588)
+[2026-02-05 14:03:55][INFO] runtime: rig mesh bounds min=(-0.553406,-0.000000,-0.173289) max=(0.553406,1.700000,0.173289)
+[2026-02-05 14:03:55][INFO] runtime: rig skeleton min y=0.040637
+[2026-02-05 14:03:55][INFO] runtime: player rig offset set to 0.000000 (grounded by mesh bounds)
+[2026-02-05 14:03:55][INFO] runtime: controller size set (radius=0.150000, half_height=0.100000, center_offset=0.250000, mesh height=0.018000, mesh bottom=0.000000)
+[2026-02-05 14:03:55][INFO] runtime: player rig asset = manny (source=/home/skooze/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb)
+[2026-02-05 14:03:55][INFO] runtime: attached skeleton from asset manny joints=24
+[2026-02-05 14:03:55][INFO] content reloaded (raw)
+[2026-02-05 14:03:55][INFO] reload reason: stop
+[2026-02-05 14:05:04][INFO] debug_ui: shutdown
+[2026-02-05 14:05:04][INFO] physics_basic: shutdown
+[2026-02-05 14:05:05][INFO] renderer:vulkan shutdown
+[2026-02-05 14:05:05][INFO] log shutdown
