@@ -681,6 +681,28 @@ struct DebugLines {
     color.clear();
     count = 0;
   }
+  void append_from(const rkg::VulkanViewportLineList* list) {
+    if (!list || list->line_count == 0) return;
+    const uint32_t max_copy = std::min(list->line_count,
+                                       rkg::VulkanViewportLineList::kMaxLines - count);
+    pos.reserve((count + max_copy) * 6);
+    color.reserve((count + max_copy) * 4);
+    for (uint32_t i = 0; i < max_copy; ++i) {
+      const uint32_t p = i * 6;
+      pos.push_back(list->positions[p + 0]);
+      pos.push_back(list->positions[p + 1]);
+      pos.push_back(list->positions[p + 2]);
+      pos.push_back(list->positions[p + 3]);
+      pos.push_back(list->positions[p + 4]);
+      pos.push_back(list->positions[p + 5]);
+      const uint32_t c = i * 4;
+      color.push_back(list->colors[c + 0]);
+      color.push_back(list->colors[c + 1]);
+      color.push_back(list->colors[c + 2]);
+      color.push_back(list->colors[c + 3]);
+      ++count;
+    }
+  }
   void add_line(const Vec3& a, const Vec3& b, const Vec3& c) {
     if (count >= rkg::VulkanViewportLineList::kMaxLines) return;
     pos.push_back(a.x); pos.push_back(a.y); pos.push_back(a.z);
@@ -881,9 +903,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 r_foot = safe_pos(gait->bone_r_foot);
 
   const Vec3 hips_e = safe_pos(gait->bone_hips);
-  const Vec3 hips_w = to_world_point(*transform, hips_e);
-  to_array(hips_w, gait->debug_hips_world);
   const Vec3 root_offset_e = {gait->pelvis_offset[0], 0.0f, gait->pelvis_offset[2]};
+  const Vec3 hips_w = to_world_point(*transform, add(hips_e, root_offset_e));
+  to_array(hips_w, gait->debug_hips_world);
   auto to_world_point_root = [&](const Vec3& local) {
     return to_world_point(*transform, add(local, root_offset_e));
   };
@@ -1374,7 +1396,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   }
 
   if (rkg::movement_log::enabled()) {
-    const bool log_enabled = gait->debug_draw || (std::getenv("RKG_GAIT_LOG") != nullptr);
+    const bool log_enabled = true;
     if (log_enabled) {
       static float gait_log_accum = 0.0f;
       gait_log_accum += dt;
@@ -1398,6 +1420,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
         const Vec3 r_lock_w_log = from_array(gait->right_lock_pos);
         const Vec3 l_err = sub(l_lock_w_log, l_foot_w_log);
         const Vec3 r_err = sub(r_lock_w_log, r_foot_w_log);
+        const float l_err_len = length(l_err);
+        const float r_err_len = length(r_err);
+        const Vec3 entity_pos = {transform->position[0], transform->position[1], transform->position[2]};
         const Vec3 hips_e_log = safe_pos(gait->bone_hips);
         Vec3 rad_l = sub(l_target_e, hips_e_log);
         Vec3 rad_r = sub(r_target_e, hips_e_log);
@@ -1413,7 +1438,18 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
         line << "gait entity=" << entity
              << " yaw=" << gait->yaw
              << " yaw_rate=" << gait->yaw_rate
+             << " phase=" << gait->phase
+             << " cycle=" << cycle
+             << " stance_frac=" << stance_fraction
+             << " u=(" << u_l << "," << u_r << ")"
+             << " stance_u=(" << left_stance_u << "," << right_stance_u << ")"
+             << " swing_u=(" << left_swing_u << "," << right_swing_u << ")"
+             << " step_active=(" << gait->left_step_active << "," << gait->right_step_active << ")"
+             << " lock_now=(" << left_locked_now << "," << right_locked_now << ")"
              << " speed=" << speed
+             << " cadence=" << cadence
+             << " stride_e=" << stride_len_e
+             << " step_time=" << step_time
              << " grounded=" << grounded
             << " left_stance=" << left_stance_run
             << " right_stance=" << right_stance_run
@@ -1429,14 +1465,22 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
              << " min_side=" << min_side
              << " min_rad=" << min_rad
              << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")"
+             << " stance=(" << left_stance_run << "," << right_stance_run << ")"
+             << " swing=(" << left_swing_run << "," << right_swing_run << ")"
+             << " max=" << max_speed
              << " lockL=" << gait->left_locked
              << " lockR=" << gait->right_locked
              << " l_foot_w=(" << l_foot_w_log.x << "," << l_foot_w_log.y << "," << l_foot_w_log.z << ")"
              << " r_foot_w=(" << r_foot_w_log.x << "," << r_foot_w_log.y << "," << r_foot_w_log.z << ")"
              << " l_lock_w=(" << l_lock_w_log.x << "," << l_lock_w_log.y << "," << l_lock_w_log.z << ")"
              << " r_lock_w=(" << r_lock_w_log.x << "," << r_lock_w_log.y << "," << r_lock_w_log.z << ")"
+             << " pos=(" << entity_pos.x << "," << entity_pos.y << "," << entity_pos.z << ")"
+             << " l_tgt_w=(" << l_target_w.x << "," << l_target_w.y << "," << l_target_w.z << ")"
+             << " r_tgt_w=(" << r_target_w.x << "," << r_target_w.y << "," << r_target_w.z << ")"
              << " l_err=(" << l_err.x << "," << l_err.y << "," << l_err.z << ")"
              << " r_err=(" << r_err.x << "," << r_err.y << "," << r_err.z << ")"
+             << " l_err_len=" << l_err_len
+             << " r_err_len=" << r_err_len
              << " root_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[2] << ")";
         rkg::movement_log::write(line.str());
       }
@@ -1447,11 +1491,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 void update_procedural_gaits(ecs::Registry& registry, float dt) {
   static DebugLines lines;
   lines.clear();
+  bool any_debug = false;
   for (auto& kv : registry.procedural_gaits()) {
     auto& gait = kv.second;
     if (!gait.enabled) continue;
     update_procedural_gait(registry, kv.first, dt);
     if (!gait.debug_draw) continue;
+    if (!any_debug) {
+      lines.append_from(rkg::get_vulkan_viewport_line_list());
+      any_debug = true;
+    }
     auto* skeleton = registry.get_skeleton(kv.first);
     if (!skeleton) continue;
     auto* transform = registry.get_transform(kv.first);
@@ -1472,10 +1521,28 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
     Vec3 r_foot_w = to_world_point(*transform, r_foot);
     Vec3 l_target_e = from_array(gait.debug_left_target);
     Vec3 r_target_e = from_array(gait.debug_right_target);
-    Vec3 l_target_w = to_world_point(*transform, l_target_e);
-    Vec3 r_target_w = to_world_point(*transform, r_target_e);
+    const Vec3 root_offset_e = {gait.pelvis_offset[0], 0.0f, gait.pelvis_offset[2]};
+    auto to_world_point_root = [&](const Vec3& local) {
+      return to_world_point(*transform, add(local, root_offset_e));
+    };
+    Vec3 l_target_w = to_world_point_root(l_target_e);
+    Vec3 r_target_w = to_world_point_root(r_target_e);
     lines.add_line(l_foot_w, l_target_w, v3(0.2f, 0.8f, 0.2f));
     lines.add_line(r_foot_w, r_target_w, v3(0.2f, 0.8f, 0.2f));
+    auto add_cross = [&](const Vec3& p, float size, const Vec3& c) {
+      lines.add_line(add(p, v3(-size, 0.0f, 0.0f)), add(p, v3(size, 0.0f, 0.0f)), c);
+      lines.add_line(add(p, v3(0.0f, 0.0f, -size)), add(p, v3(0.0f, 0.0f, size)), c);
+    };
+    if (gait.left_locked) {
+      const Vec3 l_lock_w = from_array(gait.left_lock_pos);
+      lines.add_line(l_foot_w, l_lock_w, v3(0.9f, 0.2f, 0.2f));
+      add_cross(l_lock_w, 0.05f, v3(0.9f, 0.2f, 0.2f));
+    }
+    if (gait.right_locked) {
+      const Vec3 r_lock_w = from_array(gait.right_lock_pos);
+      lines.add_line(r_foot_w, r_lock_w, v3(0.2f, 0.4f, 0.9f));
+      add_cross(r_lock_w, 0.05f, v3(0.2f, 0.4f, 0.9f));
+    }
     Vec3 l_hip = safe_pos(gait.bone_l_thigh);
     Vec3 l_knee = safe_pos(gait.bone_l_calf);
     Vec3 r_hip = safe_pos(gait.bone_r_thigh);
@@ -1512,7 +1579,7 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
     lines.add_line(hips_w, add(hips_w, mul(right, 0.3f)), v3(0.9f, 0.2f, 0.2f));
   }
 
-  if (lines.count > 0) {
+  if (any_debug && lines.count > 0) {
     rkg::set_vulkan_viewport_line_list(lines.pos.data(), lines.color.data(), lines.count);
   }
 }
