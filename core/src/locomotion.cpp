@@ -883,6 +883,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const Vec3 hips_e = safe_pos(gait->bone_hips);
   const Vec3 hips_w = to_world_point(*transform, hips_e);
   to_array(hips_w, gait->debug_hips_world);
+  const Vec3 root_offset_e = {gait->pelvis_offset[0], 0.0f, gait->pelvis_offset[2]};
+  auto to_world_point_root = [&](const Vec3& local) {
+    return to_world_point(*transform, add(local, root_offset_e));
+  };
+  auto to_local_point_root = [&](const Vec3& world) {
+    Vec3 local = to_local_point(*transform, world);
+    return sub(local, root_offset_e);
+  };
   Vec3 intent_world = forward;
   float intent_mag = 0.0f;
   if (controller) {
@@ -931,8 +939,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const Vec3 home_l_e = add(hips_e, from_array(gait->foot_home_l));
   const Vec3 home_r_e = add(hips_e, from_array(gait->foot_home_r));
-  const Vec3 home_l_w = to_world_point(*transform, home_l_e);
-  const Vec3 home_r_w = to_world_point(*transform, home_r_e);
+  const Vec3 home_l_w = to_world_point_root(home_l_e);
+  const Vec3 home_r_w = to_world_point_root(home_r_e);
 
   const float v_side = dot(planar, side_world);
   const float step_len = 0.5f * stride_len_e;
@@ -1044,11 +1052,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
 
     const float ray_height = std::max(leg_len_world * 0.8f, 0.2f);
-    Vec3 desired_w = to_world_point(*transform, desired);
+    Vec3 desired_w = to_world_point_root(desired);
     RayHit hit = raycast_down(registry, add(desired_w, mul(up_axis(), ray_height)), ray_height * 1.6f);
     if (hit.hit) {
       desired_w.y = hit.point.y;
-      desired = to_local_point(*transform, desired_w);
+      desired = to_local_point_root(desired_w);
     }
     return desired;
   };
@@ -1069,8 +1077,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     gait->right_locked = false;
   } else {
     if (idle) {
-      Vec3 home_l_w = to_world_point(*transform, home_l_e_adj);
-      Vec3 home_r_w = to_world_point(*transform, home_r_e_adj);
+      Vec3 home_l_w = to_world_point_root(home_l_e_adj);
+      Vec3 home_r_w = to_world_point_root(home_r_e_adj);
       to_array(home_l_w, gait->left_lock_pos);
       to_array(home_r_w, gait->right_lock_pos);
       to_array(home_l_e_adj, gait->left_step_pos);
@@ -1083,7 +1091,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->right_locked = true;
     }
     if (left_swing_run && !left_was_swing) {
-      Vec3 start_e = gait->left_locked ? to_local_point(*transform, l_lock_w) : l_foot;
+      Vec3 start_e = gait->left_locked ? to_local_point_root(l_lock_w) : l_foot;
       start_e = recenter_home(start_e, side_sign_l);
       to_array(start_e, gait->left_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_l, home_l_e_adj);
@@ -1092,7 +1100,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->left_locked = false;
     }
     if (right_swing_run && !right_was_swing) {
-      Vec3 start_e = gait->right_locked ? to_local_point(*transform, r_lock_w) : r_foot;
+      Vec3 start_e = gait->right_locked ? to_local_point_root(r_lock_w) : r_foot;
       start_e = recenter_home(start_e, side_sign_r);
       to_array(start_e, gait->right_swing_start_pos);
       Vec3 end_e = compute_step_target_e(side_sign_r, home_r_e_adj);
@@ -1104,7 +1112,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->left_step_active = false;
       Vec3 end_e = from_array(gait->left_step_pos);
       end_e = clamp_target_e(end_e, side_sign_l);
-      l_lock_w = to_world_point(*transform, end_e);
+      l_lock_w = to_world_point_root(end_e);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
     }
@@ -1112,21 +1120,21 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       gait->right_step_active = false;
       Vec3 end_e = from_array(gait->right_step_pos);
       end_e = clamp_target_e(end_e, side_sign_r);
-      r_lock_w = to_world_point(*transform, end_e);
+      r_lock_w = to_world_point_root(end_e);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
     }
     if (left_stance_run && !gait->left_locked && !gait->left_step_active) {
-      l_lock_w = to_world_point(*transform, l_foot);
-      Vec3 clamp_e = clamp_target_e(to_local_point(*transform, l_lock_w), side_sign_l);
-      l_lock_w = to_world_point(*transform, clamp_e);
+      l_lock_w = to_world_point_root(l_foot);
+      Vec3 clamp_e = clamp_target_e(to_local_point_root(l_lock_w), side_sign_l);
+      l_lock_w = to_world_point_root(clamp_e);
       to_array(l_lock_w, gait->left_lock_pos);
       gait->left_locked = true;
     }
     if (right_stance_run && !gait->right_locked && !gait->right_step_active) {
-      r_lock_w = to_world_point(*transform, r_foot);
-      Vec3 clamp_e = clamp_target_e(to_local_point(*transform, r_lock_w), side_sign_r);
-      r_lock_w = to_world_point(*transform, clamp_e);
+      r_lock_w = to_world_point_root(r_foot);
+      Vec3 clamp_e = clamp_target_e(to_local_point_root(r_lock_w), side_sign_r);
+      r_lock_w = to_world_point_root(clamp_e);
       to_array(r_lock_w, gait->right_lock_pos);
       gait->right_locked = true;
     }
@@ -1144,12 +1152,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   Vec3 l_target_e = l_foot;
   Vec3 r_target_e = r_foot;
-  Vec3 l_target_w = to_world_point(*transform, l_foot);
-  Vec3 r_target_w = to_world_point(*transform, r_foot);
+  Vec3 l_target_w = to_world_point_root(l_foot);
+  Vec3 r_target_w = to_world_point_root(r_foot);
   if (grounded) {
     if (left_stance_run) {
       l_target_w = l_lock_w;
-      l_target_e = to_local_point(*transform, l_target_w);
+      l_target_e = to_local_point_root(l_target_w);
     } else if (left_swing_run) {
       const Vec3 start_e = from_array(gait->left_swing_start_pos);
       const Vec3 end_e = from_array(gait->left_step_pos);
@@ -1157,7 +1165,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
     if (right_stance_run) {
       r_target_w = r_lock_w;
-      r_target_e = to_local_point(*transform, r_target_w);
+      r_target_e = to_local_point_root(r_target_w);
     } else if (right_swing_run) {
       const Vec3 start_e = from_array(gait->right_swing_start_pos);
       const Vec3 end_e = from_array(gait->right_step_pos);
@@ -1165,16 +1173,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
   }
   if (left_stance_run) {
-    l_target_e = to_local_point(*transform, l_target_w);
+    l_target_e = to_local_point_root(l_target_w);
   }
   if (right_stance_run) {
-    r_target_e = to_local_point(*transform, r_target_w);
+    r_target_e = to_local_point_root(r_target_w);
   }
   if (left_swing_run) {
-    l_target_w = to_world_point(*transform, l_target_e);
+    l_target_w = to_world_point_root(l_target_e);
   }
   if (right_swing_run) {
-    r_target_w = to_world_point(*transform, r_target_e);
+    r_target_w = to_world_point_root(r_target_e);
   }
 
   const bool left_locked_now =
@@ -1184,11 +1192,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   if (left_locked_now) {
     l_target_w = l_lock_w;
-    l_target_e = to_local_point(*transform, l_target_w);
+    l_target_e = to_local_point_root(l_target_w);
   }
   if (right_locked_now) {
     r_target_w = r_lock_w;
-    r_target_e = to_local_point(*transform, r_target_w);
+    r_target_e = to_local_point_root(r_target_w);
   }
 
   const float target_alpha = 1.0f - std::exp(-dt * 12.0f);
@@ -1218,8 +1226,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   } else {
     r_target_e = r_smooth;
   }
-  l_target_w = to_world_point(*transform, l_target_e);
-  r_target_w = to_world_point(*transform, r_target_e);
+  l_target_w = to_world_point_root(l_target_e);
+  r_target_w = to_world_point_root(r_target_e);
   if (left_locked_now) {
     l_target_w = l_lock_w;
   }
@@ -1238,14 +1246,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     Vec3 lock_offset_e = v3();
     int lock_count = 0;
     if (left_locked_now) {
-      const Vec3 foot_w = to_world_point(*transform, l_foot);
+      const Vec3 foot_w = to_world_point_root(l_foot);
       const Vec3 delta_w = sub(l_lock_w, foot_w);
       const Vec3 delta_e = to_local_dir(*transform, delta_w);
       lock_offset_e = add(lock_offset_e, delta_e);
       ++lock_count;
     }
     if (right_locked_now) {
-      const Vec3 foot_w = to_world_point(*transform, r_foot);
+      const Vec3 foot_w = to_world_point_root(r_foot);
       const Vec3 delta_w = sub(r_lock_w, foot_w);
       const Vec3 delta_e = to_local_dir(*transform, delta_w);
       lock_offset_e = add(lock_offset_e, delta_e);
