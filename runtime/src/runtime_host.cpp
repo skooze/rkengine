@@ -1396,7 +1396,7 @@ void RuntimeHost::load_initial_level() {
           gait.walk_speed = controller->max_speed;
           gait.sprint_speed = controller->max_speed * controller->sprint_multiplier;
           gait.input_smooth_tau = controller->input_smooth_tau;
-          gait.debug_draw = true;
+          gait.debug_draw = false;
           apply_gait_env_overrides(gait);
           registry_.set_procedural_gait(player_, gait);
         }
@@ -1436,7 +1436,7 @@ void RuntimeHost::load_initial_level() {
           gait.walk_speed = controller->max_speed;
           gait.sprint_speed = controller->max_speed * controller->sprint_multiplier;
           gait.input_smooth_tau = controller->input_smooth_tau;
-          gait.debug_draw = true;
+          gait.debug_draw = false;
           apply_gait_env_overrides(gait);
           registry_.set_procedural_gait(player_, gait);
         }
