@@ -83,6 +83,17 @@ static float smoothstep01(float v) {
   return v * v * (3.0f - 2.0f * v);
 }
 
+static float unwrap_angle(float angle, float prev) {
+  const float two_pi = 2.0f * kPi;
+  float delta = angle - prev;
+  if (delta > kPi) {
+    angle -= two_pi;
+  } else if (delta < -kPi) {
+    angle += two_pi;
+  }
+  return angle;
+}
+
 static float frac(float v) {
   return v - std::floor(v);
 }
@@ -539,9 +550,12 @@ static void apply_bone_aim(ecs::Skeleton& skel,
   const rkg::Mat4 new_world_rot = rkg::mat4_mul(delta, bone_world_rot);
   const rkg::Mat4 local_rot = rkg::mat4_mul(parent_world_inv, new_world_rot);
   const rkg::Vec3 euler = mat4_to_euler_xyz(local_rot);
-  skel.bones[bone_idx].local_pose.rotation[0] = euler.x;
-  skel.bones[bone_idx].local_pose.rotation[1] = euler.y;
-  skel.bones[bone_idx].local_pose.rotation[2] = euler.z;
+  const float prev_x = skel.bones[bone_idx].local_pose.rotation[0];
+  const float prev_y = skel.bones[bone_idx].local_pose.rotation[1];
+  const float prev_z = skel.bones[bone_idx].local_pose.rotation[2];
+  skel.bones[bone_idx].local_pose.rotation[0] = unwrap_angle(euler.x, prev_x);
+  skel.bones[bone_idx].local_pose.rotation[1] = unwrap_angle(euler.y, prev_y);
+  skel.bones[bone_idx].local_pose.rotation[2] = unwrap_angle(euler.z, prev_z);
 }
 
 static bool build_bone_map(ecs::ProceduralGait& gait, const ecs::Skeleton& skel) {
@@ -810,10 +824,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float stride_scale = std::max(gait->stride_scale, 0.1f);
   float stride_len_e = (cadence > 0.1f) ? (speed_e / cadence) : leg_len_e;
   stride_len_e *= stride_scale;
-  stride_len_e = clampf(stride_len_e, 0.50f * leg_len_e, 0.90f * leg_len_e);
+  stride_len_e = clampf(stride_len_e, 0.50f * leg_len_e, 1.05f * leg_len_e);
   float cycle_rate_hz = (stride_len_e > kEps) ? (speed_e / stride_len_e) : 0.0f;
   if (turn_in_place) {
     cycle_rate_hz = cadence * gait->turn_step_rate;
+  } else {
+    const float max_cycle = cadence * 1.05f;
+    if (cycle_rate_hz > max_cycle) cycle_rate_hz = max_cycle;
   }
   if (speed > 0.01f || turn_in_place) {
     const float gait_speed_scale = 1.0f;
@@ -985,7 +1002,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float v_side = dot(planar, side_world);
   const float step_len = 0.5f * stride_len_e;
   const float step_len_small = 0.08f * leg_len_e;
-  const float step_height_e = gait->step_height_scale * leg_len_e;
+  const float step_height_e = gait->step_height_scale * leg_len_e *
+                              (0.6f + 0.4f * speed_gait_norm);
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
   const float home_width_e = 0.5f * std::abs(dot(sub(home_r_e, home_l_e), side_e));
