@@ -1,6 +1,6 @@
 From github.com:skooze/rkengine
-   3ea5a78..ec67f21  main       -> origin/main
-Updating 3ea5a78..ec67f21
+   97d5b99..84b954d  main       -> origin/main
+Updating 97d5b99..84b954d
 Fast-forward
- core/src/locomotion.cpp | 68 +++++++++++++++++++++++++++----------------------
- 1 file changed, 38 insertions(+), 30 deletions(-)
+ core/src/locomotion.cpp | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
