@@ -281,6 +281,18 @@ static Vec3 to_local_dir(const ecs::Transform& root, const Vec3& world_dir) {
   return rotate_xyz_vec(world_dir, inv_rot);
 }
 
+static Vec3 to_local_offset(const ecs::Transform& root, const Vec3& world_offset) {
+  const Vec3 inv_rot{-root.rotation[0], -root.rotation[1], -root.rotation[2]};
+  Vec3 v = rotate_xyz_vec(world_offset, inv_rot);
+  const float sx = (root.scale[0] != 0.0f) ? root.scale[0] : 1.0f;
+  const float sy = (root.scale[1] != 0.0f) ? root.scale[1] : 1.0f;
+  const float sz = (root.scale[2] != 0.0f) ? root.scale[2] : 1.0f;
+  v.x /= sx;
+  v.y /= sy;
+  v.z /= sz;
+  return v;
+}
+
 static void compute_world_matrices(const ecs::Skeleton& skel,
                                    const std::vector<ecs::Transform>& locals,
                                    std::vector<rkg::Mat4>& world) {
@@ -1272,14 +1284,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (left_locked_now) {
       const Vec3 foot_w = to_world_point_root(l_foot);
       const Vec3 delta_w = sub(l_lock_w, foot_w);
-      const Vec3 delta_e = to_local_dir(*transform, delta_w);
+      const Vec3 delta_e = to_local_offset(*transform, delta_w);
       lock_offset_e = add(lock_offset_e, delta_e);
       ++lock_count;
     }
     if (right_locked_now) {
       const Vec3 foot_w = to_world_point_root(r_foot);
       const Vec3 delta_w = sub(r_lock_w, foot_w);
-      const Vec3 delta_e = to_local_dir(*transform, delta_w);
+      const Vec3 delta_e = to_local_offset(*transform, delta_w);
       lock_offset_e = add(lock_offset_e, delta_e);
       ++lock_count;
     }
