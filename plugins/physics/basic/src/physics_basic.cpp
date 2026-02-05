@@ -152,6 +152,7 @@ struct SweepHit {
 struct MotorInput {
   Vec3 dir_world = v3();
   float mag = 0.0f;
+  float raw_mag = 0.0f;
   bool jump_pressed = false;
   bool jump_held = false;
 };
@@ -262,6 +263,7 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
       raw_mag = 1.0f;
     }
   }
+  input.raw_mag = raw_mag;
 
   const float tau = std::max(controller.input_smooth_tau, 0.0f);
   if (tau > kEps) {
@@ -575,8 +577,12 @@ static Vec3 update_ground_velocity(const rkg::ecs::CharacterController& controll
   const bool braking = !has_input || (dot(v_ground, desired_vel) < 0.0f) ||
                        (speed > desired_speed + 0.05f);
   if (braking) {
-    const float friction = controller.friction * controller.braking_friction_factor;
-    const float decel = controller.braking_deceleration;
+    float friction = controller.friction * controller.braking_friction_factor;
+    float decel = controller.braking_deceleration;
+    if (!has_input) {
+      friction *= 1.5f;
+      decel *= 1.5f;
+    }
     v_ground = sub(v_ground, mul(v_ground, friction * dt));
     const float v_len = length(v_ground);
     if (v_len > kEps) {
@@ -585,6 +591,9 @@ static Vec3 update_ground_velocity(const rkg::ecs::CharacterController& controll
       if (dot(v_ground, v_dir) < 0.0f) {
         v_ground = v3();
       }
+    }
+    if (!has_input && length(v_ground) < 0.05f) {
+      v_ground = v3();
     }
   }
 
@@ -669,7 +678,8 @@ static void move_with_collisions(rkg::ecs::Registry& registry,
     last_hit_normal = hit.normal;
 
     const float into = dot(remaining, hit.normal);
-    remaining = sub(remaining, mul(hit.normal, into));
+    const float remaining_t = 1.0f - hit.t;
+    remaining = mul(sub(remaining, mul(hit.normal, into)), remaining_t);
     const float vel_into = dot(velocity, hit.normal);
     if (vel_into < 0.0f) {
       velocity = sub(velocity, mul(hit.normal, vel_into));
@@ -751,7 +761,11 @@ static void update_character(rkg::ecs::Registry& registry,
   Vec3 desired_dir = input.dir_world;
   const float max_speed = controller.max_speed *
                           (controller.is_sprinting ? controller.sprint_multiplier : 1.0f);
+  const bool raw_has_input = input.raw_mag > 0.01f;
   float desired_speed = input.mag * max_speed;
+  if (!raw_has_input) {
+    desired_speed = 0.0f;
+  }
 
   if (controller.mode == rkg::ecs::MovementMode::Grounded) {
     velocity = update_ground_velocity(controller, velocity, desired_dir, desired_speed,

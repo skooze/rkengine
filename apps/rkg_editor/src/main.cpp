@@ -4360,6 +4360,7 @@ void update_camera_and_draw_list(EditorState& state) {
     };
   };
 
+  const float grid_lift = 0.02f;
   const float world_grid_color[4] = {0.22f, 0.22f, 0.26f, 1.0f};
   const float character_grid_color[4] = {0.28f, 0.34f, 0.5f, 1.0f};
   const float axis_x_color[4] = {0.85f, 0.2f, 0.2f, 1.0f};
@@ -4372,8 +4373,8 @@ void update_camera_and_draw_list(EditorState& state) {
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
     for (int i = -steps; i <= steps; ++i) {
       const float coord = static_cast<float>(i) * state.grid_step;
-      add_line({-extent, 0.0f, coord}, {extent, 0.0f, coord}, world_grid_color);
-      add_line({coord, 0.0f, -extent}, {coord, 0.0f, extent}, world_grid_color);
+      add_line({-extent, grid_lift, coord}, {extent, grid_lift, coord}, world_grid_color);
+      add_line({coord, grid_lift, -extent}, {coord, grid_lift, extent}, world_grid_color);
     }
   }
 
@@ -4393,7 +4394,7 @@ void update_camera_and_draw_list(EditorState& state) {
 
     const float extent = state.grid_half_extent * 0.5f;
     const int steps = static_cast<int>(std::floor(extent / state.grid_step));
-    const Vec3 rig_pos{rig_root.position[0], 0.0f, rig_root.position[2]};
+    const Vec3 rig_pos{rig_root.position[0], grid_lift, rig_root.position[2]};
     const Vec3 rig_rot{0.0f, 0.0f, 0.0f};
     const Mat4 rig_rot_m = mat4_rotation_xyz(rig_rot);
     const Vec3 rig_right = vec3_normalize(Vec3{rig_rot_m.m[0], rig_rot_m.m[1], rig_rot_m.m[2]});
