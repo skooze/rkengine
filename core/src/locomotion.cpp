@@ -11,6 +11,7 @@
 #include <cmath>
 #include <functional>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 namespace rkg::locomotion {
@@ -806,14 +807,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float cadence = walk_cadence + (run_cadence - walk_cadence) * speed_gait_norm;
 
   const float speed_e = speed * inv_rig_scale;
+  const float stride_scale = std::max(gait->stride_scale, 0.1f);
   float stride_len_e = (cadence > 0.1f) ? (speed_e / cadence) : leg_len_e;
-  stride_len_e = clampf(stride_len_e, 0.55f * leg_len_e, 1.10f * leg_len_e);
+  stride_len_e *= stride_scale;
+  stride_len_e = clampf(stride_len_e, 0.50f * leg_len_e, 0.90f * leg_len_e);
   float cycle_rate_hz = (stride_len_e > kEps) ? (speed_e / stride_len_e) : 0.0f;
   if (turn_in_place) {
     cycle_rate_hz = cadence;
   }
   if (speed > 0.01f || turn_in_place) {
-    const float gait_speed_scale = 0.25f;
+    const float gait_speed_scale = 1.0f;
     gait->phase += cycle_rate_hz * dt * 2.0f * kPi * gait_speed_scale;
     if (gait->phase > 2.0f * kPi) gait->phase = std::fmod(gait->phase, 2.0f * kPi);
   }
@@ -1023,6 +1026,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (rad_len < min_rad) {
       Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_e, side_sign);
       Vec3 xz = add(hips_e, mul(rad_dir, min_rad));
+      out.x = xz.x;
+      out.z = xz.z;
+      rad = sub(out, hips_e);
+      rad.y = 0.0f;
+      rad_len = length(rad);
+    }
+    const float max_rad = std::max(min_rad, 0.95f * leg_len_e);
+    if (rad_len > max_rad) {
+      Vec3 rad_dir = (rad_len > kEps) ? mul(rad, 1.0f / rad_len) : mul(side_e, side_sign);
+      Vec3 xz = add(hips_e, mul(rad_dir, max_rad));
       out.x = xz.x;
       out.z = xz.z;
     }
@@ -1412,96 +1425,129 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   }
 
   if (rkg::movement_log::enabled()) {
-    const bool log_enabled = true;
-    if (log_enabled) {
-      static float gait_log_accum = 0.0f;
-      gait_log_accum += dt;
-      if (gait_log_accum >= 0.1f) {
-        gait_log_accum = 0.0f;
-        std::vector<ecs::Transform> log_locals(skeleton->bones.size());
-        for (size_t i = 0; i < skeleton->bones.size(); ++i) {
-          log_locals[i] = skeleton->bones[i].local_pose;
-        }
-        std::vector<rkg::Mat4> log_world;
-        compute_world_matrices(*skeleton, log_locals, log_world);
-        auto safe_world_pos = [&](uint32_t idx) -> Vec3 {
-          if (idx == UINT32_MAX || idx >= log_world.size()) return v3();
-          return {log_world[idx].m[12], log_world[idx].m[13], log_world[idx].m[14]};
-        };
-        const Vec3 l_foot_e_log = safe_world_pos(gait->bone_l_foot);
-        const Vec3 r_foot_e_log = safe_world_pos(gait->bone_r_foot);
-        const Vec3 l_foot_w_log = to_world_point(*transform, l_foot_e_log);
-        const Vec3 r_foot_w_log = to_world_point(*transform, r_foot_e_log);
-        const Vec3 l_lock_w_log = from_array(gait->left_lock_pos);
-        const Vec3 r_lock_w_log = from_array(gait->right_lock_pos);
-        const Vec3 l_err = sub(l_lock_w_log, l_foot_w_log);
-        const Vec3 r_err = sub(r_lock_w_log, r_foot_w_log);
-        const float l_err_len = length(l_err);
-        const float r_err_len = length(r_err);
-        const Vec3 entity_pos = {transform->position[0], transform->position[1], transform->position[2]};
-        const Vec3 hips_e_log = safe_pos(gait->bone_hips);
-        Vec3 rad_l = sub(l_target_e, hips_e_log);
-        Vec3 rad_r = sub(r_target_e, hips_e_log);
-        rad_l.y = 0.0f;
-        rad_r.y = 0.0f;
-        const float target_rad_l = length(rad_l);
-        const float target_rad_r = length(rad_r);
-        const Vec3 l_pole_e = from_array(gait->debug_left_pole);
-        const Vec3 r_pole_e = from_array(gait->debug_right_pole);
-        std::ostringstream line;
-        line.setf(std::ios::fixed);
-        line.precision(3);
-        line << "gait entity=" << entity
-             << " yaw=" << gait->yaw
-             << " yaw_rate=" << gait->yaw_rate
-             << " phase=" << gait->phase
-             << " cycle=" << cycle
-             << " stance_frac=" << stance_fraction
-             << " u=(" << u_l << "," << u_r << ")"
-             << " stance_u=(" << left_stance_u << "," << right_stance_u << ")"
-             << " swing_u=(" << left_swing_u << "," << right_swing_u << ")"
-             << " step_active=(" << gait->left_step_active << "," << gait->right_step_active << ")"
-             << " lock_now=(" << left_locked_now << "," << right_locked_now << ")"
-             << " speed=" << speed
-             << " cadence=" << cadence
-             << " stride_e=" << stride_len_e
-             << " step_time=" << step_time
-             << " grounded=" << grounded
-            << " left_stance=" << left_stance_run
-            << " right_stance=" << right_stance_run
-            << " left_swing=" << left_swing_run
-            << " right_swing=" << right_swing_run
-             << " l_target_e=(" << l_target_e.x << "," << l_target_e.y << "," << l_target_e.z << ")"
-             << " r_target_e=(" << r_target_e.x << "," << r_target_e.y << "," << r_target_e.z << ")"
-             << " l_pole_e=(" << l_pole_e.x << "," << l_pole_e.y << "," << l_pole_e.z << ")"
-             << " r_pole_e=(" << r_pole_e.x << "," << r_pole_e.y << "," << r_pole_e.z << ")"
-             << " knee_lat=(" << gait->debug_knee_lat_l << "," << gait->debug_knee_lat_r << ")"
-             << " target_lat=(" << gait->debug_target_lat_l << "," << gait->debug_target_lat_r << ")"
-             << " target_rad=(" << target_rad_l << "," << target_rad_r << ")"
-             << " min_side=" << min_side
-             << " min_rad=" << min_rad
-             << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")"
-             << " stance=(" << left_stance_run << "," << right_stance_run << ")"
-             << " swing=(" << left_swing_run << "," << right_swing_run << ")"
-             << " max=" << max_speed
-             << " lockL=" << gait->left_locked
-             << " lockR=" << gait->right_locked
-             << " l_foot_w=(" << l_foot_w_log.x << "," << l_foot_w_log.y << "," << l_foot_w_log.z << ")"
-             << " r_foot_w=(" << r_foot_w_log.x << "," << r_foot_w_log.y << "," << r_foot_w_log.z << ")"
-             << " l_lock_w=(" << l_lock_w_log.x << "," << l_lock_w_log.y << "," << l_lock_w_log.z << ")"
-             << " r_lock_w=(" << r_lock_w_log.x << "," << r_lock_w_log.y << "," << r_lock_w_log.z << ")"
-             << " pos=(" << entity_pos.x << "," << entity_pos.y << "," << entity_pos.z << ")"
-             << " l_tgt_w=(" << l_target_w.x << "," << l_target_w.y << "," << l_target_w.z << ")"
-             << " r_tgt_w=(" << r_target_w.x << "," << r_target_w.y << "," << r_target_w.z << ")"
-             << " l_err=(" << l_err.x << "," << l_err.y << "," << l_err.z << ")"
-             << " r_err=(" << r_err.x << "," << r_err.y << "," << r_err.z << ")"
-             << " l_err_len=" << l_err_len
-             << " r_err_len=" << r_err_len
-             << " lock_off=" << debug_lock_off_len
-             << " lock_max=" << debug_lock_max
-             << " root_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[2] << ")";
-        rkg::movement_log::write(line.str());
+    std::vector<ecs::Transform> log_locals(skeleton->bones.size());
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+      log_locals[i] = skeleton->bones[i].local_pose;
+    }
+    std::vector<rkg::Mat4> log_world;
+    compute_world_matrices(*skeleton, log_locals, log_world);
+
+    {
+      static std::unordered_map<ecs::Entity, std::vector<Vec3>> last_world_pos;
+      static std::unordered_map<ecs::Entity, std::vector<Vec3>> last_local_rot;
+      auto& prev_pos = last_world_pos[entity];
+      auto& prev_rot = last_local_rot[entity];
+      if (prev_pos.size() != log_world.size()) {
+        prev_pos.assign(log_world.size(), v3(1e9f, 1e9f, 1e9f));
+        prev_rot.assign(log_world.size(), v3(1e9f, 1e9f, 1e9f));
       }
+      const float pos_eps_sq = 1e-6f;
+      const float rot_eps_sq = 1e-6f;
+      for (size_t i = 0; i < log_world.size(); ++i) {
+        const Vec3 pos = {log_world[i].m[12], log_world[i].m[13], log_world[i].m[14]};
+        const Vec3 rot = {log_locals[i].rotation[0], log_locals[i].rotation[1], log_locals[i].rotation[2]};
+        const Vec3 dpos = sub(pos, prev_pos[i]);
+        const Vec3 drot = sub(rot, prev_rot[i]);
+        if (length_sq(dpos) > pos_eps_sq || length_sq(drot) > rot_eps_sq) {
+          std::ostringstream bone_line;
+          bone_line.setf(std::ios::fixed);
+          bone_line.precision(4);
+          const std::string& name = skeleton->bones[i].name;
+          bone_line << "bone entity=" << entity
+                    << " idx=" << i
+                    << " name=" << (name.empty() ? std::string("unnamed") : name)
+                    << " pos=(" << pos.x << "," << pos.y << "," << pos.z << ")"
+                    << " local=(" << log_locals[i].position[0] << ","
+                    << log_locals[i].position[1] << "," << log_locals[i].position[2] << ")"
+                    << " rot=(" << rot.x << "," << rot.y << "," << rot.z << ")";
+          rkg::movement_log::write(bone_line.str());
+          prev_pos[i] = pos;
+          prev_rot[i] = rot;
+        }
+      }
+    }
+
+    static float gait_log_accum = 0.0f;
+    gait_log_accum += dt;
+    if (gait_log_accum >= 0.1f) {
+      gait_log_accum = 0.0f;
+      auto safe_world_pos = [&](uint32_t idx) -> Vec3 {
+        if (idx == UINT32_MAX || idx >= log_world.size()) return v3();
+        return {log_world[idx].m[12], log_world[idx].m[13], log_world[idx].m[14]};
+      };
+      const Vec3 l_foot_e_log = safe_world_pos(gait->bone_l_foot);
+      const Vec3 r_foot_e_log = safe_world_pos(gait->bone_r_foot);
+      const Vec3 l_foot_w_log = to_world_point(*transform, l_foot_e_log);
+      const Vec3 r_foot_w_log = to_world_point(*transform, r_foot_e_log);
+      const Vec3 l_lock_w_log = from_array(gait->left_lock_pos);
+      const Vec3 r_lock_w_log = from_array(gait->right_lock_pos);
+      const Vec3 l_err = sub(l_lock_w_log, l_foot_w_log);
+      const Vec3 r_err = sub(r_lock_w_log, r_foot_w_log);
+      const float l_err_len = length(l_err);
+      const float r_err_len = length(r_err);
+      const Vec3 entity_pos = {transform->position[0], transform->position[1], transform->position[2]};
+      const Vec3 hips_e_log = safe_pos(gait->bone_hips);
+      Vec3 rad_l = sub(l_target_e, hips_e_log);
+      Vec3 rad_r = sub(r_target_e, hips_e_log);
+      rad_l.y = 0.0f;
+      rad_r.y = 0.0f;
+      const float target_rad_l = length(rad_l);
+      const float target_rad_r = length(rad_r);
+      const Vec3 l_pole_e = from_array(gait->debug_left_pole);
+      const Vec3 r_pole_e = from_array(gait->debug_right_pole);
+      std::ostringstream line;
+      line.setf(std::ios::fixed);
+      line.precision(3);
+      line << "gait entity=" << entity
+           << " yaw=" << gait->yaw
+           << " yaw_rate=" << gait->yaw_rate
+           << " phase=" << gait->phase
+           << " cycle=" << cycle
+           << " stance_frac=" << stance_fraction
+           << " u=(" << u_l << "," << u_r << ")"
+           << " stance_u=(" << left_stance_u << "," << right_stance_u << ")"
+           << " swing_u=(" << left_swing_u << "," << right_swing_u << ")"
+           << " step_active=(" << gait->left_step_active << "," << gait->right_step_active << ")"
+           << " lock_now=(" << left_locked_now << "," << right_locked_now << ")"
+           << " speed=" << speed
+           << " cadence=" << cadence
+           << " stride_e=" << stride_len_e
+           << " step_time=" << step_time
+           << " grounded=" << grounded
+          << " left_stance=" << left_stance_run
+          << " right_stance=" << right_stance_run
+          << " left_swing=" << left_swing_run
+          << " right_swing=" << right_swing_run
+           << " l_target_e=(" << l_target_e.x << "," << l_target_e.y << "," << l_target_e.z << ")"
+           << " r_target_e=(" << r_target_e.x << "," << r_target_e.y << "," << r_target_e.z << ")"
+           << " l_pole_e=(" << l_pole_e.x << "," << l_pole_e.y << "," << l_pole_e.z << ")"
+           << " r_pole_e=(" << r_pole_e.x << "," << r_pole_e.y << "," << r_pole_e.z << ")"
+           << " knee_lat=(" << gait->debug_knee_lat_l << "," << gait->debug_knee_lat_r << ")"
+           << " target_lat=(" << gait->debug_target_lat_l << "," << gait->debug_target_lat_r << ")"
+           << " target_rad=(" << target_rad_l << "," << target_rad_r << ")"
+           << " min_side=" << min_side
+           << " min_rad=" << min_rad
+           << " cont=(" << gait->debug_continuity_l << "," << gait->debug_continuity_r << ")"
+           << " stance=(" << left_stance_run << "," << right_stance_run << ")"
+           << " swing=(" << left_swing_run << "," << right_swing_run << ")"
+           << " max=" << max_speed
+           << " lockL=" << gait->left_locked
+           << " lockR=" << gait->right_locked
+           << " l_foot_w=(" << l_foot_w_log.x << "," << l_foot_w_log.y << "," << l_foot_w_log.z << ")"
+           << " r_foot_w=(" << r_foot_w_log.x << "," << r_foot_w_log.y << "," << r_foot_w_log.z << ")"
+           << " l_lock_w=(" << l_lock_w_log.x << "," << l_lock_w_log.y << "," << l_lock_w_log.z << ")"
+           << " r_lock_w=(" << r_lock_w_log.x << "," << r_lock_w_log.y << "," << r_lock_w_log.z << ")"
+           << " pos=(" << entity_pos.x << "," << entity_pos.y << "," << entity_pos.z << ")"
+           << " l_tgt_w=(" << l_target_w.x << "," << l_target_w.y << "," << l_target_w.z << ")"
+           << " r_tgt_w=(" << r_target_w.x << "," << r_target_w.y << "," << r_target_w.z << ")"
+           << " l_err=(" << l_err.x << "," << l_err.y << "," << l_err.z << ")"
+           << " r_err=(" << r_err.x << "," << r_err.y << "," << r_err.z << ")"
+           << " l_err_len=" << l_err_len
+           << " r_err_len=" << r_err_len
+           << " lock_off=" << debug_lock_off_len
+           << " lock_max=" << debug_lock_max
+           << " root_off=(" << gait->pelvis_offset[0] << "," << gait->pelvis_offset[2] << ")";
+      rkg::movement_log::write(line.str());
     }
   }
 }
