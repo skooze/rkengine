@@ -779,7 +779,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     cycle_rate_hz = cadence;
   }
   if (speed > 0.01f || turn_in_place) {
-    gait->phase += cycle_rate_hz * dt * 2.0f * kPi;
+    const float gait_speed_scale = 0.25f;
+    gait->phase += cycle_rate_hz * dt * 2.0f * kPi * gait_speed_scale;
     if (gait->phase > 2.0f * kPi) gait->phase = std::fmod(gait->phase, 2.0f * kPi);
   }
 

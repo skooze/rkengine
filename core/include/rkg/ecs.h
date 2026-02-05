@@ -65,7 +65,7 @@ struct CharacterController {
   float half_height = 0.9f;
   float center_offset = 0.0f;
   float max_speed = 1.8f;
-  float sprint_multiplier = 1.6f;
+  float sprint_multiplier = 2.0f;
   float accel = 20.0f;
   float friction = 8.0f;
   float braking_deceleration = 16.0f;

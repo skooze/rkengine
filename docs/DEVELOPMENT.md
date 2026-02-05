@@ -60,6 +60,11 @@ Logs are written to `build/logs/`.
 To test D3D12 on Windows, set `renderer: d3d12` in `projects/demo_game/project.yaml`.
 Renderer fallback (runtime only): requested → Vulkan → D3D12 → Null, with logs explaining the choice.
 
+## Movement Regression Checklist (Manual)
+- Sprint top speed: hold sprint + forward for 2s, confirm distance is ~2x walk speed.
+- Jump press: one press yields one jump across substeps; coyote time still works.
+- Thin obstacle: a narrow AABB barrier (e.g., 0.1m thick) blocks the capsule at mid-height.
+
 ## Run Minimal App (Sanity)
 ```
 ./build/bin/rkg_minimal_app

@@ -202,6 +202,7 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
                                float dt) {
   MotorInput input{};
   FrameInputSnapshot local{};
+  const bool has_snapshot = snapshot != nullptr;
   if (!snapshot) {
     local.forward = get_action("MoveForward");
     local.back = get_action("MoveBack");
@@ -212,7 +213,8 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
     snapshot = &local;
   }
 
-  input.jump_pressed = jump_pressed_once || (snapshot->jump.pressed);
+  input.jump_pressed = has_snapshot ? jump_pressed_once
+                                    : (jump_pressed_once || snapshot->jump.pressed);
   input.jump_held = snapshot->jump.held;
 
   Vec3 raw_dir = v3();
@@ -295,29 +297,58 @@ static GroundHit find_ground(const rkg::ecs::Registry& registry,
       continue;
     }
     const auto& collider = kv.second;
-    if (collider.type != rkg::ecs::ColliderType::Plane) {
-      continue;
-    }
-    Vec3 normal = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
-    const float nlen = length(normal);
-    if (nlen < kEps) {
-      continue;
-    }
-    normal = mul(normal, 1.0f / nlen);
+    Vec3 normal = v3();
+    float dist = 0.0f;
+    bool walkable = false;
+    bool has_hit = false;
 
-    float plane_d = collider.distance;
-    if (const auto* plane_transform = registry.get_transform(kv.first)) {
-      const Vec3 plane_pos = from_array(plane_transform->position);
-      plane_d += dot(normal, plane_pos);
-    }
+    if (collider.type == rkg::ecs::ColliderType::Plane) {
+      normal = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
+      const float nlen = length(normal);
+      if (nlen < kEps) {
+        continue;
+      }
+      normal = mul(normal, 1.0f / nlen);
 
-    const float dist = dot(normal, bottom) - plane_d;
-    if (dist < -controller.step_height) {
+      float plane_d = collider.distance;
+      if (const auto* plane_transform = registry.get_transform(kv.first)) {
+        const Vec3 plane_pos = from_array(plane_transform->position);
+        plane_d += dot(normal, plane_pos);
+      }
+
+      dist = dot(normal, bottom) - plane_d;
+      if (dist < -controller.step_height) {
+        continue;
+      }
+      const float cos_up = dot(normal, up);
+      walkable = cos_up >= slope_limit_cos;
+      has_hit = true;
+    } else if (collider.type == rkg::ecs::ColliderType::AABB) {
+      Vec3 box_center = v3(collider.center[0], collider.center[1], collider.center[2]);
+      if (const auto* t = registry.get_transform(kv.first)) {
+        box_center = add(box_center, from_array(t->position));
+      }
+      Vec3 half_extents = v3(collider.half_extents[0], collider.half_extents[1], collider.half_extents[2]);
+
+      const float dx = std::abs(center.x - box_center.x);
+      const float dz = std::abs(center.z - box_center.z);
+      if (dx > half_extents.x + controller.radius ||
+          dz > half_extents.z + controller.radius) {
+        continue;
+      }
+
+      dist = bottom.y - (box_center.y + half_extents.y);
+      if (dist < -controller.step_height) {
+        continue;
+      }
+      normal = up;
+      walkable = true;
+      has_hit = true;
+    } else {
       continue;
     }
-    const float cos_up = dot(normal, up);
-    const bool walkable = cos_up >= slope_limit_cos;
-    if (dist < result.distance) {
+
+    if (has_hit && dist < result.distance) {
       result.hit = true;
       result.normal = normal;
       result.distance = dist;
@@ -557,7 +588,8 @@ static Vec3 update_ground_velocity(const rkg::ecs::CharacterController& controll
     }
   }
 
-  const float max_speed = controller.max_speed;
+  const float max_speed = controller.max_speed *
+                          (controller.is_sprinting ? controller.sprint_multiplier : 1.0f);
   const float v_len = length(v_ground);
   if (v_len > max_speed) {
     v_ground = mul(v_ground, max_speed / v_len);
