@@ -813,7 +813,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   stride_len_e = clampf(stride_len_e, 0.50f * leg_len_e, 0.90f * leg_len_e);
   float cycle_rate_hz = (stride_len_e > kEps) ? (speed_e / stride_len_e) : 0.0f;
   if (turn_in_place) {
-    cycle_rate_hz = cadence;
+    cycle_rate_hz = cadence * gait->turn_step_rate;
   }
   if (speed > 0.01f || turn_in_place) {
     const float gait_speed_scale = 1.0f;
@@ -822,7 +822,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   }
 
   const float cycle = frac(gait->phase / (2.0f * kPi));
-  const float stance_fraction = 0.65f + (0.55f - 0.65f) * speed_gait_norm;
+  float stance_fraction = 0.65f + (0.55f - 0.65f) * speed_gait_norm;
+  if (turn_in_place) {
+    stance_fraction = 0.55f;
+  }
   const float u_l = frac(cycle + 0.0f);
   const float u_r = frac(cycle + 0.5f);
   const bool left_stance = grounded && (u_l < stance_fraction);
@@ -981,7 +984,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float v_side = dot(planar, side_world);
   const float step_len = 0.5f * stride_len_e;
-  const float step_len_small = 0.05f * leg_len_e;
+  const float step_len_small = 0.08f * leg_len_e;
   const float step_height_e = gait->step_height_scale * leg_len_e;
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
@@ -1138,12 +1141,25 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     if (idle) {
       Vec3 home_l_w = to_world_point_root(home_l_e_adj);
       Vec3 home_r_w = to_world_point_root(home_r_e_adj);
-      to_array(home_l_w, gait->left_lock_pos);
-      to_array(home_r_w, gait->right_lock_pos);
-      to_array(home_l_e_adj, gait->left_step_pos);
-      to_array(home_r_e_adj, gait->right_step_pos);
-      to_array(home_l_e_adj, gait->left_swing_start_pos);
-      to_array(home_r_e_adj, gait->right_swing_start_pos);
+      const float idle_alpha = 1.0f - std::exp(-dt * 6.0f);
+      if (!gait->left_locked) {
+        l_lock_w = home_l_w;
+      } else {
+        l_lock_w = lerp(l_lock_w, home_l_w, idle_alpha);
+      }
+      if (!gait->right_locked) {
+        r_lock_w = home_r_w;
+      } else {
+        r_lock_w = lerp(r_lock_w, home_r_w, idle_alpha);
+      }
+      to_array(l_lock_w, gait->left_lock_pos);
+      to_array(r_lock_w, gait->right_lock_pos);
+      Vec3 l_lock_e = to_local_point_root(l_lock_w);
+      Vec3 r_lock_e = to_local_point_root(r_lock_w);
+      to_array(l_lock_e, gait->left_step_pos);
+      to_array(r_lock_e, gait->right_step_pos);
+      to_array(l_lock_e, gait->left_swing_start_pos);
+      to_array(r_lock_e, gait->right_swing_start_pos);
       gait->left_step_active = false;
       gait->right_step_active = false;
       gait->left_locked = true;
