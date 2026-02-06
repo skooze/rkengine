@@ -267,7 +267,10 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
 
   const float tau = std::max(controller.input_smooth_tau, 0.0f);
   if (tau > kEps) {
-    const float alpha = 1.0f - std::exp(-dt / tau);
+    float alpha = 1.0f - std::exp(-dt / tau);
+    if (raw_mag < 0.01f) {
+      alpha = 1.0f - std::exp(-dt / std::max(tau * 0.25f, 0.005f));
+    }
     Vec3 prev = from_array(controller.smoothed_input);
     Vec3 target = mul(raw_dir, raw_mag);
     Vec3 smoothed = lerp(prev, target, clampf(alpha, 0.0f, 1.0f));

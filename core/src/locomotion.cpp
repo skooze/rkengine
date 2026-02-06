@@ -791,8 +791,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (gait_speed_ref < 0.01f) gait_speed_ref = max_speed;
   const float speed_gait_norm = saturate(speed / std::max(gait_speed_ref, 0.01f));
   gait->yaw = transform->rotation[1];
-  gait->yaw_rate = wrap_pi(gait->yaw - gait->last_yaw) / std::max(dt, 0.0001f);
+  const float yaw_delta = wrap_pi(gait->yaw - gait->last_yaw);
   gait->last_yaw = gait->yaw;
+  const float yaw_rate_raw = yaw_delta / std::max(dt, 0.0001f);
+  const float yaw_alpha = 1.0f - std::exp(-dt * 12.0f);
+  gait->yaw_rate += (yaw_rate_raw - gait->yaw_rate) * yaw_alpha;
+  gait->yaw_rate = clampf(gait->yaw_rate, -6.0f, 6.0f);
 
   if (grounded && !gait->was_grounded) {
     gait->landing_timer = 0.18f;
@@ -827,7 +831,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   stride_len_e = clampf(stride_len_e, 0.50f * leg_len_e, 1.05f * leg_len_e);
   float cycle_rate_hz = (stride_len_e > kEps) ? (speed_e / stride_len_e) : 0.0f;
   if (turn_in_place) {
-    cycle_rate_hz = cadence * gait->turn_step_rate;
+    const float turn_scale = clampf(std::abs(gait->yaw_rate) / 1.2f, 0.5f, 1.5f);
+    cycle_rate_hz = cadence * gait->turn_step_rate * turn_scale;
   } else {
     const float max_cycle = cadence * 1.05f;
     if (cycle_rate_hz > max_cycle) cycle_rate_hz = max_cycle;
@@ -1369,19 +1374,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       lock_offset_e = v3();
     }
 
-    const float landing_window = 0.25f;
-    float w_swing_l = 0.0f;
-    float w_swing_r = 0.0f;
-    if (left_swing_run) {
-      const float w_land = smoothstep01((left_swing_u - (1.0f - landing_window)) / landing_window);
-      w_swing_l = 0.7f + 0.3f * w_land;
-    }
-    if (right_swing_run) {
-      const float w_land = smoothstep01((right_swing_u - (1.0f - landing_window)) / landing_window);
-      w_swing_r = 0.7f + 0.3f * w_land;
-    }
-    const float ik_weight_l = grounded ? (left_stance_run ? 1.0f : w_swing_l) : 0.0f;
-    const float ik_weight_r = grounded ? (right_stance_run ? 1.0f : w_swing_r) : 0.0f;
+    const float ik_weight_l = grounded ? (left_stance_run ? 1.0f : (left_swing_run ? 1.0f : 0.0f)) : 0.0f;
+    const float ik_weight_r = grounded ? (right_stance_run ? 1.0f : (right_swing_run ? 1.0f : 0.0f)) : 0.0f;
     const Vec3 target_l = lerp(l_foot, l_target_e, ik_weight_l);
     const Vec3 target_r = lerp(r_foot, r_target_e, ik_weight_r);
 
