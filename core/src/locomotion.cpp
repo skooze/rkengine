@@ -571,6 +571,7 @@ static bool build_bone_map(ecs::ProceduralGait& gait, const ecs::Skeleton& skel)
   const std::vector<std::string> calf_tags = {"leg", "calf", "lowerleg", "shin"};
   const std::vector<std::string> foot_tags = {"foot", "ankle"};
   const std::vector<std::string> toe_tags = {"toe", "ball"};
+  const std::vector<std::string> shoulder_tags = {"shoulder", "clavicle", "collar", "scapula"};
   const std::vector<std::string> upper_arm_tags = {"upperarm", "uparm", "arm"};
   const std::vector<std::string> lower_arm_tags = {"forearm", "lowerarm"};
 
@@ -592,6 +593,8 @@ static bool build_bone_map(ecs::ProceduralGait& gait, const ecs::Skeleton& skel)
   gait.bone_r_foot = find_side_bone(skel, right_tags, foot_tags);
   gait.bone_l_toe = find_side_bone(skel, left_tags, toe_tags);
   gait.bone_r_toe = find_side_bone(skel, right_tags, toe_tags);
+  gait.bone_l_shoulder = find_side_bone(skel, left_tags, shoulder_tags, upper_arm_tags);
+  gait.bone_r_shoulder = find_side_bone(skel, right_tags, shoulder_tags, upper_arm_tags);
   gait.bone_l_upper_arm = find_side_bone(skel, left_tags, upper_arm_tags, lower_arm_tags);
   gait.bone_r_upper_arm = find_side_bone(skel, right_tags, upper_arm_tags, lower_arm_tags);
   gait.bone_l_lower_arm = find_side_bone(skel, left_tags, lower_arm_tags);
@@ -914,11 +917,17 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   step_half = std::min(step_half, 0.22f * leg_len_e);
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
   pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
+  pelvis_sway_amp *= 0.6f;
   const float pelvis_roll = gait->pelvis_roll_scale * speed_norm;
   const float sway_phase = 2.0f * kPi * cycle;
   const float sway = std::sin(sway_phase);
   const float pelvis_x = pelvis_sway_amp * sway;
   const float pelvis_y = -pelvis_bob * std::sin(kPi * stance_u);
+  const float strafe_factor =
+      1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
+  const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor;
+  const float shoulder_yaw = 0.7f * arm_amp * std::cos(sway_phase);
+  const float shoulder_roll = 0.6f * arm_amp * sway;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
@@ -928,34 +937,39 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float shoulder_yaw = 0.35f * (gait->arm_swing_scale * speed_norm + 0.02f) * std::cos(sway_phase);
   const float shoulder_roll = 0.25f * (gait->arm_swing_scale * speed_norm + 0.02f) * sway;
-  const float torso_roll = -pelvis_roll * sway * 0.1f;
-  const float lean_side_spine = gait->lean_side * 0.08f;
-  const float lean_side_chest = gait->lean_side * 0.06f;
-  const float lean_side_neck = gait->lean_side * 0.03f;
-  const float lean_side_head = gait->lean_side * 0.02f;
-  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f, shoulder_yaw * 0.35f,
-          lean_side_spine + torso_roll + shoulder_roll * 0.35f);
-  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f, shoulder_yaw * 0.65f,
-          lean_side_chest + torso_roll * 0.6f + shoulder_roll * 0.65f);
+  const float torso_roll = -pelvis_roll * sway * 0.18f;
+  const float lean_side_spine = gait->lean_side * 0.05f;
+  const float lean_side_chest = gait->lean_side * 0.04f;
+  const float lean_side_neck = gait->lean_side * 0.02f;
+  const float lean_side_head = gait->lean_side * 0.015f;
+  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f, shoulder_yaw * 0.4f,
+          lean_side_spine + torso_roll + shoulder_roll * 0.4f);
+  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f, shoulder_yaw * 0.75f,
+          lean_side_chest + torso_roll * 0.6f + shoulder_roll * 0.75f);
   add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f, shoulder_yaw * 0.25f,
-          lean_side_neck + torso_roll * 0.3f + shoulder_roll * 0.2f);
+          lean_side_neck + torso_roll * 0.3f + shoulder_roll * 0.25f);
   add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f, shoulder_yaw * 0.15f,
-          lean_side_head + torso_roll * 0.2f + shoulder_roll * 0.15f);
+          lean_side_head + torso_roll * 0.2f + shoulder_roll * 0.18f);
 
   if (gait->enable_arm_swing) {
-    const float strafe_factor = 1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
-    const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor;
     const float arm_phase_l = 2.0f * kPi * u_l;
     const float arm_phase_r = 2.0f * kPi * u_r;
     const float swing_l = std::sin(arm_phase_l);
     const float swing_r = std::sin(arm_phase_r);
     const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
     const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
-    const float arm_yaw = 0.25f * arm_amp;
-    const float arm_roll = 0.35f * arm_amp;
-    const float arm_lift = 0.08f * arm_amp;
-    const float elbow_amp = 0.45f * arm_amp;
-    const float elbow_phase = 0.35f;
+    const float arm_yaw = 0.15f * arm_amp;
+    const float arm_roll = 0.18f * arm_amp;
+    const float arm_lift = 0.06f * arm_amp;
+    const float elbow_amp = 0.4f * arm_amp;
+    const float elbow_phase = 0.28f;
+    const float shoulder_pitch_amp = 0.25f * arm_amp;
+    const float shoulder_yaw_amp = 0.18f * arm_amp;
+    const float shoulder_roll_amp = 0.25f * arm_amp;
+    add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r,
+            shoulder_yaw_amp * swing_r_90, shoulder_roll_amp * swing_r);
+    add_rot(*skeleton, gait->bone_r_shoulder, shoulder_pitch_amp * swing_l,
+            -shoulder_yaw_amp * swing_l_90, -shoulder_roll_amp * swing_l);
     add_rot(*skeleton, gait->bone_l_upper_arm, arm_amp * swing_r + arm_lift, arm_yaw * swing_r_90,
             gait->arm_tuck + arm_roll * swing_r);
     add_rot(*skeleton, gait->bone_r_upper_arm, arm_amp * swing_l + arm_lift, -arm_yaw * swing_l_90,

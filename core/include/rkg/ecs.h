@@ -203,6 +203,8 @@ struct ProceduralGait {
   uint32_t bone_r_calf = UINT32_MAX;
   uint32_t bone_r_foot = UINT32_MAX;
   uint32_t bone_r_toe = UINT32_MAX;
+  uint32_t bone_l_shoulder = UINT32_MAX;
+  uint32_t bone_r_shoulder = UINT32_MAX;
   uint32_t bone_l_upper_arm = UINT32_MAX;
   uint32_t bone_l_lower_arm = UINT32_MAX;
   uint32_t bone_r_upper_arm = UINT32_MAX;
