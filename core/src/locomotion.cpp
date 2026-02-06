@@ -1364,9 +1364,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
-    const float relax_tuck = 0.22f * relax;
+    const float relax_tuck = 0.0f;
     const float relax_elbow = 0.08f * relax;
-    const float arm_out = 0.12f + 0.08f * relax;
+    const float arm_out = 0.02f + 0.02f * relax;
     const float idle_arm = 0.06f * relax * std::sin(gait->idle_time * 2.0f * kPi * 0.25f);
     add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r + relax_pitch * 0.5f + idle_arm * 0.4f,
             shoulder_yaw_amp * swing_r_90 + relax_yaw, shoulder_roll_amp * swing_r + arm_out * 0.5f);
@@ -1378,6 +1378,36 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
             -arm_yaw * swing_l_90, -gait->arm_tuck - arm_roll * swing_l - arm_out);
     add_rot(*skeleton, gait->bone_l_lower_arm, elbow_amp * std::sin(arm_phase_r + elbow_phase) + relax_elbow, 0.0f, 0.0f);
     add_rot(*skeleton, gait->bone_r_lower_arm, elbow_amp * std::sin(arm_phase_l + elbow_phase) + relax_elbow, 0.0f, 0.0f);
+  }
+
+  const float relax_speed = clampf(1.0f - speed_norm * 1.1f, 0.0f, 1.0f);
+  const float arm_rest_weight = std::max(relax_speed, gait->idle_blend);
+  if (arm_rest_weight > 0.01f &&
+      gait->bone_l_upper_arm != UINT32_MAX && gait->bone_l_lower_arm != UINT32_MAX &&
+      gait->bone_r_upper_arm != UINT32_MAX && gait->bone_r_lower_arm != UINT32_MAX) {
+    std::vector<ecs::Transform> arm_locals(skeleton->bones.size());
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+      arm_locals[i] = skeleton->bones[i].local_pose;
+    }
+    std::vector<rkg::Mat4> arm_world;
+    compute_world_matrices(*skeleton, arm_locals, arm_world);
+    auto arm_pos = [&](uint32_t idx) -> Vec3 {
+      if (idx == UINT32_MAX || idx >= arm_world.size()) return v3();
+      return {arm_world[idx].m[12], arm_world[idx].m[13], arm_world[idx].m[14]};
+    };
+    auto apply_arm_rest = [&](uint32_t upper, uint32_t lower, float side_sign) {
+      const Vec3 shoulder = arm_pos(upper);
+      const Vec3 elbow = arm_pos(lower);
+      const float len = std::max(length(sub(elbow, shoulder)), 0.001f);
+      Vec3 rest_dir = add(mul(v3(0.0f, -1.0f, 0.0f), 1.0f),
+                          add(mul(frame_fwd_e, 0.12f), mul(side_e, side_sign * 0.20f)));
+      rest_dir = normalize(rest_dir);
+      const Vec3 desired = add(shoulder, mul(rest_dir, len));
+      const Vec3 target = lerp(elbow, desired, arm_rest_weight * 0.8f);
+      apply_bone_aim(*skeleton, arm_world, upper, lower, target);
+    };
+    apply_arm_rest(gait->bone_l_upper_arm, gait->bone_l_lower_arm, -1.0f);
+    apply_arm_rest(gait->bone_r_upper_arm, gait->bone_r_lower_arm, 1.0f);
   }
 
   std::vector<ecs::Transform> locals(skeleton->bones.size());
