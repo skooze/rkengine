@@ -1434,10 +1434,40 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
     const float width_ref_e = std::max(gait->hip_width, 0.25f * gait->leg_length);
     const float pole_out_e = 0.45f * width_ref_e;
-    Vec3 l_pole_dir = normalize(from_array(gait->knee_plane_l));
-    Vec3 r_pole_dir = normalize(from_array(gait->knee_plane_r));
-    if (length(l_pole_dir) < 0.0001f) l_pole_dir = v3(-1.0f, 0.0f, 0.0f);
-    if (length(r_pole_dir) < 0.0001f) r_pole_dir = v3(1.0f, 0.0f, 0.0f);
+    const Vec3 up_e = v3(0.0f, 1.0f, 0.0f);
+    auto compute_pole_dir = [&](const Vec3& hip, const Vec3& foot, float side_sign,
+                                const Vec3& fallback_dir) -> Vec3 {
+      Vec3 leg_dir = normalize(sub(foot, hip));
+      if (length(leg_dir) < 0.0001f) leg_dir = v3(0.0f, -1.0f, 0.0f);
+      Vec3 fwd = frame_fwd_e;
+      if (length(fwd) < 0.0001f) fwd = v3(0.0f, 0.0f, 1.0f);
+      Vec3 fwd_plane = sub(fwd, mul(leg_dir, dot(fwd, leg_dir)));
+      if (length(fwd_plane) < 0.0001f) {
+        fwd_plane = sub(up_e, mul(leg_dir, dot(up_e, leg_dir)));
+      }
+      fwd_plane = normalize(fwd_plane);
+      Vec3 out = mul(side_e, side_sign);
+      Vec3 out_plane = sub(out, mul(leg_dir, dot(out, leg_dir)));
+      if (length(out_plane) < 0.0001f) out_plane = fwd_plane;
+      out_plane = normalize(out_plane);
+      const float bias = clampf(gait->knee_plane_bias, 0.0f, 1.0f);
+      Vec3 desired = normalize(lerp(out_plane, fwd_plane, bias));
+      if (length(desired) < 0.0001f) desired = fallback_dir;
+      return desired;
+    };
+    Vec3 l_pole_prev = normalize(from_array(gait->knee_plane_l));
+    Vec3 r_pole_prev = normalize(from_array(gait->knee_plane_r));
+    if (length(l_pole_prev) < 0.0001f) l_pole_prev = v3(-1.0f, 0.0f, 0.0f);
+    if (length(r_pole_prev) < 0.0001f) r_pole_prev = v3(1.0f, 0.0f, 0.0f);
+    const Vec3 l_pole_target = compute_pole_dir(l_hip2, l_foot2, -1.0f, l_pole_prev);
+    const Vec3 r_pole_target = compute_pole_dir(r_hip2, r_foot2, 1.0f, r_pole_prev);
+    if (dot(l_pole_prev, l_pole_target) < 0.0f) l_pole_prev = mul(l_pole_prev, -1.0f);
+    if (dot(r_pole_prev, r_pole_target) < 0.0f) r_pole_prev = mul(r_pole_prev, -1.0f);
+    const float pole_alpha = 1.0f - std::exp(-dt * 12.0f);
+    const Vec3 l_pole_dir = normalize(lerp(l_pole_prev, l_pole_target, pole_alpha));
+    const Vec3 r_pole_dir = normalize(lerp(r_pole_prev, r_pole_target, pole_alpha));
+    to_array(l_pole_dir, gait->knee_plane_l);
+    to_array(r_pole_dir, gait->knee_plane_r);
     const Vec3 l_pole_e = add(l_hip2, mul(l_pole_dir, pole_out_e));
     const Vec3 r_pole_e = add(r_hip2, mul(r_pole_dir, pole_out_e));
     Vec3 l_prev_y = normalize(from_array(gait->knee_prev_y_l));
