@@ -935,8 +935,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f, 0.0f, pelvis_roll_term);
   }
 
-  const float shoulder_yaw = 0.35f * (gait->arm_swing_scale * speed_norm + 0.02f) * std::cos(sway_phase);
-  const float shoulder_roll = 0.25f * (gait->arm_swing_scale * speed_norm + 0.02f) * sway;
   const float torso_roll = -pelvis_roll * sway * 0.18f;
   const float lean_side_spine = gait->lean_side * 0.05f;
   const float lean_side_chest = gait->lean_side * 0.04f;
