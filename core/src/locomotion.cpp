@@ -771,10 +771,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float smooth_tau = std::max(gait->input_smooth_tau, 0.0f);
   const float smooth_alpha = (smooth_tau > 0.0f) ? (1.0f - std::exp(-dt / smooth_tau)) : 1.0f;
+  const float speed_raw = speed;
   gait->speed_smoothed += (speed - gait->speed_smoothed) * smooth_alpha;
   speed = gait->speed_smoothed;
 
   const bool grounded = controller ? controller->grounded : false;
+  float input_mag_raw = 0.0f;
+  if (controller) {
+    Vec3 in{controller->smoothed_input[0], 0.0f, controller->smoothed_input[2]};
+    input_mag_raw = length(in);
+  }
   const bool sprinting = controller ? controller->is_sprinting : false;
   float max_speed = gait->walk_speed;
   if (controller) {
@@ -808,8 +814,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const bool turn_in_place = gait->enable_turn_in_place &&
                              grounded &&
-                             speed < gait->turn_in_place_speed &&
-                             std::abs(gait->yaw_rate) > 0.6f;
+                             speed_raw < gait->turn_in_place_speed &&
+                             input_mag_raw < 0.1f &&
+                             std::abs(yaw_rate_raw) > 0.6f;
 
   const float sx = std::abs(transform->scale[0]);
   const float sy = std::abs(transform->scale[1]);
@@ -1021,9 +1028,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   float step_half_local = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
   step_half_local = std::max(step_half_local, 0.10f * leg_len_e);
   step_half_local = std::min(step_half_local, 0.22f * leg_len_e);
-  const float strafe_half = 0.20f * width_ref_e * std::abs(v_side / std::max(max_speed, 0.1f));
+  const float strafe_half = gait->lateral_step_scale * 0.20f * width_ref_e *
+                            std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half_local + strafe_half;
   const float min_side = 0.90f * step_half_desired;
+  const float max_side = step_half_desired * 1.6f;
   const Vec3 home_l_rad = sub(home_l_e, hips_e);
   const Vec3 home_r_rad = sub(home_r_e, hips_e);
   const float home_rad_l = length(Vec3{home_l_rad.x, 0.0f, home_l_rad.z});
@@ -1048,6 +1057,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       out = add(out, mul(side_e, (-min_side - midline)));
     } else if (side_sign > 0.0f && midline < min_side) {
       out = add(out, mul(side_e, (min_side - midline)));
+    }
+    midline = dot(sub(out, hips_e), side_e);
+    if (midline < -max_side) {
+      out = add(out, mul(side_e, (-max_side - midline)));
+    } else if (midline > max_side) {
+      out = add(out, mul(side_e, (max_side - midline)));
     }
     Vec3 rad = sub(out, hips_e);
     rad.y = 0.0f;
@@ -1115,6 +1130,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       desired = add(desired, mul(side_e, (-min_side - midline)));
     } else if (side_sign > 0.0f && midline < min_side) {
       desired = add(desired, mul(side_e, (min_side - midline)));
+    }
+    midline = dot(sub(desired, hips_e), side_e);
+    if (midline < -max_side) {
+      desired = add(desired, mul(side_e, (-max_side - midline)));
+    } else if (midline > max_side) {
+      desired = add(desired, mul(side_e, (max_side - midline)));
     }
 
     Vec3 rad = sub(desired, hips_e);
