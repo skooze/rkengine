@@ -917,7 +917,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   step_half = std::min(step_half, 0.22f * leg_len_e);
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
   pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
-  pelvis_sway_amp *= 0.6f;
+  pelvis_sway_amp *= 0.35f;
   const float pelvis_roll = gait->pelvis_roll_scale * speed_norm;
   const float sway_phase = 2.0f * kPi * cycle;
   const float sway = std::sin(sway_phase);
@@ -927,19 +927,19 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
   const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor;
   const float shoulder_yaw = 0.7f * arm_amp * std::cos(sway_phase);
-  const float shoulder_roll = 0.6f * arm_amp * sway;
+  const float shoulder_roll = 0.45f * arm_amp * sway;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
-    const float pelvis_roll_term = -pelvis_roll * sway * 0.25f;
+    const float pelvis_roll_term = -pelvis_roll * sway * 0.18f;
     add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f, 0.0f, pelvis_roll_term);
   }
 
-  const float torso_roll = -pelvis_roll * sway * 0.18f;
-  const float lean_side_spine = gait->lean_side * 0.05f;
-  const float lean_side_chest = gait->lean_side * 0.04f;
-  const float lean_side_neck = gait->lean_side * 0.02f;
-  const float lean_side_head = gait->lean_side * 0.015f;
+  const float torso_roll = -pelvis_roll * sway * 0.12f;
+  const float lean_side_spine = 0.0f;
+  const float lean_side_chest = 0.0f;
+  const float lean_side_neck = 0.0f;
+  const float lean_side_head = 0.0f;
   add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f, shoulder_yaw * 0.4f,
           lean_side_spine + torso_roll + shoulder_roll * 0.4f);
   add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f, shoulder_yaw * 0.75f,
