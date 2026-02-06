@@ -898,8 +898,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   to_array(vel, gait->last_velocity);
   const float accel_fwd = dot(accel, forward);
   const float accel_side = dot(accel, right);
-  const float lean_fwd = clampf(accel_fwd / std::max(max_speed, 0.1f), -1.0f, 1.0f) * gait->pelvis_lean_scale;
-  const float lean_side = clampf(accel_side / std::max(max_speed, 0.1f), -1.0f, 1.0f) * gait->pelvis_lean_scale;
+  const float lean_fwd_raw = clampf(accel_fwd / std::max(max_speed, 0.1f), -1.0f, 1.0f) * gait->pelvis_lean_scale;
+  const float lean_side_raw = clampf(accel_side / std::max(max_speed, 0.1f), -1.0f, 1.0f) * gait->pelvis_lean_scale;
+  const float lean_alpha = 1.0f - std::exp(-dt * 10.0f);
+  gait->lean_fwd += (lean_fwd_raw - gait->lean_fwd) * lean_alpha;
+  gait->lean_side += (lean_side_raw - gait->lean_side) * lean_alpha;
 
   const float landing_alpha = (gait->landing_timer > 0.0f) ? (gait->landing_timer / 0.18f) : 0.0f;
   const float landing_drop = -gait->landing_compress * leg_len_e * landing_alpha;
@@ -912,20 +915,22 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
   pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
   const float pelvis_roll = gait->pelvis_roll_scale * speed_norm;
-  const float pelvis_x = pelvis_sway_amp * stance_sign * std::sin(kPi * stance_u);
+  const float sway_phase = 2.0f * kPi * cycle;
+  const float sway = std::sin(sway_phase);
+  const float pelvis_x = pelvis_sway_amp * sway;
   const float pelvis_y = -pelvis_bob * std::sin(kPi * stance_u);
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
-    const float pelvis_roll_term = -pelvis_roll * stance_sign * 0.25f;
-    add_rot(*skeleton, gait->bone_hips, -lean_fwd * 0.25f, 0.0f, pelvis_roll_term);
+    const float pelvis_roll_term = -pelvis_roll * sway * 0.25f;
+    add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f, 0.0f, pelvis_roll_term);
   }
 
-  const float torso_roll = -pelvis_roll * stance_sign * 0.1f;
-  add_rot(*skeleton, gait->bone_spine, lean_fwd * 0.2f, 0.0f, lean_side * 0.2f + torso_roll);
-  add_rot(*skeleton, gait->bone_chest, lean_fwd * 0.15f, 0.0f, lean_side * 0.15f + torso_roll * 0.6f);
-  add_rot(*skeleton, gait->bone_neck, lean_fwd * 0.06f, 0.0f, lean_side * 0.04f + torso_roll * 0.3f);
-  add_rot(*skeleton, gait->bone_head, lean_fwd * 0.04f, 0.0f, lean_side * 0.03f + torso_roll * 0.2f);
+  const float torso_roll = -pelvis_roll * sway * 0.1f;
+  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f, 0.0f, gait->lean_side * 0.2f + torso_roll);
+  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f, 0.0f, gait->lean_side * 0.15f + torso_roll * 0.6f);
+  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f, 0.0f, gait->lean_side * 0.04f + torso_roll * 0.3f);
+  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f, 0.0f, gait->lean_side * 0.03f + torso_roll * 0.2f);
 
   if (gait->enable_arm_swing) {
     const float strafe_factor = 1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));

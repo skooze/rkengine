@@ -141,6 +141,8 @@ struct ProceduralGait {
   float landing_compress = 0.04f;
   float landing_recover = 10.0f;
   float input_smooth_tau = 0.05f;
+  float lean_fwd = 0.0f;
+  float lean_side = 0.0f;
 
   float phase = 0.0f;
   float speed_smoothed = 0.0f;
