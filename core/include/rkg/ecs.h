@@ -193,6 +193,7 @@ struct ProceduralGait {
   float debug_target_lat_r = 0.0f;
   std::vector<float> bone_rest_len;
   std::vector<float> bone_radius;
+  std::vector<float> bone_max_angle;
   std::vector<uint8_t> bone_collide;
   float debug_continuity_l = 1.0f;
   float debug_continuity_r = 1.0f;

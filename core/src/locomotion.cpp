@@ -26,6 +26,15 @@ struct Vec3 {
   float z;
 };
 
+struct CapsuleSeg {
+  Vec3 a;
+  Vec3 b;
+  float r;
+  ecs::Entity owner;
+};
+
+static std::vector<CapsuleSeg> g_external_caps;
+
 static Vec3 v3(float x = 0.0f, float y = 0.0f, float z = 0.0f) {
   return {x, y, z};
 }
@@ -766,6 +775,17 @@ static float capsule_radius_from_name(const std::string& name, float leg_len) {
   return 0.07f * leg_len;
 }
 
+static float joint_limit_from_name(const std::string& name) {
+  const std::string n = to_lower(name);
+  if (name_has(n, {"spine", "chest", "neck"})) return 0.45f;
+  if (name_has(n, {"head"})) return 0.60f;
+  if (name_has(n, {"upperarm", "uparm"})) return 1.15f;
+  if (name_has(n, {"forearm", "lowerarm"})) return 1.05f;
+  if (name_has(n, {"thigh", "upleg", "upperleg"})) return 1.10f;
+  if (name_has(n, {"calf", "lowerleg", "shin"})) return 1.00f;
+  return 1.20f;
+}
+
 static void ensure_self_collision_cache(ecs::ProceduralGait& gait,
                                         const ecs::Skeleton& skel,
                                         const std::vector<rkg::Mat4>& world,
@@ -773,11 +793,13 @@ static void ensure_self_collision_cache(ecs::ProceduralGait& gait,
   const size_t count = skel.bones.size();
   if (gait.bone_rest_len.size() == count &&
       gait.bone_radius.size() == count &&
+      gait.bone_max_angle.size() == count &&
       gait.bone_collide.size() == count) {
     return;
   }
   gait.bone_rest_len.assign(count, 0.0f);
   gait.bone_radius.assign(count, 0.0f);
+  gait.bone_max_angle.assign(count, 0.0f);
   gait.bone_collide.assign(count, 0);
   for (size_t i = 0; i < count; ++i) {
     const int parent = skel.bones[i].parent_index;
@@ -787,7 +809,47 @@ static void ensure_self_collision_cache(ecs::ProceduralGait& gait,
     const float rest = length(sub(c, p));
     gait.bone_rest_len[i] = rest;
     gait.bone_radius[i] = capsule_radius_from_name(skel.bones[i].name, leg_len);
+    gait.bone_max_angle[i] = joint_limit_from_name(skel.bones[i].name);
     gait.bone_collide[i] = (rest > 0.05f * leg_len) ? 1u : 0u;
+  }
+}
+
+static void build_external_capsules(ecs::Registry& registry, std::vector<CapsuleSeg>& out) {
+  out.clear();
+  for (auto& kv : registry.procedural_gaits()) {
+    const ecs::Entity entity = kv.first;
+    auto& gait = kv.second;
+    if (!gait.enabled || !gait.enable_self_collision) continue;
+    const auto* skeleton = registry.get_skeleton(entity);
+    const auto* transform = registry.get_transform(entity);
+    if (!skeleton || !transform || skeleton->bones.empty()) continue;
+    std::vector<ecs::Transform> locals(skeleton->bones.size());
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+      locals[i] = skeleton->bones[i].local_pose;
+    }
+    std::vector<rkg::Mat4> world;
+    compute_world_matrices(*skeleton, locals, world);
+    ensure_self_collision_cache(gait, *skeleton, world, std::max(gait.leg_length, 1.0f));
+
+    const float sx = std::abs(transform->scale[0]);
+    const float sy = std::abs(transform->scale[1]);
+    const float sz = std::abs(transform->scale[2]);
+    float rig_scale = (sx + sy + sz) * (1.0f / 3.0f);
+    if (rig_scale < 0.0001f) rig_scale = 1.0f;
+
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const int parent = skeleton->bones[i].parent_index;
+      if (parent < 0 || static_cast<size_t>(parent) >= skeleton->bones.size()) continue;
+      const Vec3 p = {world[parent].m[12], world[parent].m[13], world[parent].m[14]};
+      const Vec3 c = {world[i].m[12], world[i].m[13], world[i].m[14]};
+      CapsuleSeg seg{};
+      seg.a = to_world_point(*transform, p);
+      seg.b = to_world_point(*transform, c);
+      seg.r = gait.bone_radius[i] * rig_scale;
+      seg.owner = entity;
+      out.push_back(seg);
+    }
   }
 }
 
@@ -840,6 +902,9 @@ static Vec3 rotate_y(const Vec3& v, float angle) {
 static void solve_self_collision(ecs::ProceduralGait& gait,
                                  ecs::Skeleton& skel,
                                  const ecs::Registry& registry,
+                                 ecs::Entity self,
+                                 const ecs::Transform& root,
+                                 const std::vector<CapsuleSeg>* external_caps,
                                  std::vector<ecs::Transform>& locals,
                                  std::vector<rkg::Mat4>& world,
                                  float leg_len,
@@ -851,6 +916,7 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
   const size_t count = skel.bones.size();
   std::vector<Vec3> pos(count);
   std::vector<Vec3> target(count);
+  std::vector<Vec3> rest_dir(count);
   std::vector<int> child_count(count, 0);
   std::vector<int> first_child(count, -1);
 
@@ -863,8 +929,14 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
       ++child_count[parent];
     }
   }
+  for (size_t i = 0; i < count; ++i) {
+    const int parent = skel.bones[i].parent_index;
+    if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+    Vec3 d = sub(target[i], target[parent]);
+    rest_dir[i] = normalize(d);
+  }
 
-  const int root = (gait.bone_root != UINT32_MAX) ? static_cast<int>(gait.bone_root) : 0;
+  const int root_bone = (gait.bone_root != UINT32_MAX) ? static_cast<int>(gait.bone_root) : 0;
   const int iters = std::max(1, gait.self_collision_iters);
   const float stiffness = clampf(gait.self_collision_stiffness, 0.0f, 1.0f);
 
@@ -880,7 +952,7 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
       if (len < kEps) continue;
       const float diff = (len - rest) / len;
       const Vec3 corr = mul(delta, 0.5f * diff * stiffness);
-      if (parent != root) pos[parent] = add(pos[parent], corr);
+      if (parent != root_bone) pos[parent] = add(pos[parent], corr);
       pos[i] = sub(pos[i], corr);
     }
 
@@ -911,9 +983,9 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
           Vec3 n = (dist > kEps) ? mul(sub(c1, c2), 1.0f / dist) : v3(1.0f, 0.0f, 0.0f);
           const float push = (min_dist - dist) * 0.5f * stiffness;
           const Vec3 d = mul(n, push);
-          if (parent_i != root) pos[parent_i] = add(pos[parent_i], d);
+          if (parent_i != root_bone) pos[parent_i] = add(pos[parent_i], d);
           pos[i] = add(pos[i], d);
-          if (parent_j != root) pos[parent_j] = sub(pos[parent_j], d);
+          if (parent_j != root_bone) pos[parent_j] = sub(pos[parent_j], d);
           pos[j] = sub(pos[j], d);
         }
       }
@@ -925,12 +997,18 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
       const int parent = skel.bones[i].parent_index;
       if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
       const float r = gait.bone_radius[i];
-      Vec3 points[2] = {pos[parent], pos[i]};
+      Vec3 points_local[2] = {pos[parent], pos[i]};
+      Vec3 points[2] = {to_world_point(root, points_local[0]),
+                        to_world_point(root, points_local[1])};
       for (const auto& kv : registry.colliders()) {
         const auto& collider = kv.second;
         if (collider.type == ecs::ColliderType::Plane) {
           const Vec3 normal = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
-          const float d = collider.distance;
+          float d = collider.distance;
+          if (const auto* plane_transform = registry.get_transform(kv.first)) {
+            const Vec3 plane_pos = from_array(plane_transform->position);
+            d += dot(normal, plane_pos);
+          }
           for (auto& p : points) {
             const float dist = dot(p, normal) - d;
             if (dist < r) {
@@ -971,8 +1049,61 @@ static void solve_self_collision(ecs::ProceduralGait& gait,
           }
         }
       }
-      pos[parent] = points[0];
-      pos[i] = points[1];
+      points_local[0] = to_local_point(root, points[0]);
+      points_local[1] = to_local_point(root, points[1]);
+      pos[parent] = points_local[0];
+      pos[i] = points_local[1];
+    }
+
+    // collide with external capsules (other entities), push only this skeleton
+    if (external_caps && !external_caps->empty()) {
+      for (size_t i = 0; i < count; ++i) {
+        if (!gait.bone_collide[i]) continue;
+        const int parent_i = skel.bones[i].parent_index;
+        if (parent_i < 0 || static_cast<size_t>(parent_i) >= count) continue;
+        const float ri = gait.bone_radius[i];
+        const Vec3 a0 = to_world_point(root, pos[parent_i]);
+        const Vec3 a1 = to_world_point(root, pos[i]);
+        for (const auto& ext : *external_caps) {
+          if (ext.owner == self) continue;
+          Vec3 c1{};
+          Vec3 c2{};
+          float s = 0.0f;
+          float t = 0.0f;
+          const float dist = closest_points_on_segments(a0, a1, ext.a, ext.b, c1, c2, s, t);
+          const float min_dist = ri + ext.r;
+          if (dist < min_dist) {
+            Vec3 n = (dist > kEps) ? mul(sub(c1, c2), 1.0f / dist) : v3(1.0f, 0.0f, 0.0f);
+            const float push = (min_dist - dist) * stiffness;
+            const Vec3 d = mul(n, push);
+            Vec3 local_push = to_local_offset(root, d);
+            if (parent_i != root_bone) pos[parent_i] = add(pos[parent_i], mul(local_push, 0.5f));
+            pos[i] = add(pos[i], mul(local_push, 0.5f));
+          }
+        }
+      }
+    }
+
+    // joint cone limits (keep near animated direction)
+    for (size_t i = 0; i < count; ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const int parent = skel.bones[i].parent_index;
+      if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+      const float max_ang = gait.bone_max_angle[i];
+      if (max_ang <= 0.0f) continue;
+      Vec3 dir = sub(pos[i], pos[parent]);
+      const float len = length(dir);
+      if (len < kEps) continue;
+      dir = mul(dir, 1.0f / len);
+      const Vec3 rest = rest_dir[i];
+      if (length(rest) < kEps) continue;
+      const float cosang = clampf(dot(dir, rest), -1.0f, 1.0f);
+      const float angle = std::acos(cosang);
+      if (angle > max_ang) {
+        const float t = max_ang / angle;
+        Vec3 new_dir = normalize(lerp(rest, dir, t));
+        pos[i] = add(pos[parent], mul(new_dir, gait.bone_rest_len[i]));
+      }
     }
 
     // stay near animated pose
@@ -1843,7 +1974,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       locals[i] = skeleton->bones[i].local_pose;
     }
     compute_world_matrices(*skeleton, locals, world);
-    solve_self_collision(*gait, *skeleton, registry, locals, world, leg_len_e, dt);
+    solve_self_collision(*gait, *skeleton, registry, entity, *transform, &g_external_caps,
+                         locals, world, leg_len_e, dt);
   }
 
   if (rkg::movement_log::enabled()) {
@@ -1978,6 +2110,7 @@ void update_procedural_gaits(ecs::Registry& registry, float dt) {
   static DebugLines lines;
   lines.clear();
   bool any_debug = false;
+  build_external_capsules(registry, g_external_caps);
   for (auto& kv : registry.procedural_gaits()) {
     auto& gait = kv.second;
     if (!gait.enabled) continue;
