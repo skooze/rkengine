@@ -150,6 +150,8 @@ struct ProceduralGait {
   float last_yaw = 0.0f;
   float yaw_rate = 0.0f;
   float landing_timer = 0.0f;
+  float idle_time = 0.0f;
+  float idle_blend = 0.0f;
   bool was_grounded = false;
   float last_velocity[3] = {0.0f, 0.0f, 0.0f};
   float pelvis_offset[3] = {0.0f, 0.0f, 0.0f};
