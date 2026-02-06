@@ -702,6 +702,95 @@ static void add_pos(ecs::Skeleton& skel, uint32_t idx, float px, float py, float
   skel.bones[idx].local_pose.position[2] += pz;
 }
 
+static float closest_points_on_segments(const Vec3& p1, const Vec3& q1,
+                                        const Vec3& p2, const Vec3& q2,
+                                        Vec3& c1, Vec3& c2,
+                                        float& s, float& t) {
+  const Vec3 d1 = sub(q1, p1);
+  const Vec3 d2 = sub(q2, p2);
+  const Vec3 r = sub(p1, p2);
+  const float a = dot(d1, d1);
+  const float e = dot(d2, d2);
+  const float f = dot(d2, r);
+  s = 0.0f;
+  t = 0.0f;
+
+  if (a <= kEps && e <= kEps) {
+    c1 = p1;
+    c2 = p2;
+    return length(sub(c1, c2));
+  }
+  if (a <= kEps) {
+    t = clampf(f / e, 0.0f, 1.0f);
+    c1 = p1;
+    c2 = add(p2, mul(d2, t));
+    return length(sub(c1, c2));
+  }
+  const float c = dot(d1, r);
+  if (e <= kEps) {
+    s = clampf(-c / a, 0.0f, 1.0f);
+    c1 = add(p1, mul(d1, s));
+    c2 = p2;
+    return length(sub(c1, c2));
+  }
+  const float b = dot(d1, d2);
+  const float denom = a * e - b * b;
+  if (denom > kEps) {
+    s = clampf((b * f - c * e) / denom, 0.0f, 1.0f);
+  } else {
+    s = 0.0f;
+  }
+  t = (b * s + f) / e;
+  if (t < 0.0f) {
+    t = 0.0f;
+    s = clampf(-c / a, 0.0f, 1.0f);
+  } else if (t > 1.0f) {
+    t = 1.0f;
+    s = clampf((b - c) / a, 0.0f, 1.0f);
+  }
+  c1 = add(p1, mul(d1, s));
+  c2 = add(p2, mul(d2, t));
+  return length(sub(c1, c2));
+}
+
+static float capsule_radius_from_name(const std::string& name, float leg_len) {
+  const std::string n = to_lower(name);
+  if (name.empty()) return 0.07f * leg_len;
+  if (name_has(n, {"hips", "pelvis", "spine", "chest", "torso"})) return 0.14f * leg_len;
+  if (name_has(n, {"thigh", "upleg", "upperleg"})) return 0.11f * leg_len;
+  if (name_has(n, {"calf", "lowerleg", "shin"})) return 0.09f * leg_len;
+  if (name_has(n, {"upperarm", "uparm", "arm"})) return 0.08f * leg_len;
+  if (name_has(n, {"forearm", "lowerarm"})) return 0.07f * leg_len;
+  if (name_has(n, {"hand", "wrist"})) return 0.06f * leg_len;
+  if (name_has(n, {"head", "neck"})) return 0.12f * leg_len;
+  return 0.07f * leg_len;
+}
+
+static void ensure_self_collision_cache(ecs::ProceduralGait& gait,
+                                        const ecs::Skeleton& skel,
+                                        const std::vector<rkg::Mat4>& world,
+                                        float leg_len) {
+  const size_t count = skel.bones.size();
+  if (gait.bone_rest_len.size() == count &&
+      gait.bone_radius.size() == count &&
+      gait.bone_collide.size() == count) {
+    return;
+  }
+  gait.bone_rest_len.assign(count, 0.0f);
+  gait.bone_radius.assign(count, 0.0f);
+  gait.bone_collide.assign(count, 0);
+  for (size_t i = 0; i < count; ++i) {
+    const int parent = skel.bones[i].parent_index;
+    if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+    const Vec3 p = {world[parent].m[12], world[parent].m[13], world[parent].m[14]};
+    const Vec3 c = {world[i].m[12], world[i].m[13], world[i].m[14]};
+    const float rest = length(sub(c, p));
+    gait.bone_rest_len[i] = rest;
+    gait.bone_radius[i] = capsule_radius_from_name(skel.bones[i].name, leg_len);
+    gait.bone_collide[i] = (rest > 0.05f * leg_len) ? 1u : 0u;
+  }
+}
+
 struct DebugLines {
   std::vector<float> pos;
   std::vector<float> color;
@@ -746,6 +835,174 @@ static Vec3 rotate_y(const Vec3& v, float angle) {
   const float c = std::cos(angle);
   const float s = std::sin(angle);
   return {v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
+}
+
+static void solve_self_collision(ecs::ProceduralGait& gait,
+                                 ecs::Skeleton& skel,
+                                 const ecs::Registry& registry,
+                                 std::vector<ecs::Transform>& locals,
+                                 std::vector<rkg::Mat4>& world,
+                                 float leg_len,
+                                 float dt) {
+  if (!gait.enable_self_collision) return;
+  if (skel.bones.empty()) return;
+
+  ensure_self_collision_cache(gait, skel, world, leg_len);
+  const size_t count = skel.bones.size();
+  std::vector<Vec3> pos(count);
+  std::vector<Vec3> target(count);
+  std::vector<int> child_count(count, 0);
+  std::vector<int> first_child(count, -1);
+
+  for (size_t i = 0; i < count; ++i) {
+    pos[i] = {world[i].m[12], world[i].m[13], world[i].m[14]};
+    target[i] = pos[i];
+    const int parent = skel.bones[i].parent_index;
+    if (parent >= 0 && static_cast<size_t>(parent) < count) {
+      if (child_count[parent] == 0) first_child[parent] = static_cast<int>(i);
+      ++child_count[parent];
+    }
+  }
+
+  const int root = (gait.bone_root != UINT32_MAX) ? static_cast<int>(gait.bone_root) : 0;
+  const int iters = std::max(1, gait.self_collision_iters);
+  const float stiffness = clampf(gait.self_collision_stiffness, 0.0f, 1.0f);
+
+  for (int iter = 0; iter < iters; ++iter) {
+    // length constraints
+    for (size_t i = 0; i < count; ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const int parent = skel.bones[i].parent_index;
+      if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+      const float rest = gait.bone_rest_len[i];
+      Vec3 delta = sub(pos[i], pos[parent]);
+      const float len = length(delta);
+      if (len < kEps) continue;
+      const float diff = (len - rest) / len;
+      const Vec3 corr = mul(delta, 0.5f * diff * stiffness);
+      if (parent != root) pos[parent] = add(pos[parent], corr);
+      pos[i] = sub(pos[i], corr);
+    }
+
+    // self-collision between bone capsules
+    for (size_t i = 0; i < count; ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const int parent_i = skel.bones[i].parent_index;
+      if (parent_i < 0 || static_cast<size_t>(parent_i) >= count) continue;
+      const float ri = gait.bone_radius[i];
+      const Vec3 a0 = pos[parent_i];
+      const Vec3 a1 = pos[i];
+      for (size_t j = i + 1; j < count; ++j) {
+        if (!gait.bone_collide[j]) continue;
+        const int parent_j = skel.bones[j].parent_index;
+        if (parent_j < 0 || static_cast<size_t>(parent_j) >= count) continue;
+        if (parent_i == static_cast<int>(j) || parent_j == static_cast<int>(i)) continue;
+        if (parent_i == parent_j) continue;
+        const float rj = gait.bone_radius[j];
+        const Vec3 b0 = pos[parent_j];
+        const Vec3 b1 = pos[j];
+        Vec3 c1{};
+        Vec3 c2{};
+        float s = 0.0f;
+        float t = 0.0f;
+        const float dist = closest_points_on_segments(a0, a1, b0, b1, c1, c2, s, t);
+        const float min_dist = ri + rj;
+        if (dist < min_dist) {
+          Vec3 n = (dist > kEps) ? mul(sub(c1, c2), 1.0f / dist) : v3(1.0f, 0.0f, 0.0f);
+          const float push = (min_dist - dist) * 0.5f * stiffness;
+          const Vec3 d = mul(n, push);
+          if (parent_i != root) pos[parent_i] = add(pos[parent_i], d);
+          pos[i] = add(pos[i], d);
+          if (parent_j != root) pos[parent_j] = sub(pos[parent_j], d);
+          pos[j] = sub(pos[j], d);
+        }
+      }
+    }
+
+    // collide endpoints with world colliders (approximate as spheres)
+    for (size_t i = 0; i < count; ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const int parent = skel.bones[i].parent_index;
+      if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+      const float r = gait.bone_radius[i];
+      Vec3 points[2] = {pos[parent], pos[i]};
+      for (const auto& kv : registry.colliders()) {
+        const auto& collider = kv.second;
+        if (collider.type == ecs::ColliderType::Plane) {
+          const Vec3 normal = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
+          const float d = collider.distance;
+          for (auto& p : points) {
+            const float dist = dot(p, normal) - d;
+            if (dist < r) {
+              p = add(p, mul(normal, (r - dist)));
+            }
+          }
+        } else if (collider.type == ecs::ColliderType::AABB) {
+          const Vec3 center = v3(collider.center[0], collider.center[1], collider.center[2]);
+          const Vec3 half = v3(collider.half_extents[0], collider.half_extents[1], collider.half_extents[2]);
+          for (auto& p : points) {
+            Vec3 local = sub(p, center);
+            Vec3 clamped = v3(clampf(local.x, -half.x, half.x),
+                              clampf(local.y, -half.y, half.y),
+                              clampf(local.z, -half.z, half.z));
+            Vec3 closest = add(center, clamped);
+            Vec3 delta = sub(p, closest);
+            const float dist_sq = length_sq(delta);
+            if (dist_sq < r * r) {
+              if (dist_sq > kEps) {
+                const float dist = std::sqrt(dist_sq);
+                p = add(p, mul(delta, (r - dist) / dist));
+              } else {
+                const float px = half.x - std::abs(local.x);
+                const float py = half.y - std::abs(local.y);
+                const float pz = half.z - std::abs(local.z);
+                if (px <= py && px <= pz) {
+                  const float sign = (local.x >= 0.0f) ? 1.0f : -1.0f;
+                  p.x = center.x + sign * (half.x + r);
+                } else if (py <= pz) {
+                  const float sign = (local.y >= 0.0f) ? 1.0f : -1.0f;
+                  p.y = center.y + sign * (half.y + r);
+                } else {
+                  const float sign = (local.z >= 0.0f) ? 1.0f : -1.0f;
+                  p.z = center.z + sign * (half.z + r);
+                }
+              }
+            }
+          }
+        }
+      }
+      pos[parent] = points[0];
+      pos[i] = points[1];
+    }
+
+    // stay near animated pose
+    for (size_t i = 0; i < count; ++i) {
+      if (!gait.bone_collide[i]) continue;
+      const Vec3 delta = sub(target[i], pos[i]);
+      pos[i] = add(pos[i], mul(delta, 0.15f));
+    }
+  }
+
+  // apply adjustments back to skeleton (only for single-child bones)
+  for (int pass = 0; pass < 2; ++pass) {
+    for (size_t i = 0; i < count; ++i) {
+      locals[i] = skel.bones[i].local_pose;
+    }
+    compute_world_matrices(skel, locals, world);
+    for (size_t i = 0; i < count; ++i) {
+      const int parent = skel.bones[i].parent_index;
+      if (parent < 0 || static_cast<size_t>(parent) >= count) continue;
+      if (!gait.bone_collide[i]) continue;
+      if (child_count[parent] != 1) continue;
+      apply_bone_aim(skel, world, static_cast<uint32_t>(parent), static_cast<uint32_t>(i), pos[i]);
+    }
+  }
+
+  for (size_t i = 0; i < count; ++i) {
+    locals[i] = skel.bones[i].local_pose;
+  }
+  compute_world_matrices(skel, locals, world);
+  (void)dt;
 }
 
 } // namespace
@@ -929,10 +1186,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
   const float swing_scale = 0.25f + 0.75f * speed_norm;
   const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor * swing_scale;
-  const float pelvis_yaw = 0.08f * arm_amp * twist;
-  const float torso_yaw = -0.12f * arm_amp * twist;
-  const float torso_roll = 0.10f * arm_amp * rock;
-  const float chest_roll = 0.28f * arm_amp * rock;
+  const float pelvis_yaw = 0.06f * arm_amp * twist;
+  const float torso_yaw = -0.08f * arm_amp * twist;
+  const float rock_amp = (0.08f + 0.22f * speed_norm);
+  const float torso_roll = 0.5f * rock_amp * rock;
+  const float chest_roll = 1.0f * rock_amp * rock;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
@@ -947,9 +1205,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float breathe = std::sin(gait->idle_time * 2.0f * kPi * 0.22f);
   const float breathe_amp = 0.03f * gait->idle_blend;
   add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_amp * 0.4f, torso_yaw * 0.35f,
-          lean_side_spine + torso_roll * 0.35f);
+          lean_side_spine + torso_roll * 0.45f);
   add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_amp, torso_yaw * 0.75f,
-          lean_side_chest + torso_roll * 0.55f + chest_roll);
+          lean_side_chest + chest_roll);
   add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_amp * 0.25f, torso_yaw * 0.2f,
           lean_side_neck + torso_roll * 0.25f);
   add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_amp * 0.15f, torso_yaw * 0.1f,
@@ -963,28 +1221,30 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float swing_r = std::sin(arm_phase_r);
     const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
     const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
-    const float arm_pitch_amp = 0.55f * arm_amp;
-    const float arm_yaw = 0.03f * arm_amp;
-    const float arm_roll = 0.04f * arm_amp;
+    const float arm_pitch_amp = 0.60f * arm_amp;
+    const float arm_yaw = 0.02f * arm_amp;
+    const float arm_roll = 0.03f * arm_amp;
     const float arm_lift = 0.03f * arm_amp;
     const float elbow_amp = 0.12f * arm_amp;
     const float elbow_phase = 0.20f;
-    const float shoulder_pitch_amp = 0.25f * arm_amp;
-    const float shoulder_yaw_amp = 0.12f * arm_amp;
-    const float shoulder_roll_amp = 0.14f * arm_amp;
+    const float shoulder_pitch_amp = 0.20f * arm_amp;
+    const float shoulder_yaw_amp = 0.08f * arm_amp;
+    const float shoulder_roll_amp = 0.10f * arm_amp;
     const float relax = gait->idle_blend;
-    const float relax_pitch = 0.22f * relax;
-    const float relax_yaw = 0.03f * relax;
-    const float relax_tuck = 0.12f * relax;
-    const float relax_elbow = 0.10f * relax;
-    add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r + relax_pitch * 0.6f,
-            shoulder_yaw_amp * swing_r_90 + relax_yaw, shoulder_roll_amp * swing_r + relax_tuck * 0.6f);
-    add_rot(*skeleton, gait->bone_r_shoulder, shoulder_pitch_amp * swing_l + relax_pitch * 0.6f,
-            -shoulder_yaw_amp * swing_l_90 - relax_yaw, -shoulder_roll_amp * swing_l - relax_tuck * 0.6f);
-    add_rot(*skeleton, gait->bone_l_upper_arm, arm_pitch_amp * swing_r + arm_lift + relax_pitch, arm_yaw * swing_r_90,
-            gait->arm_tuck + arm_roll * swing_r + relax_tuck);
-    add_rot(*skeleton, gait->bone_r_upper_arm, arm_pitch_amp * swing_l + arm_lift + relax_pitch, -arm_yaw * swing_l_90,
-            -gait->arm_tuck - arm_roll * swing_l - relax_tuck);
+    const float relax_pitch = 0.18f * relax;
+    const float relax_yaw = 0.02f * relax;
+    const float relax_tuck = 0.22f * relax;
+    const float relax_elbow = 0.08f * relax;
+    const float arm_out = 0.12f + 0.08f * relax;
+    const float idle_arm = 0.06f * relax * std::sin(gait->idle_time * 2.0f * kPi * 0.25f);
+    add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r + relax_pitch * 0.5f + idle_arm * 0.4f,
+            shoulder_yaw_amp * swing_r_90 + relax_yaw, shoulder_roll_amp * swing_r + arm_out * 0.5f);
+    add_rot(*skeleton, gait->bone_r_shoulder, shoulder_pitch_amp * swing_l + relax_pitch * 0.5f - idle_arm * 0.4f,
+            -shoulder_yaw_amp * swing_l_90 - relax_yaw, -shoulder_roll_amp * swing_l - arm_out * 0.5f);
+    add_rot(*skeleton, gait->bone_l_upper_arm, arm_pitch_amp * swing_r + arm_lift + relax_pitch + idle_arm,
+            arm_yaw * swing_r_90, gait->arm_tuck + arm_roll * swing_r + arm_out);
+    add_rot(*skeleton, gait->bone_r_upper_arm, arm_pitch_amp * swing_l + arm_lift + relax_pitch - idle_arm,
+            -arm_yaw * swing_l_90, -gait->arm_tuck - arm_roll * swing_l - arm_out);
     add_rot(*skeleton, gait->bone_l_lower_arm, elbow_amp * std::sin(arm_phase_r + elbow_phase) + relax_elbow, 0.0f, 0.0f);
     add_rot(*skeleton, gait->bone_r_lower_arm, elbow_amp * std::sin(arm_phase_l + elbow_phase) + relax_elbow, 0.0f, 0.0f);
   }
@@ -1576,6 +1836,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
         gait->right_locked = true;
       }
     }
+  }
+
+  if (gait->enable_self_collision) {
+    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
+      locals[i] = skeleton->bones[i].local_pose;
+    }
+    compute_world_matrices(*skeleton, locals, world);
+    solve_self_collision(*gait, *skeleton, registry, locals, world, leg_len_e, dt);
   }
 
   if (rkg::movement_log::enabled()) {

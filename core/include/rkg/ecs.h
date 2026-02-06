@@ -120,6 +120,9 @@ struct ProceduralGait {
   bool enable_arm_swing = true;
   bool enable_pelvis_motion = true;
   bool enable_turn_in_place = true;
+  bool enable_self_collision = true;
+  int self_collision_iters = 4;
+  float self_collision_stiffness = 0.7f;
 
   float walk_speed = 2.2f;
   float sprint_speed = 4.0f;
@@ -188,6 +191,9 @@ struct ProceduralGait {
   float debug_knee_lat_r = 0.0f;
   float debug_target_lat_l = 0.0f;
   float debug_target_lat_r = 0.0f;
+  std::vector<float> bone_rest_len;
+  std::vector<float> bone_radius;
+  std::vector<uint8_t> bone_collide;
   float debug_continuity_l = 1.0f;
   float debug_continuity_r = 1.0f;
 
