@@ -64,13 +64,13 @@ struct CharacterController {
   float radius = 0.35f;
   float half_height = 0.9f;
   float center_offset = 0.0f;
-  float max_speed = 1.8f;
+  float max_speed = 1.6f;
   float sprint_multiplier = 2.0f;
   float accel = 20.0f;
   float friction = 8.0f;
   float braking_deceleration = 16.0f;
   float braking_friction_factor = 2.0f;
-  float max_air_speed = 1.8f;
+  float max_air_speed = 1.6f;
   float max_air_accel = 12.0f;
   float air_control = 0.35f;
   float air_control_boost_multiplier = 2.0f;
@@ -123,13 +123,13 @@ struct ProceduralGait {
 
   float walk_speed = 2.2f;
   float sprint_speed = 4.0f;
-  float stride_scale = 0.9f;
+  float stride_scale = 1.0f;
   float step_height_scale = 0.3f;
   float pelvis_bob_scale = 0.03f;
   float pelvis_sway_scale = 0.02f;
   float pelvis_roll_scale = 0.15f;
   float pelvis_lean_scale = 0.25f;
-  float arm_swing_scale = 0.45f;
+  float arm_swing_scale = 0.35f;
   float arm_tuck = -0.2f;
   float turn_in_place_speed = 0.25f;
   float turn_step_rate = 0.8f;

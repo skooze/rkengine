@@ -833,8 +833,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float leg_len_e = gait->leg_length;
   const float leg_len_world = leg_len_e * rig_scale;
 
-  const float walk_cadence = 1.8f;
-  const float run_cadence = 2.8f;
+  const float walk_cadence = 1.6f;
+  const float run_cadence = 2.6f;
   const float cadence = walk_cadence + (run_cadence - walk_cadence) * speed_gait_norm;
 
   const float speed_e = speed * inv_rig_scale;
@@ -959,15 +959,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float swing_r = std::sin(arm_phase_r);
     const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
     const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
-    const float arm_pitch_amp = 0.65f * arm_amp;
-    const float arm_yaw = 0.08f * arm_amp;
-    const float arm_roll = 0.10f * arm_amp;
-    const float arm_lift = 0.05f * arm_amp;
-    const float elbow_amp = 0.32f * arm_amp;
-    const float elbow_phase = 0.22f;
-    const float shoulder_pitch_amp = 0.35f * arm_amp;
-    const float shoulder_yaw_amp = 0.28f * arm_amp;
-    const float shoulder_roll_amp = 0.32f * arm_amp;
+    const float arm_pitch_amp = 0.45f * arm_amp;
+    const float arm_yaw = 0.05f * arm_amp;
+    const float arm_roll = 0.07f * arm_amp;
+    const float arm_lift = 0.04f * arm_amp;
+    const float elbow_amp = 0.18f * arm_amp;
+    const float elbow_phase = 0.20f;
+    const float shoulder_pitch_amp = 0.30f * arm_amp;
+    const float shoulder_yaw_amp = 0.22f * arm_amp;
+    const float shoulder_roll_amp = 0.26f * arm_amp;
     add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r,
             shoulder_yaw_amp * swing_r_90, shoulder_roll_amp * swing_r);
     add_rot(*skeleton, gait->bone_r_shoulder, shoulder_pitch_amp * swing_l,
