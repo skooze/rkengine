@@ -264,6 +264,7 @@ static MotorInput gather_input(const rkg::ecs::Transform& transform,
     }
   }
   input.raw_mag = raw_mag;
+  controller.raw_input_mag = raw_mag;
 
   const float tau = std::max(controller.input_smooth_tau, 0.0f);
   if (tau > kEps) {

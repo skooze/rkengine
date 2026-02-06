@@ -778,8 +778,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const bool grounded = controller ? controller->grounded : false;
   float input_mag_raw = 0.0f;
   if (controller) {
-    Vec3 in{controller->smoothed_input[0], 0.0f, controller->smoothed_input[2]};
-    input_mag_raw = length(in);
+    input_mag_raw = controller->raw_input_mag;
+    if (input_mag_raw <= 0.0f) {
+      Vec3 in{controller->smoothed_input[0], 0.0f, controller->smoothed_input[2]};
+      input_mag_raw = length(in);
+    }
   }
   const bool sprinting = controller ? controller->is_sprinting : false;
   float max_speed = gait->walk_speed;
@@ -815,8 +818,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const bool turn_in_place = gait->enable_turn_in_place &&
                              grounded &&
                              speed_raw < gait->turn_in_place_speed &&
-                             input_mag_raw < 0.1f &&
-                             std::abs(yaw_rate_raw) > 0.6f;
+                             input_mag_raw < 0.15f &&
+                             std::abs(gait->yaw_rate) > 0.6f;
 
   const float sx = std::abs(transform->scale[0]);
   const float sy = std::abs(transform->scale[1]);
@@ -1031,8 +1034,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float strafe_half = gait->lateral_step_scale * 0.20f * width_ref_e *
                             std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half_local + strafe_half;
-  const float min_side = 0.90f * step_half_desired;
-  const float max_side = step_half_desired * 1.6f;
+  const float side_cap = 0.20f * leg_len_e;
+  const float min_side = std::min(0.90f * step_half_desired, side_cap);
+  const float max_side = side_cap;
   const Vec3 home_l_rad = sub(home_l_e, hips_e);
   const Vec3 home_r_rad = sub(home_r_e, hips_e);
   const float home_rad_l = length(Vec3{home_l_rad.x, 0.0f, home_l_rad.z});

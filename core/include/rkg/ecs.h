@@ -108,6 +108,7 @@ struct CharacterController {
   float desired_move_speed = 0.0f;
   bool use_desired_input = false;
   float smoothed_input[3] = {0.0f, 0.0f, 0.0f};
+  float raw_input_mag = 0.0f;
   float external_base_velocity[3] = {0.0f, 0.0f, 0.0f};
 };
 
@@ -130,12 +131,12 @@ struct ProceduralGait {
   float pelvis_lean_scale = 0.25f;
   float arm_swing_scale = 0.45f;
   float arm_tuck = -0.2f;
-  float turn_in_place_speed = 0.15f;
+  float turn_in_place_speed = 0.25f;
   float turn_step_rate = 0.8f;
   float foot_lock_in = 0.25f;
   float foot_lock_out = 0.65f;
   float ik_blend_speed = 8.0f;
-  float lateral_step_scale = 0.6f;
+  float lateral_step_scale = 0.35f;
   float knee_plane_bias = 0.9f;
   float landing_compress = 0.04f;
   float landing_recover = 10.0f;
