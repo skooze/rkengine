@@ -982,14 +982,19 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float frame_rate = (intent_mag > 0.05f) ? 8.0f : 20.0f;
   const float frame_alpha = 1.0f - std::exp(-dt * frame_rate);
   Vec3 desired_frame_e = frame_fwd_e;
+  Vec3 fwd_e = normalize(to_local_dir(*transform, forward));
+  if (length(fwd_e) < 0.0001f) fwd_e = v3(0.0f, 0.0f, 1.0f);
   if (intent_mag > 0.05f) {
     Vec3 intent_e = normalize(to_local_dir(*transform, intent_world));
     if (length(intent_e) > 0.0001f) {
-      desired_frame_e = intent_e;
+      const float forwardness = std::abs(dot(intent_e, fwd_e));
+      const float intent_blend = saturate((forwardness - 0.2f) / 0.6f);
+      desired_frame_e = normalize(lerp(fwd_e, intent_e, intent_blend));
+    } else {
+      desired_frame_e = fwd_e;
     }
   } else if (idle) {
-    Vec3 fwd_e = normalize(to_local_dir(*transform, forward));
-    if (length(fwd_e) > 0.0001f) desired_frame_e = fwd_e;
+    desired_frame_e = fwd_e;
   }
   frame_fwd_e = normalize(lerp(frame_fwd_e, desired_frame_e, frame_alpha));
   to_array(frame_fwd_e, gait->frame_fwd_entity);
