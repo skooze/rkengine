@@ -1271,7 +1271,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float walk_cadence = 1.6f;
   const float run_cadence = 2.6f;
-  const float cadence = walk_cadence + (run_cadence - walk_cadence) * speed_gait_norm;
+  const float cadence_scale = clampf(gait->cadence_scale, 0.5f, 1.3f);
+  const float cadence = (walk_cadence + (run_cadence - walk_cadence) * speed_gait_norm) * cadence_scale;
 
   const float speed_e = speed * inv_rig_scale;
   const float stride_scale = std::max(gait->stride_scale, 0.1f);
@@ -1411,14 +1412,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float arm_lift = 0.03f * arm_amp;
     const float elbow_amp = 0.12f * arm_amp;
     const float elbow_phase = 0.20f;
-    const float shoulder_pitch_amp = 0.45f * arm_amp;
-    const float shoulder_yaw_amp = 0.01f * arm_amp;
-    const float shoulder_roll_amp = 0.01f * arm_amp;
+    const float shoulder_pitch_amp = 0.40f * arm_amp;
+    const float shoulder_yaw_amp = 0.005f * arm_amp;
+    const float shoulder_roll_amp = 0.005f * arm_amp;
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
     const float relax_elbow = 0.08f * relax;
-    const float arm_out = gait->arm_out * (0.3f + 0.7f * relax);
+    const float arm_out = gait->arm_out * (0.2f + 0.6f * relax);
     const float idle_arm = 0.06f * relax * std::sin(gait->idle_time * 2.0f * kPi * 0.25f);
     add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r + relax_pitch * 0.5f + idle_arm * 0.4f,
             shoulder_yaw_amp * swing_r_90 + relax_yaw, shoulder_roll_amp * swing_r + arm_out * 0.5f);
@@ -1531,11 +1532,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float arm_rest_base = clampf(gait->arm_relax, 0.0f, 1.0f);
   const float arm_rest_weight = clampf(std::max(arm_rest_base, std::max(relax_speed, gait->idle_blend)),
                                        0.0f, 0.85f);
-  const float arm_side_idle = gait->arm_out + 0.14f;
-  const float arm_side_run = std::max(0.08f, gait->arm_out * 0.75f);
+  const float arm_side_idle = gait->arm_out + 0.06f;
+  const float arm_side_run = std::max(0.04f, gait->arm_out * 0.55f);
   const float arm_side_bias = arm_side_run + (arm_side_idle - arm_side_run) * relax_speed;
-  const float arm_fwd_bias = 0.06f;
-  const float arm_down_bias = 0.65f;
+  const float arm_fwd_bias = 0.03f;
+  const float arm_down_bias = 0.78f;
   if (arm_rest_weight > 0.01f &&
       gait->bone_l_upper_arm != UINT32_MAX && gait->bone_l_lower_arm != UINT32_MAX &&
       gait->bone_r_upper_arm != UINT32_MAX && gait->bone_r_lower_arm != UINT32_MAX) {
@@ -1555,8 +1556,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
                               mul(side_e, side_sign * arm_side_bias)));
       rest_dir = normalize(rest_dir);
       const float out_dot = dot(rest_dir, side_e) * side_sign;
-      if (out_dot < 0.18f) {
-        rest_dir = normalize(add(rest_dir, mul(side_e, side_sign * (0.18f - out_dot))));
+      if (out_dot < 0.10f) {
+        rest_dir = normalize(add(rest_dir, mul(side_e, side_sign * (0.10f - out_dot))));
       }
       return rest_dir;
     };

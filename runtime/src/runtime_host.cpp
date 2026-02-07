@@ -81,6 +81,7 @@ static void apply_gait_env_overrides(rkg::ecs::ProceduralGait& gait) {
   read_f("RKG_GAIT_WALK_SPEED", gait.walk_speed);
   read_f("RKG_GAIT_SPRINT_SPEED", gait.sprint_speed);
   read_f("RKG_GAIT_STRIDE_SCALE", gait.stride_scale);
+  read_f("RKG_GAIT_CADENCE_SCALE", gait.cadence_scale);
   read_f("RKG_GAIT_STEP_HEIGHT", gait.step_height_scale);
   read_f("RKG_GAIT_PELVIS_BOB", gait.pelvis_bob_scale);
   read_f("RKG_GAIT_PELVIS_SWAY", gait.pelvis_sway_scale);
