@@ -1354,15 +1354,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float swing_r = std::sin(arm_phase_r);
     const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
     const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
-    const float arm_pitch_amp = 0.65f * arm_amp;
-    const float arm_yaw = 0.02f * arm_amp;
-    const float arm_roll = 0.03f * arm_amp;
+    const float arm_pitch_amp = 0.70f * arm_amp;
+    const float arm_yaw = 0.01f * arm_amp;
+    const float arm_roll = 0.01f * arm_amp;
     const float arm_lift = 0.03f * arm_amp;
     const float elbow_amp = 0.12f * arm_amp;
     const float elbow_phase = 0.20f;
-    const float shoulder_pitch_amp = 0.35f * arm_amp;
-    const float shoulder_yaw_amp = 0.03f * arm_amp;
-    const float shoulder_roll_amp = 0.02f * arm_amp;
+    const float shoulder_pitch_amp = 0.45f * arm_amp;
+    const float shoulder_yaw_amp = 0.01f * arm_amp;
+    const float shoulder_roll_amp = 0.01f * arm_amp;
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
@@ -1509,28 +1509,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       }
       return rest_dir;
     };
-    auto apply_shoulder_rest = [&](uint32_t shoulder_idx, uint32_t upper, const Vec3& rest_dir) {
-      if (shoulder_idx == UINT32_MAX || shoulder_idx >= arm_world.size()) return;
-      const Vec3 shoulder_pos = arm_pos(shoulder_idx);
-      const Vec3 upper_pos = arm_pos(upper);
-      const float shoulder_len = std::max(length(sub(upper_pos, shoulder_pos)), 0.001f);
-      const Vec3 desired_upper = add(shoulder_pos, mul(rest_dir, shoulder_len));
-      const float shoulder_weight = arm_rest_weight * 0.6f;
-      const Vec3 shoulder_target = lerp(upper_pos, desired_upper, shoulder_weight);
-      apply_bone_aim(*skeleton, arm_world, shoulder_idx, upper, shoulder_target);
-    };
     const Vec3 rest_dir_l = rest_dir_for(-1.0f);
     const Vec3 rest_dir_r = rest_dir_for(1.0f);
-    if (gait->bone_l_shoulder != UINT32_MAX) {
-      apply_shoulder_rest(gait->bone_l_shoulder, gait->bone_l_upper_arm, rest_dir_l);
-    }
-    if (gait->bone_r_shoulder != UINT32_MAX) {
-      apply_shoulder_rest(gait->bone_r_shoulder, gait->bone_r_upper_arm, rest_dir_r);
-    }
-    for (size_t i = 0; i < skeleton->bones.size(); ++i) {
-      arm_locals[i] = skeleton->bones[i].local_pose;
-    }
-    compute_world_matrices(*skeleton, arm_locals, arm_world);
     auto apply_upper_rest = [&](uint32_t upper, uint32_t lower, const Vec3& rest_dir) {
       const Vec3 shoulder = arm_pos(upper);
       const Vec3 elbow = arm_pos(lower);
