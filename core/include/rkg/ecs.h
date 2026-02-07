@@ -132,6 +132,11 @@ struct ProceduralGait {
   float pelvis_sway_scale = 0.018f;
   float pelvis_roll_scale = 0.10f;
   float pelvis_lean_scale = 0.25f;
+  float body_mass = 80.0f;
+  float body_spring_hz = 4.5f;
+  float body_damping = 1.0f;
+  float foot_spring_hz = 8.0f;
+  float foot_damping = 1.0f;
   float arm_swing_scale = 0.32f;
   float arm_tuck = -0.04f;
   float arm_relax = 0.70f;
@@ -161,6 +166,8 @@ struct ProceduralGait {
   float last_velocity[3] = {0.0f, 0.0f, 0.0f};
   float pelvis_offset[3] = {0.0f, 0.0f, 0.0f};
   float pelvis_bob_y = 0.0f;
+  float pelvis_bob_v = 0.0f;
+  float pelvis_offset_vel[3] = {0.0f, 0.0f, 0.0f};
   bool left_locked = false;
   bool right_locked = false;
   float left_lock_pos[3] = {0.0f, 0.0f, 0.0f};
@@ -173,6 +180,8 @@ struct ProceduralGait {
   float right_swing_start_pos[3] = {0.0f, 0.0f, 0.0f};
   float smooth_left_target[3] = {0.0f, 0.0f, 0.0f};
   float smooth_right_target[3] = {0.0f, 0.0f, 0.0f};
+  float smooth_left_vel[3] = {0.0f, 0.0f, 0.0f};
+  float smooth_right_vel[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_l[3] = {0.0f, 0.0f, 0.0f};
   float foot_home_r[3] = {0.0f, 0.0f, 0.0f};
   float side_sign_l = -1.0f;

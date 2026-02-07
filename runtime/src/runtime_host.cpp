@@ -86,6 +86,11 @@ static void apply_gait_env_overrides(rkg::ecs::ProceduralGait& gait) {
   read_f("RKG_GAIT_PELVIS_SWAY", gait.pelvis_sway_scale);
   read_f("RKG_GAIT_PELVIS_ROLL", gait.pelvis_roll_scale);
   read_f("RKG_GAIT_PELVIS_LEAN", gait.pelvis_lean_scale);
+  read_f("RKG_GAIT_BODY_MASS", gait.body_mass);
+  read_f("RKG_GAIT_BODY_HZ", gait.body_spring_hz);
+  read_f("RKG_GAIT_BODY_DAMP", gait.body_damping);
+  read_f("RKG_GAIT_FOOT_HZ", gait.foot_spring_hz);
+  read_f("RKG_GAIT_FOOT_DAMP", gait.foot_damping);
   read_f("RKG_GAIT_ARM_SWING", gait.arm_swing_scale);
   read_f("RKG_GAIT_ARM_TUCK", gait.arm_tuck);
   read_f("RKG_GAIT_ARM_RELAX", gait.arm_relax);

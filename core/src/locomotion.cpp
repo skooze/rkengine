@@ -356,6 +356,38 @@ static void reset_pose_to_bind(ecs::Skeleton& skel) {
   }
 }
 
+static void spring_1d(float target,
+                      float freq_hz,
+                      float damping_ratio,
+                      float dt,
+                      float& x,
+                      float& v) {
+  if (dt <= 0.0f || freq_hz <= 0.0f) {
+    x = target;
+    v = 0.0f;
+    return;
+  }
+  const float omega = 2.0f * kPi * freq_hz;
+  const float f = 1.0f + 2.0f * dt * damping_ratio * omega;
+  const float oo = omega * omega;
+  const float hoo = dt * oo;
+  const float hhoo = dt * hoo;
+  const float inv = 1.0f / (f + hhoo);
+  x = (f * x + dt * v + hhoo * target) * inv;
+  v = (v + hoo * (target - x)) * inv;
+}
+
+static void spring_3d(const Vec3& target,
+                      float freq_hz,
+                      float damping_ratio,
+                      float dt,
+                      Vec3& x,
+                      Vec3& v) {
+  spring_1d(target.x, freq_hz, damping_ratio, dt, x.x, v.x);
+  spring_1d(target.y, freq_hz, damping_ratio, dt, x.y, v.y);
+  spring_1d(target.z, freq_hz, damping_ratio, dt, x.z, v.z);
+}
+
 static bool update_foot_lock_internal(bool& locked,
                                       Vec3& lock_pos,
                                       const Vec3& foot_pos,
@@ -1161,6 +1193,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   auto* controller = registry.get_character_controller(entity);
   auto* velocity = registry.get_velocity(entity);
+  auto* rigid_body = registry.get_rigid_body(entity);
   const Vec3 vel = velocity ? from_array(velocity->linear) : v3();
   Vec3 planar = v3(vel.x, 0.0f, vel.z);
   float speed = length(planar);
@@ -1195,6 +1228,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   if (sprinting) gait_speed_ref = gait->sprint_speed;
   if (gait_speed_ref < 0.01f) gait_speed_ref = max_speed;
   const float speed_gait_norm = saturate(speed / std::max(gait_speed_ref, 0.01f));
+
+  float anim_mass = gait->body_mass;
+  if (rigid_body && rigid_body->mass > 0.01f) {
+    anim_mass = rigid_body->mass;
+  }
+  const float mass_scale = clampf(std::sqrt(anim_mass / 80.0f), 0.6f, 1.6f);
+  const float body_hz = gait->body_spring_hz / mass_scale;
+  const float foot_hz = gait->foot_spring_hz / mass_scale;
+  const float body_damp = clampf(gait->body_damping, 0.1f, 4.0f);
+  const float foot_damp = clampf(gait->foot_damping, 0.1f, 4.0f);
   gait->yaw = transform->rotation[1];
   const float yaw_delta = wrap_pi(gait->yaw - gait->last_yaw);
   gait->last_yaw = gait->yaw;
@@ -1317,8 +1360,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float twist = std::cos(sway_phase);
   const float pelvis_x = pelvis_sway_amp * sway;
   const float pelvis_y_target = -pelvis_bob * std::sin(kPi * stance_u);
-  const float bob_alpha = 1.0f - std::exp(-dt * 10.0f);
-  gait->pelvis_bob_y += (pelvis_y_target - gait->pelvis_bob_y) * bob_alpha;
+  spring_1d(pelvis_y_target, body_hz, body_damp, dt, gait->pelvis_bob_y, gait->pelvis_bob_v);
   const float pelvis_y = gait->pelvis_bob_y;
   const float strafe_factor =
       1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
@@ -1843,23 +1885,28 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     r_target_e = to_local_point_root(r_target_w);
   }
 
-  const float target_alpha = 1.0f - std::exp(-dt * 12.0f);
   Vec3 l_smooth = from_array(gait->smooth_left_target);
   Vec3 r_smooth = from_array(gait->smooth_right_target);
+  Vec3 l_smooth_v = from_array(gait->smooth_left_vel);
+  Vec3 r_smooth_v = from_array(gait->smooth_right_vel);
   if (length(l_smooth) < 0.0001f) l_smooth = l_target_e;
   if (length(r_smooth) < 0.0001f) r_smooth = r_target_e;
   if (left_swing_run || left_locked_now) {
     l_smooth = l_target_e;
+    l_smooth_v = v3();
   } else {
-    l_smooth = lerp(l_smooth, l_target_e, target_alpha);
+    spring_3d(l_target_e, foot_hz, foot_damp, dt, l_smooth, l_smooth_v);
   }
   if (right_swing_run || right_locked_now) {
     r_smooth = r_target_e;
+    r_smooth_v = v3();
   } else {
-    r_smooth = lerp(r_smooth, r_target_e, target_alpha);
+    spring_3d(r_target_e, foot_hz, foot_damp, dt, r_smooth, r_smooth_v);
   }
   to_array(l_smooth, gait->smooth_left_target);
   to_array(r_smooth, gait->smooth_right_target);
+  to_array(l_smooth_v, gait->smooth_left_vel);
+  to_array(r_smooth_v, gait->smooth_right_vel);
   if (!left_locked_now) {
     l_target_e = clamp_target_e(l_smooth, side_sign_l);
   } else {
@@ -1931,10 +1978,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float max_pelvis_drop = leg_len_e * 0.12f;
     const float desired_drop = std::min(0.0f, std::min(target_l.y - l_foot.y, target_r.y - r_foot.y));
     const float clamped_drop = clampf(desired_drop, -max_pelvis_drop, 0.0f);
-    const float pelvis_alpha = 1.0f - std::exp(-dt * gait->ik_blend_speed);
-    gait->pelvis_offset[0] += (lock_offset_e.x - gait->pelvis_offset[0]) * pelvis_alpha;
-    gait->pelvis_offset[1] += (clamped_drop - gait->pelvis_offset[1]) * pelvis_alpha;
-    gait->pelvis_offset[2] += (lock_offset_e.z - gait->pelvis_offset[2]) * pelvis_alpha;
+    Vec3 pelvis_off = {gait->pelvis_offset[0], gait->pelvis_offset[1], gait->pelvis_offset[2]};
+    Vec3 pelvis_off_v = from_array(gait->pelvis_offset_vel);
+    spring_1d(lock_offset_e.x, body_hz, body_damp, dt, pelvis_off.x, pelvis_off_v.x);
+    spring_1d(clamped_drop, body_hz, body_damp, dt, pelvis_off.y, pelvis_off_v.y);
+    spring_1d(lock_offset_e.z, body_hz, body_damp, dt, pelvis_off.z, pelvis_off_v.z);
+    to_array(pelvis_off, gait->pelvis_offset);
+    to_array(pelvis_off_v, gait->pelvis_offset_vel);
     const uint32_t root_idx = (gait->bone_root != UINT32_MAX) ? gait->bone_root : gait->bone_hips;
     add_pos(*skeleton, root_idx, gait->pelvis_offset[0], 0.0f, gait->pelvis_offset[2]);
     add_pos(*skeleton, gait->bone_hips, 0.0f, gait->pelvis_offset[1], 0.0f);
