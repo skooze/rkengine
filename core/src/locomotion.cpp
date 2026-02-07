@@ -1876,22 +1876,19 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const bool right_locked_now =
       grounded && gait->enable_foot_lock && right_stance_run && gait->right_locked;
 
-  spring_1d(left_locked_now ? 1.0f : 0.0f, foot_hz, foot_damp, dt,
-            gait->left_lock_weight, gait->left_lock_weight_v);
-  spring_1d(right_locked_now ? 1.0f : 0.0f, foot_hz, foot_damp, dt,
-            gait->right_lock_weight, gait->right_lock_weight_v);
-  gait->left_lock_weight = clampf(gait->left_lock_weight, 0.0f, 1.0f);
-  gait->right_lock_weight = clampf(gait->right_lock_weight, 0.0f, 1.0f);
+  const float lock_in = std::max(gait->foot_lock_in, 0.05f);
+  gait->left_lock_weight = left_stance_run ? smoothstep01(left_stance_u / lock_in) : 0.0f;
+  gait->right_lock_weight = right_stance_run ? smoothstep01(right_stance_u / lock_in) : 0.0f;
 
-  if (left_locked_now || gait->left_lock_weight > 0.001f) {
+  if (left_locked_now) {
     const Vec3 lock_e = to_local_point_root(l_lock_w);
-    l_target_e = lerp(l_target_e, lock_e, gait->left_lock_weight);
-    l_target_w = to_world_point_root(l_target_e);
+    l_target_e = lock_e;
+    l_target_w = l_lock_w;
   }
-  if (right_locked_now || gait->right_lock_weight > 0.001f) {
+  if (right_locked_now) {
     const Vec3 lock_e = to_local_point_root(r_lock_w);
-    r_target_e = lerp(r_target_e, lock_e, gait->right_lock_weight);
-    r_target_w = to_world_point_root(r_target_e);
+    r_target_e = lock_e;
+    r_target_w = r_lock_w;
   }
 
   Vec3 l_smooth = from_array(gait->smooth_left_target);
