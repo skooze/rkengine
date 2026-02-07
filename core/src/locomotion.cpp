@@ -1585,7 +1585,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float step_time = 1.0f / std::max(cadence, 0.1f);
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
   const float home_width_e = 0.5f * std::abs(dot(sub(home_r_e, home_l_e), side_e));
-  const float width_ref_e = std::max(std::max(gait->hip_width, home_width_e), 0.20f * leg_len_e);
+  const float width_ref_e = std::max(home_width_e, 0.20f * leg_len_e);
   float step_half_walk = 0.36f * width_ref_e;
   float step_half_run = 0.28f * width_ref_e;
   float step_half_local = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
@@ -1594,15 +1594,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float strafe_half = gait->lateral_step_scale * 0.20f * width_ref_e *
                             std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half_local + strafe_half;
-  const float side_cap = 0.22f * leg_len_e;
-  const float min_side = std::min(0.95f * step_half_desired, side_cap);
+  const float side_cap = 0.20f * leg_len_e;
+  const float min_side = std::min(0.85f * step_half_desired, side_cap);
   const float max_side = side_cap;
   const Vec3 home_l_rad = sub(home_l_e, hips_e);
   const Vec3 home_r_rad = sub(home_r_e, hips_e);
   const float home_rad_l = length(Vec3{home_l_rad.x, 0.0f, home_l_rad.z});
   const float home_rad_r = length(Vec3{home_r_rad.x, 0.0f, home_r_rad.z});
   const float home_rad_e = 0.5f * (home_rad_l + home_rad_r);
-  const float min_rad = std::max(0.50f * home_rad_e, 0.22f * leg_len_e);
+  const float min_rad = std::max(0.45f * home_rad_e, 0.20f * leg_len_e);
 
   // Ensure side axis points from left to right based on bind/home foot offsets.
   if (dot(sub(home_r_e, home_l_e), side_e) < 0.0f) {
@@ -2088,13 +2088,17 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       if (left_just_landed) {
         const Vec3 foot_e = safe_pos(gait->bone_l_foot);
         const Vec3 foot_w = to_world_point(*transform, foot_e);
-        to_array(foot_w, gait->left_lock_pos);
+        Vec3 clamp_e = clamp_target_e(to_local_point_root(foot_w), side_sign_l);
+        const Vec3 clamp_w = to_world_point_root(clamp_e);
+        to_array(clamp_w, gait->left_lock_pos);
         gait->left_locked = true;
       }
       if (right_just_landed) {
         const Vec3 foot_e = safe_pos(gait->bone_r_foot);
         const Vec3 foot_w = to_world_point(*transform, foot_e);
-        to_array(foot_w, gait->right_lock_pos);
+        Vec3 clamp_e = clamp_target_e(to_local_point_root(foot_w), side_sign_r);
+        const Vec3 clamp_w = to_world_point_root(clamp_e);
+        to_array(clamp_w, gait->right_lock_pos);
         gait->right_locked = true;
       }
     }
