@@ -1305,7 +1305,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float pelvis_bob = gait->pelvis_bob_scale * leg_len_e * speed_norm;
   const float pelvis_width_ref_e = std::max(gait->hip_width, 0.20f * leg_len_e);
-  float step_half = 0.45f * pelvis_width_ref_e + (0.35f * pelvis_width_ref_e - 0.45f * pelvis_width_ref_e) * speed_gait_norm;
+  float step_half = 0.36f * pelvis_width_ref_e + (0.28f * pelvis_width_ref_e - 0.36f * pelvis_width_ref_e) * speed_gait_norm;
   step_half = std::max(step_half, 0.10f * leg_len_e);
   step_half = std::min(step_half, 0.22f * leg_len_e);
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
@@ -1371,7 +1371,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
     const float relax_elbow = 0.08f * relax;
-    const float arm_out = 0.02f + 0.02f * relax;
+    const float arm_out = gait->arm_out * (0.3f + 0.7f * relax);
     const float idle_arm = 0.06f * relax * std::sin(gait->idle_time * 2.0f * kPi * 0.25f);
     add_rot(*skeleton, gait->bone_l_shoulder, shoulder_pitch_amp * swing_r + relax_pitch * 0.5f + idle_arm * 0.4f,
             shoulder_yaw_amp * swing_r_90 + relax_yaw, shoulder_roll_amp * swing_r + arm_out * 0.5f);
@@ -1481,8 +1481,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   to_array(side_e, gait->frame_side_entity);
 
   const float relax_speed = clampf(1.0f - speed_norm * 0.9f, 0.0f, 1.0f);
-  const float arm_rest_base = 0.18f + 0.22f * (1.0f - speed_norm);
+  const float arm_rest_base = clampf(gait->arm_relax, 0.0f, 1.0f);
   const float arm_rest_weight = std::max(arm_rest_base, std::max(relax_speed, gait->idle_blend));
+  const float arm_side_idle = gait->arm_out + 0.08f;
+  const float arm_side_run = std::max(0.04f, gait->arm_out * 0.5f);
+  const float arm_side_bias = arm_side_run + (arm_side_idle - arm_side_run) * relax_speed;
+  const float arm_fwd_bias = 0.10f;
   if (arm_rest_weight > 0.01f &&
       gait->bone_l_upper_arm != UINT32_MAX && gait->bone_l_lower_arm != UINT32_MAX &&
       gait->bone_r_upper_arm != UINT32_MAX && gait->bone_r_lower_arm != UINT32_MAX) {
@@ -1498,8 +1502,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     };
     auto rest_dir_for = [&](float side_sign) {
       Vec3 rest_dir = add(mul(v3(0.0f, -1.0f, 0.0f), 1.0f),
-                          add(mul(frame_fwd_e, 0.18f), mul(side_e, side_sign * 0.08f)));
-      return normalize(rest_dir);
+                          add(mul(frame_fwd_e, arm_fwd_bias),
+                              mul(side_e, side_sign * arm_side_bias)));
+      rest_dir = normalize(rest_dir);
+      const float out_dot = dot(rest_dir, side_e) * side_sign;
+      if (out_dot < 0.06f) {
+        rest_dir = normalize(add(rest_dir, mul(side_e, side_sign * (0.06f - out_dot))));
+      }
+      return rest_dir;
     };
     auto apply_shoulder_rest = [&](uint32_t shoulder_idx, uint32_t upper, const Vec3& rest_dir) {
       if (shoulder_idx == UINT32_MAX || shoulder_idx >= arm_world.size()) return;
@@ -1507,7 +1517,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const Vec3 upper_pos = arm_pos(upper);
       const float shoulder_len = std::max(length(sub(upper_pos, shoulder_pos)), 0.001f);
       const Vec3 desired_upper = add(shoulder_pos, mul(rest_dir, shoulder_len));
-      const Vec3 shoulder_target = lerp(upper_pos, desired_upper, arm_rest_weight * 0.6f);
+      const float shoulder_weight = clampf(arm_rest_weight * 0.85f, 0.0f, 1.0f);
+      const Vec3 shoulder_target = lerp(upper_pos, desired_upper, shoulder_weight);
       apply_bone_aim(*skeleton, arm_world, shoulder_idx, upper, shoulder_target);
     };
     const Vec3 rest_dir_l = rest_dir_for(-1.0f);
@@ -1527,7 +1538,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const Vec3 elbow = arm_pos(lower);
       const float len = std::max(length(sub(elbow, shoulder)), 0.001f);
       const Vec3 desired = add(shoulder, mul(rest_dir, len));
-      const Vec3 target = lerp(elbow, desired, arm_rest_weight);
+      const float upper_weight = clampf(arm_rest_weight * 0.9f, 0.0f, 1.0f);
+      const Vec3 target = lerp(elbow, desired, upper_weight);
       apply_bone_aim(*skeleton, arm_world, upper, lower, target);
     };
     apply_upper_rest(gait->bone_l_upper_arm, gait->bone_l_lower_arm, rest_dir_l);
@@ -1547,8 +1559,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float angle_step = clampf(gait->yaw_rate * step_time * 0.35f, -0.35f, 0.35f);
   const float home_width_e = 0.5f * std::abs(dot(sub(home_r_e, home_l_e), side_e));
   const float width_ref_e = std::max(std::max(gait->hip_width, home_width_e), 0.20f * leg_len_e);
-  float step_half_walk = 0.45f * width_ref_e;
-  float step_half_run = 0.35f * width_ref_e;
+  float step_half_walk = 0.36f * width_ref_e;
+  float step_half_run = 0.28f * width_ref_e;
   float step_half_local = step_half_walk + (step_half_run - step_half_walk) * speed_gait_norm;
   step_half_local = std::max(step_half_local, 0.10f * leg_len_e);
   step_half_local = std::min(step_half_local, 0.22f * leg_len_e);
