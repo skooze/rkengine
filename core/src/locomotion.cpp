@@ -1319,9 +1319,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor * swing_scale;
   const float pelvis_yaw = 0.06f * arm_amp * twist;
   const float torso_yaw = -0.08f * arm_amp * twist;
-  const float rock_amp = (0.08f + 0.22f * speed_norm);
-  const float torso_roll = 0.5f * rock_amp * rock;
-  const float chest_roll = 1.0f * rock_amp * rock;
+  const float rock_amp = (0.06f + 0.18f * speed_norm);
+  const float torso_roll = 0.35f * rock_amp * rock;
+  const float chest_roll = 0.7f * rock_amp * rock;
+  const float torso_pitch_rock = 0.10f * rock_amp * twist;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
@@ -1336,14 +1337,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float breathe = std::sin(gait->idle_time * 2.0f * kPi * 0.22f);
   const float breathe_amp = 0.03f * gait->idle_blend;
   const float breathe_term = breathe_amp * breathe;
-  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f, torso_yaw * 0.35f,
-          lean_side_spine + torso_roll * 0.45f);
-  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term, torso_yaw * 0.75f,
-          lean_side_chest + chest_roll);
-  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f, torso_yaw * 0.2f,
-          lean_side_neck + torso_roll * 0.25f);
-  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f, torso_yaw * 0.1f,
-          lean_side_head + torso_roll * 0.18f);
+  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f + torso_pitch_rock * 0.6f,
+          torso_yaw * 0.35f, lean_side_spine + torso_roll * 0.45f);
+  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term + torso_pitch_rock * 0.9f,
+          torso_yaw * 0.75f, lean_side_chest + chest_roll);
+  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f + torso_pitch_rock * 0.4f,
+          torso_yaw * 0.2f, lean_side_neck + torso_roll * 0.25f);
+  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f + torso_pitch_rock * 0.25f,
+          torso_yaw * 0.1f, lean_side_head + torso_roll * 0.18f);
 
   if (gait->enable_arm_swing) {
     const float phase_offset = 0.25f;
@@ -1353,15 +1354,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float swing_r = std::sin(arm_phase_r);
     const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
     const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
-    const float arm_pitch_amp = 0.60f * arm_amp;
+    const float arm_pitch_amp = 0.65f * arm_amp;
     const float arm_yaw = 0.02f * arm_amp;
     const float arm_roll = 0.03f * arm_amp;
     const float arm_lift = 0.03f * arm_amp;
     const float elbow_amp = 0.12f * arm_amp;
     const float elbow_phase = 0.20f;
-    const float shoulder_pitch_amp = 0.20f * arm_amp;
-    const float shoulder_yaw_amp = 0.08f * arm_amp;
-    const float shoulder_roll_amp = 0.10f * arm_amp;
+    const float shoulder_pitch_amp = 0.35f * arm_amp;
+    const float shoulder_yaw_amp = 0.03f * arm_amp;
+    const float shoulder_roll_amp = 0.02f * arm_amp;
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
