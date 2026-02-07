@@ -1306,7 +1306,11 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   float pelvis_sway_amp = gait->pelvis_sway_scale * (0.35f * step_half);
   pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
   pelvis_sway_amp *= 0.20f;
-  const float pelvis_roll = gait->pelvis_roll_scale * speed_norm;
+  const float lateral = std::abs(dot(planar, right)) / std::max(max_speed, 0.1f);
+  const float sway_gate = clampf(lateral, 0.0f, 1.0f);
+  const float sway_scale = sway_gate * sway_gate;
+  pelvis_sway_amp *= sway_scale;
+  const float pelvis_roll = gait->pelvis_roll_scale * speed_norm * sway_scale;
   const float sway_phase = 2.0f * kPi * cycle;
   const float sway = std::sin(sway_phase);
   const float rock = sway;
@@ -1319,7 +1323,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor * swing_scale;
   const float pelvis_yaw = 0.06f * arm_amp * twist;
   const float torso_yaw = -0.08f * arm_amp * twist;
-  const float rock_amp = (0.06f + 0.18f * speed_norm);
+  const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
   const float torso_roll = 0.35f * rock_amp * rock;
   const float chest_roll = 0.7f * rock_amp * rock;
   const float torso_pitch_rock = 0.10f * rock_amp * twist;
