@@ -536,7 +536,7 @@ static Vec3 solve_two_bone_ik_pole(const Vec3& hip,
   float d_raw = length(to_t);
   if (d_raw < 0.0001f) d_raw = 0.0001f;
   const float min_d = std::max(0.001f, std::fabs(l1 - l2) + 0.001f);
-  const float max_d = std::max(0.001f, l1 + l2 - 0.001f);
+  const float max_d = std::max(0.001f, std::max(min_d, (l1 + l2) * 0.98f));
   const float d = clampf(d_raw, min_d, max_d);
   const Vec3 x = mul(to_t, 1.0f / d_raw);
 
@@ -1594,15 +1594,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float strafe_half = gait->lateral_step_scale * 0.20f * width_ref_e *
                             std::abs(v_side / std::max(max_speed, 0.1f));
   const float step_half_desired = step_half_local + strafe_half;
-  const float side_cap = 0.20f * leg_len_e;
-  const float min_side = std::min(0.90f * step_half_desired, side_cap);
+  const float side_cap = 0.22f * leg_len_e;
+  const float min_side = std::min(0.95f * step_half_desired, side_cap);
   const float max_side = side_cap;
   const Vec3 home_l_rad = sub(home_l_e, hips_e);
   const Vec3 home_r_rad = sub(home_r_e, hips_e);
   const float home_rad_l = length(Vec3{home_l_rad.x, 0.0f, home_l_rad.z});
   const float home_rad_r = length(Vec3{home_r_rad.x, 0.0f, home_r_rad.z});
   const float home_rad_e = 0.5f * (home_rad_l + home_rad_r);
-  const float min_rad = std::max(0.60f * home_rad_e, 0.25f * leg_len_e);
+  const float min_rad = std::max(0.50f * home_rad_e, 0.22f * leg_len_e);
 
   // Ensure side axis points from left to right based on bind/home foot offsets.
   if (dot(sub(home_r_e, home_l_e), side_e) < 0.0f) {
@@ -1876,13 +1876,22 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const bool right_locked_now =
       grounded && gait->enable_foot_lock && right_stance_run && gait->right_locked;
 
-  if (left_locked_now) {
-    l_target_w = l_lock_w;
-    l_target_e = to_local_point_root(l_target_w);
+  spring_1d(left_locked_now ? 1.0f : 0.0f, foot_hz, foot_damp, dt,
+            gait->left_lock_weight, gait->left_lock_weight_v);
+  spring_1d(right_locked_now ? 1.0f : 0.0f, foot_hz, foot_damp, dt,
+            gait->right_lock_weight, gait->right_lock_weight_v);
+  gait->left_lock_weight = clampf(gait->left_lock_weight, 0.0f, 1.0f);
+  gait->right_lock_weight = clampf(gait->right_lock_weight, 0.0f, 1.0f);
+
+  if (left_locked_now || gait->left_lock_weight > 0.001f) {
+    const Vec3 lock_e = to_local_point_root(l_lock_w);
+    l_target_e = lerp(l_target_e, lock_e, gait->left_lock_weight);
+    l_target_w = to_world_point_root(l_target_e);
   }
-  if (right_locked_now) {
-    r_target_w = r_lock_w;
-    r_target_e = to_local_point_root(r_target_w);
+  if (right_locked_now || gait->right_lock_weight > 0.001f) {
+    const Vec3 lock_e = to_local_point_root(r_lock_w);
+    r_target_e = lerp(r_target_e, lock_e, gait->right_lock_weight);
+    r_target_w = to_world_point_root(r_target_e);
   }
 
   Vec3 l_smooth = from_array(gait->smooth_left_target);
@@ -1970,8 +1979,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       lock_offset_e = v3();
     }
 
-    const float ik_weight_l = grounded ? (left_stance_run ? 1.0f : (left_swing_run ? 1.0f : 0.0f)) : 0.0f;
-    const float ik_weight_r = grounded ? (right_stance_run ? 1.0f : (right_swing_run ? 1.0f : 0.0f)) : 0.0f;
+    const float ik_weight_l =
+        grounded ? (left_swing_run ? 1.0f : (left_stance_run ? gait->left_lock_weight : 0.0f)) : 0.0f;
+    const float ik_weight_r =
+        grounded ? (right_swing_run ? 1.0f : (right_stance_run ? gait->right_lock_weight : 0.0f)) : 0.0f;
     const Vec3 target_l = lerp(l_foot, l_target_e, ik_weight_l);
     const Vec3 target_r = lerp(r_foot, r_target_e, ik_weight_r);
 
@@ -2099,6 +2110,60 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     compute_world_matrices(*skeleton, locals, world);
     solve_self_collision(*gait, *skeleton, registry, entity, *transform, &g_external_caps,
                          locals, world, leg_len_e, dt);
+  }
+
+  if (gait->bone_l_foot != UINT32_MAX || gait->bone_r_foot != UINT32_MAX) {
+    auto foot_pitch = [&](bool stance, float stance_u, bool swing, float swing_u) {
+      if (!stance && !swing) return 0.0f;
+      const float toe_up_amp = 0.18f;
+      const float push_off_amp = 0.12f;
+      const float heel_strike_amp = 0.10f;
+      const float toe_off_amp = 0.20f;
+      float pitch = 0.0f;
+      if (swing) {
+        const float toe_up = std::sin(kPi * swing_u);
+        const float push = 1.0f - smoothstep01(swing_u / 0.20f);
+        const float heel = smoothstep01((swing_u - 0.80f) / 0.20f);
+        pitch += toe_up_amp * toe_up;
+        pitch += heel_strike_amp * heel;
+        pitch -= push_off_amp * push;
+      } else if (stance) {
+        const float heel = 1.0f - smoothstep01(stance_u / 0.20f);
+        const float toe = smoothstep01((stance_u - 0.60f) / 0.40f);
+        pitch += heel_strike_amp * heel;
+        pitch -= toe_off_amp * toe;
+      }
+      return pitch * speed_norm;
+    };
+
+    auto toe_pitch = [&](bool stance, float stance_u, bool swing, float swing_u, float foot_pitch_val) {
+      float extra = 0.0f;
+      if (swing) {
+        const float toe_up = std::sin(kPi * swing_u);
+        extra += 0.06f * toe_up;
+      } else if (stance) {
+        const float toe = smoothstep01((stance_u - 0.60f) / 0.40f);
+        extra -= 0.12f * toe;
+      }
+      return (0.5f * foot_pitch_val + extra) * speed_norm;
+    };
+
+    if (gait->bone_l_foot != UINT32_MAX) {
+      const float foot_p = foot_pitch(left_stance_run, left_stance_u, left_swing_run, left_swing_u);
+      add_rot(*skeleton, gait->bone_l_foot, foot_p, 0.0f, 0.0f);
+      if (gait->bone_l_toe != UINT32_MAX) {
+        const float toe_p = toe_pitch(left_stance_run, left_stance_u, left_swing_run, left_swing_u, foot_p);
+        add_rot(*skeleton, gait->bone_l_toe, toe_p, 0.0f, 0.0f);
+      }
+    }
+    if (gait->bone_r_foot != UINT32_MAX) {
+      const float foot_p = foot_pitch(right_stance_run, right_stance_u, right_swing_run, right_swing_u);
+      add_rot(*skeleton, gait->bone_r_foot, foot_p, 0.0f, 0.0f);
+      if (gait->bone_r_toe != UINT32_MAX) {
+        const float toe_p = toe_pitch(right_stance_run, right_stance_u, right_swing_run, right_swing_u, foot_p);
+        add_rot(*skeleton, gait->bone_r_toe, toe_p, 0.0f, 0.0f);
+      }
+    }
   }
 
   if (rkg::movement_log::enabled()) {

@@ -147,7 +147,7 @@ struct ProceduralGait {
   float foot_lock_out = 0.65f;
   float ik_blend_speed = 8.0f;
   float lateral_step_scale = 0.20f;
-  float knee_plane_bias = 1.0f;
+  float knee_plane_bias = 0.60f;
   float landing_compress = 0.04f;
   float landing_recover = 10.0f;
   float input_smooth_tau = 0.05f;
@@ -168,6 +168,10 @@ struct ProceduralGait {
   float pelvis_bob_y = 0.0f;
   float pelvis_bob_v = 0.0f;
   float pelvis_offset_vel[3] = {0.0f, 0.0f, 0.0f};
+  float left_lock_weight = 0.0f;
+  float right_lock_weight = 0.0f;
+  float left_lock_weight_v = 0.0f;
+  float right_lock_weight_v = 0.0f;
   bool left_locked = false;
   bool right_locked = false;
   float left_lock_pos[3] = {0.0f, 0.0f, 0.0f};
