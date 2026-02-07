@@ -1265,20 +1265,15 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float left_swing_u = left_swing ? ((u_l - stance_fraction) / std::max(1.0f - stance_fraction, 0.001f)) : 0.0f;
   const float right_swing_u = right_swing ? ((u_r - stance_fraction) / std::max(1.0f - stance_fraction, 0.001f)) : 0.0f;
 
-  float stance_sign = 0.0f;
   float stance_u = 0.0f;
   if (left_stance && !right_stance) {
-    stance_sign = -1.0f;
     stance_u = left_stance_u;
   } else if (right_stance && !left_stance) {
-    stance_sign = 1.0f;
     stance_u = right_stance_u;
   } else if (left_stance && right_stance) {
     if (u_l <= u_r) {
-      stance_sign = -1.0f;
       stance_u = left_stance_u;
     } else {
-      stance_sign = 1.0f;
       stance_u = right_stance_u;
     }
   }
@@ -1482,11 +1477,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const float relax_speed = clampf(1.0f - speed_norm * 0.9f, 0.0f, 1.0f);
   const float arm_rest_base = clampf(gait->arm_relax, 0.0f, 1.0f);
-  const float arm_rest_weight = std::max(arm_rest_base, std::max(relax_speed, gait->idle_blend));
-  const float arm_side_idle = gait->arm_out + 0.08f;
-  const float arm_side_run = std::max(0.04f, gait->arm_out * 0.5f);
+  const float arm_rest_weight = clampf(std::max(arm_rest_base, std::max(relax_speed, gait->idle_blend)),
+                                       0.0f, 1.0f);
+  const float arm_side_idle = gait->arm_out + 0.14f;
+  const float arm_side_run = std::max(0.08f, gait->arm_out * 0.75f);
   const float arm_side_bias = arm_side_run + (arm_side_idle - arm_side_run) * relax_speed;
-  const float arm_fwd_bias = 0.10f;
+  const float arm_fwd_bias = 0.06f;
   if (arm_rest_weight > 0.01f &&
       gait->bone_l_upper_arm != UINT32_MAX && gait->bone_l_lower_arm != UINT32_MAX &&
       gait->bone_r_upper_arm != UINT32_MAX && gait->bone_r_lower_arm != UINT32_MAX) {
@@ -1506,8 +1502,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
                               mul(side_e, side_sign * arm_side_bias)));
       rest_dir = normalize(rest_dir);
       const float out_dot = dot(rest_dir, side_e) * side_sign;
-      if (out_dot < 0.06f) {
-        rest_dir = normalize(add(rest_dir, mul(side_e, side_sign * (0.06f - out_dot))));
+      if (out_dot < 0.18f) {
+        rest_dir = normalize(add(rest_dir, mul(side_e, side_sign * (0.18f - out_dot))));
       }
       return rest_dir;
     };
@@ -1517,7 +1513,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const Vec3 upper_pos = arm_pos(upper);
       const float shoulder_len = std::max(length(sub(upper_pos, shoulder_pos)), 0.001f);
       const Vec3 desired_upper = add(shoulder_pos, mul(rest_dir, shoulder_len));
-      const float shoulder_weight = clampf(arm_rest_weight * 0.85f, 0.0f, 1.0f);
+      const float shoulder_weight = arm_rest_weight;
       const Vec3 shoulder_target = lerp(upper_pos, desired_upper, shoulder_weight);
       apply_bone_aim(*skeleton, arm_world, shoulder_idx, upper, shoulder_target);
     };
@@ -1538,7 +1534,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const Vec3 elbow = arm_pos(lower);
       const float len = std::max(length(sub(elbow, shoulder)), 0.001f);
       const Vec3 desired = add(shoulder, mul(rest_dir, len));
-      const float upper_weight = clampf(arm_rest_weight * 0.9f, 0.0f, 1.0f);
+      const float upper_weight = arm_rest_weight;
       const Vec3 target = lerp(elbow, desired, upper_weight);
       apply_bone_aim(*skeleton, arm_world, upper, lower, target);
     };
@@ -1548,8 +1544,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
 
   const Vec3 home_l_e = add(hips_e, from_array(gait->foot_home_l));
   const Vec3 home_r_e = add(hips_e, from_array(gait->foot_home_r));
-  const Vec3 home_l_w = to_world_point_root(home_l_e);
-  const Vec3 home_r_w = to_world_point_root(home_r_e);
 
   const float v_side = dot(planar, side_world);
   const float step_len = 0.5f * stride_len_e;

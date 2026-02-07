@@ -132,10 +132,10 @@ struct ProceduralGait {
   float pelvis_sway_scale = 0.018f;
   float pelvis_roll_scale = 0.10f;
   float pelvis_lean_scale = 0.25f;
-  float arm_swing_scale = 0.28f;
-  float arm_tuck = -0.08f;
-  float arm_relax = 0.45f;
-  float arm_out = 0.12f;
+  float arm_swing_scale = 0.32f;
+  float arm_tuck = -0.04f;
+  float arm_relax = 0.70f;
+  float arm_out = 0.16f;
   float turn_in_place_speed = 0.25f;
   float turn_step_rate = 0.8f;
   float foot_lock_in = 0.25f;

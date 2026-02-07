@@ -431,57 +431,6 @@ static Vec3 closest_point_aabb(const Vec3& p, const Vec3& center, const Vec3& ha
   return out;
 }
 
-static bool sphere_overlap_aabb(const Vec3& center,
-                                float radius,
-                                const Vec3& box_center,
-                                const Vec3& half_extents,
-                                Vec3& out_normal,
-                                float& out_depth) {
-  const Vec3 closest = closest_point_aabb(center, box_center, half_extents);
-  Vec3 diff = sub(center, closest);
-  const float dist_sq = length_sq(diff);
-  const float radius_sq = radius * radius;
-  if (dist_sq > radius_sq) {
-    return false;
-  }
-  if (dist_sq > kEps) {
-    const float dist = std::sqrt(dist_sq);
-    out_normal = mul(diff, 1.0f / dist);
-    out_depth = radius - dist;
-    return out_depth > 0.0f;
-  }
-  // Inside the box: push out along the smallest penetration axis.
-  Vec3 delta = sub(center, box_center);
-  float px = half_extents.x - std::abs(delta.x);
-  float py = half_extents.y - std::abs(delta.y);
-  float pz = half_extents.z - std::abs(delta.z);
-  out_depth = px + radius;
-  out_normal = v3((delta.x >= 0.0f) ? 1.0f : -1.0f, 0.0f, 0.0f);
-  if (py + radius < out_depth) {
-    out_depth = py + radius;
-    out_normal = v3(0.0f, (delta.y >= 0.0f) ? 1.0f : -1.0f, 0.0f);
-  }
-  if (pz + radius < out_depth) {
-    out_depth = pz + radius;
-    out_normal = v3(0.0f, 0.0f, (delta.z >= 0.0f) ? 1.0f : -1.0f);
-  }
-  return out_depth > 0.0f;
-}
-
-static bool sphere_overlap_plane(const Vec3& center,
-                                 float radius,
-                                 const Vec3& plane_normal,
-                                 float plane_d,
-                                 Vec3& out_normal,
-                                 float& out_depth) {
-  const float dist = dot(plane_normal, center) - plane_d;
-  if (dist >= radius) {
-    return false;
-  }
-  out_normal = plane_normal;
-  out_depth = radius - dist;
-  return out_depth > 0.0f;
-}
 
 static bool sweep_sphere_plane(const Vec3& center,
                                float radius,
