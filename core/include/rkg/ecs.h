@@ -128,7 +128,7 @@ struct ProceduralGait {
   float sprint_speed = 4.0f;
   float stride_scale = 0.95f;
   float step_height_scale = 0.24f;
-  float pelvis_bob_scale = 0.025f;
+  float pelvis_bob_scale = 0.018f;
   float pelvis_sway_scale = 0.018f;
   float pelvis_roll_scale = 0.10f;
   float pelvis_lean_scale = 0.25f;
@@ -160,6 +160,7 @@ struct ProceduralGait {
   bool was_grounded = false;
   float last_velocity[3] = {0.0f, 0.0f, 0.0f};
   float pelvis_offset[3] = {0.0f, 0.0f, 0.0f};
+  float pelvis_bob_y = 0.0f;
   bool left_locked = false;
   bool right_locked = false;
   float left_lock_pos[3] = {0.0f, 0.0f, 0.0f};

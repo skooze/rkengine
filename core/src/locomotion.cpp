@@ -1316,7 +1316,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float rock = sway;
   const float twist = std::cos(sway_phase);
   const float pelvis_x = pelvis_sway_amp * sway;
-  const float pelvis_y = -pelvis_bob * std::sin(kPi * stance_u);
+  const float pelvis_y_target = -pelvis_bob * std::sin(kPi * stance_u);
+  const float bob_alpha = 1.0f - std::exp(-dt * 10.0f);
+  gait->pelvis_bob_y += (pelvis_y_target - gait->pelvis_bob_y) * bob_alpha;
+  const float pelvis_y = gait->pelvis_bob_y;
   const float strafe_factor =
       1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
   const float swing_scale = 0.25f + 0.75f * speed_norm;
@@ -1326,13 +1329,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
   const float torso_roll = 0.35f * rock_amp * rock;
   const float chest_roll = 0.7f * rock_amp * rock;
-  const float fwd_rock_amp = (0.04f + 0.12f * speed_norm) * speed_norm;
+  const float fwd_rock_amp = (0.02f + 0.08f * speed_norm) * speed_norm;
   const float torso_pitch_rock = fwd_rock_amp * twist;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
     const float pelvis_roll_term = -pelvis_roll * rock * 0.10f;
-    add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f + torso_pitch_rock * 0.15f, pelvis_yaw,
+    add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f + torso_pitch_rock * 0.08f, pelvis_yaw,
             pelvis_roll_term);
   }
 
@@ -1343,13 +1346,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float breathe = std::sin(gait->idle_time * 2.0f * kPi * 0.22f);
   const float breathe_amp = 0.03f * gait->idle_blend;
   const float breathe_term = breathe_amp * breathe;
-  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f + torso_pitch_rock * 0.35f,
+  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f + torso_pitch_rock * 0.25f,
           torso_yaw * 0.35f, lean_side_spine + torso_roll * 0.45f);
-  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term + torso_pitch_rock * 0.55f,
+  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term + torso_pitch_rock * 0.40f,
           torso_yaw * 0.75f, lean_side_chest + chest_roll);
-  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f + torso_pitch_rock * 0.25f,
+  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f + torso_pitch_rock * 0.18f,
           torso_yaw * 0.2f, lean_side_neck + torso_roll * 0.25f);
-  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f + torso_pitch_rock * 0.18f,
+  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f + torso_pitch_rock * 0.12f,
           torso_yaw * 0.1f, lean_side_head + torso_roll * 0.18f);
 
   if (gait->enable_arm_swing) {
@@ -1785,7 +1788,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float t_ease = t * t * (3.0f - 2.0f * t);
     Vec3 out = lerp(start, end, t_ease);
     float arc = std::sin(kPi * t);
-    arc = std::pow(std::max(arc, 0.0f), 0.75f);
+    arc = std::pow(std::max(arc, 0.0f), 0.65f);
     out.y += step_height_e * arc;
     out.y += step_height_e * 0.15f * smoothstep01((t - 0.7f) / 0.3f);
     return out;
@@ -1914,7 +1917,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       }
       const float lock_side = dot(lock_offset_e, side_e);
       const float lock_fwd = dot(lock_offset_e, frame_fwd_e);
-      lock_offset_e = add(mul(side_e, lock_side * sway_scale), mul(frame_fwd_e, lock_fwd));
+      const float lock_fwd_scale = 0.55f + 0.25f * speed_norm;
+      lock_offset_e = add(mul(side_e, lock_side * sway_scale), mul(frame_fwd_e, lock_fwd * lock_fwd_scale));
     } else {
       lock_offset_e = v3();
     }
