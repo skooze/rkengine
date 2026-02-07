@@ -1478,11 +1478,12 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float relax_speed = clampf(1.0f - speed_norm * 0.9f, 0.0f, 1.0f);
   const float arm_rest_base = clampf(gait->arm_relax, 0.0f, 1.0f);
   const float arm_rest_weight = clampf(std::max(arm_rest_base, std::max(relax_speed, gait->idle_blend)),
-                                       0.0f, 1.0f);
+                                       0.0f, 0.85f);
   const float arm_side_idle = gait->arm_out + 0.14f;
   const float arm_side_run = std::max(0.08f, gait->arm_out * 0.75f);
   const float arm_side_bias = arm_side_run + (arm_side_idle - arm_side_run) * relax_speed;
   const float arm_fwd_bias = 0.06f;
+  const float arm_down_bias = 0.65f;
   if (arm_rest_weight > 0.01f &&
       gait->bone_l_upper_arm != UINT32_MAX && gait->bone_l_lower_arm != UINT32_MAX &&
       gait->bone_r_upper_arm != UINT32_MAX && gait->bone_r_lower_arm != UINT32_MAX) {
@@ -1497,7 +1498,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       return {arm_world[idx].m[12], arm_world[idx].m[13], arm_world[idx].m[14]};
     };
     auto rest_dir_for = [&](float side_sign) {
-      Vec3 rest_dir = add(mul(v3(0.0f, -1.0f, 0.0f), 1.0f),
+      Vec3 rest_dir = add(mul(v3(0.0f, -1.0f, 0.0f), arm_down_bias),
                           add(mul(frame_fwd_e, arm_fwd_bias),
                               mul(side_e, side_sign * arm_side_bias)));
       rest_dir = normalize(rest_dir);
@@ -1513,7 +1514,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       const Vec3 upper_pos = arm_pos(upper);
       const float shoulder_len = std::max(length(sub(upper_pos, shoulder_pos)), 0.001f);
       const Vec3 desired_upper = add(shoulder_pos, mul(rest_dir, shoulder_len));
-      const float shoulder_weight = arm_rest_weight;
+      const float shoulder_weight = arm_rest_weight * 0.6f;
       const Vec3 shoulder_target = lerp(upper_pos, desired_upper, shoulder_weight);
       apply_bone_aim(*skeleton, arm_world, shoulder_idx, upper, shoulder_target);
     };
