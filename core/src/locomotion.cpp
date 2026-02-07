@@ -445,7 +445,8 @@ static bool raycast_aabb(const Vec3& origin,
 
 static RayHit raycast_down(const ecs::Registry& registry,
                            const Vec3& origin,
-                           float max_dist) {
+                           float max_dist,
+                           float radius) {
   RayHit best{};
   best.t = max_dist;
   const Vec3 dir = v3(0.0f, -1.0f, 0.0f);
@@ -456,7 +457,7 @@ static RayHit raycast_down(const ecs::Registry& registry,
       const float nlen = length(normal);
       if (nlen < kEps) continue;
       normal = mul(normal, 1.0f / nlen);
-      float plane_d = collider.distance;
+      float plane_d = collider.distance + radius;
       if (const auto* t = registry.get_transform(kv.first)) {
         plane_d += dot(normal, from_array(t->position));
       }
@@ -467,7 +468,7 @@ static RayHit raycast_down(const ecs::Registry& registry,
         best.hit = true;
         best.t = t;
         best.normal = normal;
-        best.point = add(origin, mul(dir, t));
+        best.point = sub(add(origin, mul(dir, t)), mul(normal, radius));
       }
     } else if (collider.type == ecs::ColliderType::AABB) {
       Vec3 center = v3(collider.center[0], collider.center[1], collider.center[2]);
@@ -475,10 +476,14 @@ static RayHit raycast_down(const ecs::Registry& registry,
         center = add(center, from_array(t->position));
       }
       Vec3 half_extents = v3(collider.half_extents[0], collider.half_extents[1], collider.half_extents[2]);
+      half_extents.x += radius;
+      half_extents.y += radius;
+      half_extents.z += radius;
       RayHit hit{};
       if (raycast_aabb(origin, dir, center, half_extents, best.t, hit)) {
         if (hit.t <= best.t) {
           best = hit;
+          best.point = sub(best.point, mul(best.normal, radius));
         }
       }
     }
@@ -1679,8 +1684,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     }
 
     const float ray_height = std::max(leg_len_world * 0.8f, 0.2f);
+    const float foot_radius = std::max(0.02f, gait->foot_length * rig_scale * 0.25f);
     Vec3 desired_w = to_world_point_root(desired);
-    RayHit hit = raycast_down(registry, add(desired_w, mul(up_axis(), ray_height)), ray_height * 1.6f);
+    RayHit hit = raycast_down(registry, add(desired_w, mul(up_axis(), ray_height)),
+                              ray_height * 1.6f, foot_radius);
     if (hit.hit) {
       desired_w.y = hit.point.y;
       desired = to_local_point_root(desired_w);

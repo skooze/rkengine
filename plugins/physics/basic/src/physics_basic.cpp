@@ -295,7 +295,8 @@ static GroundHit find_ground(const rkg::ecs::Registry& registry,
   const Vec3 up = up_axis();
   const Vec3 pos = from_array(transform.position);
   const Vec3 center = add(pos, mul(up, controller.center_offset));
-  const Vec3 bottom = sub(center, mul(up, controller.half_height + controller.radius));
+  const Vec3 bottom_center = sub(center, mul(up, controller.half_height));
+  const Vec3 top_center = add(center, mul(up, controller.half_height));
   const float slope_limit_cos = std::cos(controller.slope_limit_deg * (kPi / 180.0f));
 
   for (const auto& kv : registry.colliders()) {
@@ -322,10 +323,9 @@ static GroundHit find_ground(const rkg::ecs::Registry& registry,
         plane_d += dot(normal, plane_pos);
       }
 
-      dist = dot(normal, bottom) - plane_d;
-      if (dist < -controller.step_height) {
-        continue;
-      }
+      const float dist_bottom = dot(normal, bottom_center) - plane_d - controller.radius;
+      const float dist_top = dot(normal, top_center) - plane_d - controller.radius;
+      dist = std::min(dist_bottom, dist_top);
       const float cos_up = dot(normal, up);
       walkable = cos_up >= slope_limit_cos;
       has_hit = true;
@@ -343,10 +343,7 @@ static GroundHit find_ground(const rkg::ecs::Registry& registry,
         continue;
       }
 
-      dist = bottom.y - (box_center.y + half_extents.y);
-      if (dist < -controller.step_height) {
-        continue;
-      }
+      dist = bottom_center.y - (box_center.y + half_extents.y) - controller.radius;
       normal = up;
       walkable = true;
       has_hit = true;
@@ -424,6 +421,187 @@ static bool sweep_sphere_aabb(const Vec3& center,
   return true;
 }
 
+static Vec3 closest_point_aabb(const Vec3& p, const Vec3& center, const Vec3& half_extents) {
+  Vec3 min_b = sub(center, half_extents);
+  Vec3 max_b = add(center, half_extents);
+  Vec3 out = p;
+  out.x = std::min(max_b.x, std::max(min_b.x, out.x));
+  out.y = std::min(max_b.y, std::max(min_b.y, out.y));
+  out.z = std::min(max_b.z, std::max(min_b.z, out.z));
+  return out;
+}
+
+static bool sphere_overlap_aabb(const Vec3& center,
+                                float radius,
+                                const Vec3& box_center,
+                                const Vec3& half_extents,
+                                Vec3& out_normal,
+                                float& out_depth) {
+  const Vec3 closest = closest_point_aabb(center, box_center, half_extents);
+  Vec3 diff = sub(center, closest);
+  const float dist_sq = length_sq(diff);
+  const float radius_sq = radius * radius;
+  if (dist_sq > radius_sq) {
+    return false;
+  }
+  if (dist_sq > kEps) {
+    const float dist = std::sqrt(dist_sq);
+    out_normal = mul(diff, 1.0f / dist);
+    out_depth = radius - dist;
+    return out_depth > 0.0f;
+  }
+  // Inside the box: push out along the smallest penetration axis.
+  Vec3 delta = sub(center, box_center);
+  float px = half_extents.x - std::abs(delta.x);
+  float py = half_extents.y - std::abs(delta.y);
+  float pz = half_extents.z - std::abs(delta.z);
+  out_depth = px + radius;
+  out_normal = v3((delta.x >= 0.0f) ? 1.0f : -1.0f, 0.0f, 0.0f);
+  if (py + radius < out_depth) {
+    out_depth = py + radius;
+    out_normal = v3(0.0f, (delta.y >= 0.0f) ? 1.0f : -1.0f, 0.0f);
+  }
+  if (pz + radius < out_depth) {
+    out_depth = pz + radius;
+    out_normal = v3(0.0f, 0.0f, (delta.z >= 0.0f) ? 1.0f : -1.0f);
+  }
+  return out_depth > 0.0f;
+}
+
+static bool sphere_overlap_plane(const Vec3& center,
+                                 float radius,
+                                 const Vec3& plane_normal,
+                                 float plane_d,
+                                 Vec3& out_normal,
+                                 float& out_depth) {
+  const float dist = dot(plane_normal, center) - plane_d;
+  if (dist >= radius) {
+    return false;
+  }
+  out_normal = plane_normal;
+  out_depth = radius - dist;
+  return out_depth > 0.0f;
+}
+
+static bool sweep_sphere_plane(const Vec3& center,
+                               float radius,
+                               const Vec3& delta,
+                               const Vec3& plane_normal,
+                               float plane_d,
+                               float& out_t,
+                               Vec3& out_normal) {
+  const float dist0 = dot(plane_normal, center) - plane_d - radius;
+  const float denom = dot(plane_normal, delta);
+  if (dist0 <= 0.0f) {
+    if (denom < -kEps) {
+      out_t = 0.0f;
+      out_normal = plane_normal;
+      return true;
+    }
+    return false;
+  }
+  if (denom >= -kEps) {
+    return false;
+  }
+  const float t = dist0 / -denom;
+  if (t < 0.0f || t > 1.0f) {
+    return false;
+  }
+  out_t = t;
+  out_normal = plane_normal;
+  return true;
+}
+
+static bool sweep_point_aabb_2d(const Vec3& center,
+                                const Vec3& delta,
+                                float min_x,
+                                float max_x,
+                                float min_z,
+                                float max_z,
+                                float& out_t,
+                                Vec3& out_normal) {
+  float tmin = 0.0f;
+  float tmax = 1.0f;
+  Vec3 hit_normal = v3();
+
+  const float pos[2] = {center.x, center.z};
+  const float dir[2] = {delta.x, delta.z};
+  const float bmin[2] = {min_x, min_z};
+  const float bmax[2] = {max_x, max_z};
+
+  for (int axis = 0; axis < 2; ++axis) {
+    if (std::abs(dir[axis]) < kEps) {
+      if (pos[axis] < bmin[axis] || pos[axis] > bmax[axis]) {
+        return false;
+      }
+      continue;
+    }
+    const float inv = 1.0f / dir[axis];
+    float t1 = (bmin[axis] - pos[axis]) * inv;
+    float t2 = (bmax[axis] - pos[axis]) * inv;
+    float n_sign = 0.0f;
+    if (t1 > t2) {
+      std::swap(t1, t2);
+      n_sign = 1.0f;
+    } else {
+      n_sign = -1.0f;
+    }
+    if (t1 > tmin) {
+      tmin = t1;
+      hit_normal = v3();
+      if (axis == 0) hit_normal.x = n_sign;
+      if (axis == 1) hit_normal.z = n_sign;
+    }
+    if (t2 < tmax) {
+      tmax = t2;
+    }
+    if (tmin > tmax) {
+      return false;
+    }
+  }
+
+  if (tmin < 0.0f || tmin > 1.0f) {
+    return false;
+  }
+  out_t = tmin;
+  out_normal = hit_normal;
+  return true;
+}
+
+static bool sweep_capsule_cylinder_aabb(const Vec3& center,
+                                        float half_height,
+                                        float radius,
+                                        const Vec3& delta,
+                                        const Vec3& box_center,
+                                        const Vec3& half_extents,
+                                        float& out_t,
+                                        Vec3& out_normal) {
+  if (std::abs(delta.x) < kEps && std::abs(delta.z) < kEps) {
+    return false;
+  }
+  const float min_x = box_center.x - half_extents.x - radius;
+  const float max_x = box_center.x + half_extents.x + radius;
+  const float min_z = box_center.z - half_extents.z - radius;
+  const float max_z = box_center.z + half_extents.z + radius;
+  float t_enter = 0.0f;
+  Vec3 normal = v3();
+  if (!sweep_point_aabb_2d(center, delta, min_x, max_x, min_z, max_z, t_enter, normal)) {
+    return false;
+  }
+  const float y0 = center.y - half_height;
+  const float y1 = center.y + half_height;
+  const float y0_t = y0 + delta.y * t_enter;
+  const float y1_t = y1 + delta.y * t_enter;
+  const float box_min_y = box_center.y - half_extents.y;
+  const float box_max_y = box_center.y + half_extents.y;
+  if (y1_t < box_min_y || y0_t > box_max_y) {
+    return false;
+  }
+  out_t = t_enter;
+  out_normal = normal;
+  return true;
+}
+
 static bool sweep_capsule_world(const rkg::ecs::Registry& registry,
                                 rkg::ecs::Entity self,
                                 const Vec3& center,
@@ -444,6 +622,35 @@ static bool sweep_capsule_world(const rkg::ecs::Registry& registry,
       continue;
     }
     const auto& collider = kv.second;
+    if (collider.type == rkg::ecs::ColliderType::Plane) {
+      Vec3 normal = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
+      const float nlen = length(normal);
+      if (nlen < kEps) {
+        continue;
+      }
+      normal = mul(normal, 1.0f / nlen);
+      float plane_d = collider.distance;
+      if (const auto* t = registry.get_transform(kv.first)) {
+        plane_d += dot(normal, from_array(t->position));
+      }
+      float t_hit = 1.0f;
+      Vec3 hit_normal = v3();
+      if (sweep_sphere_plane(bottom, radius, delta, normal, plane_d, t_hit, hit_normal)) {
+        if (t_hit < best_t) {
+          best_t = t_hit;
+          best_normal = hit_normal;
+          hit_any = true;
+        }
+      }
+      if (sweep_sphere_plane(top, radius, delta, normal, plane_d, t_hit, hit_normal)) {
+        if (t_hit < best_t) {
+          best_t = t_hit;
+          best_normal = hit_normal;
+          hit_any = true;
+        }
+      }
+      continue;
+    }
     if (collider.type != rkg::ecs::ColliderType::AABB) {
       continue;
     }
@@ -469,6 +676,14 @@ static bool sweep_capsule_world(const rkg::ecs::Registry& registry,
         hit_any = true;
       }
     }
+    if (sweep_capsule_cylinder_aabb(center, half_height, radius, delta, box_center, half_extents,
+                                    t_hit, normal)) {
+      if (t_hit < best_t) {
+        best_t = t_hit;
+        best_normal = normal;
+        hit_any = true;
+      }
+    }
   }
 
   if (hit_any) {
@@ -477,6 +692,198 @@ static bool sweep_capsule_world(const rkg::ecs::Registry& registry,
     out_hit.normal = best_normal;
   }
   return hit_any;
+}
+
+static bool capsule_overlap_aabb(const Vec3& center,
+                                 float half_height,
+                                 float radius,
+                                 const Vec3& box_center,
+                                 const Vec3& half_extents,
+                                 Vec3& out_normal,
+                                 float& out_depth) {
+  const Vec3 min_b = sub(box_center, half_extents);
+  const Vec3 max_b = add(box_center, half_extents);
+
+  const float clamped_x = clampf(center.x, min_b.x, max_b.x);
+  const float clamped_z = clampf(center.z, min_b.z, max_b.z);
+  const float y0 = center.y - half_height;
+  const float y1 = center.y + half_height;
+
+  float closest_seg_y = center.y;
+  float closest_box_y = clampf(center.y, min_b.y, max_b.y);
+  if (y1 < min_b.y) {
+    closest_seg_y = y1;
+    closest_box_y = min_b.y;
+  } else if (y0 > max_b.y) {
+    closest_seg_y = y0;
+    closest_box_y = max_b.y;
+  } else {
+    closest_seg_y = closest_box_y;
+  }
+
+  Vec3 diff = v3(center.x - clamped_x, closest_seg_y - closest_box_y, center.z - clamped_z);
+  const float dist_sq = length_sq(diff);
+  const float radius_sq = radius * radius;
+  if (dist_sq > radius_sq) {
+    return false;
+  }
+  if (dist_sq > kEps) {
+    const float dist = std::sqrt(dist_sq);
+    out_normal = mul(diff, 1.0f / dist);
+    out_depth = radius - dist;
+    return out_depth > 0.0f;
+  }
+
+  const Vec3 delta = sub(center, box_center);
+  const float pen_x = (half_extents.x + radius) - std::abs(delta.x);
+  const float pen_z = (half_extents.z + radius) - std::abs(delta.z);
+  const float pen_y = (half_extents.y + half_height + radius) - std::abs(delta.y);
+  out_depth = pen_x;
+  out_normal = v3((delta.x >= 0.0f) ? 1.0f : -1.0f, 0.0f, 0.0f);
+  if (pen_y < out_depth) {
+    out_depth = pen_y;
+    out_normal = v3(0.0f, (delta.y >= 0.0f) ? 1.0f : -1.0f, 0.0f);
+  }
+  if (pen_z < out_depth) {
+    out_depth = pen_z;
+    out_normal = v3(0.0f, 0.0f, (delta.z >= 0.0f) ? 1.0f : -1.0f);
+  }
+  return out_depth > 0.0f;
+}
+
+static bool capsule_overlap_plane(const Vec3& center,
+                                  float half_height,
+                                  float radius,
+                                  const Vec3& plane_normal,
+                                  float plane_d,
+                                  Vec3& out_normal,
+                                  float& out_depth) {
+  const Vec3 up = up_axis();
+  const Vec3 bottom = sub(center, mul(up, half_height));
+  const Vec3 top = add(center, mul(up, half_height));
+  const float dist_bottom = dot(plane_normal, bottom) - plane_d;
+  const float dist_top = dot(plane_normal, top) - plane_d;
+  const float dist = std::min(dist_bottom, dist_top);
+  if (dist >= radius) {
+    return false;
+  }
+  out_normal = plane_normal;
+  out_depth = radius - dist;
+  return out_depth > 0.0f;
+}
+
+static void depenetrate_capsule_world(const rkg::ecs::Registry& registry,
+                                      rkg::ecs::Entity self,
+                                      const rkg::ecs::CharacterController& controller,
+                                      Vec3& center,
+                                      Vec3& velocity,
+                                      float dt) {
+  const int iterations = std::max(1, controller.max_sweep_iterations);
+  const float max_push = (controller.max_depenetration_velocity > 0.0f)
+                             ? controller.max_depenetration_velocity * dt
+                             : std::numeric_limits<float>::max();
+  for (int iter = 0; iter < iterations; ++iter) {
+    float best_depth = 0.0f;
+    Vec3 best_normal = v3();
+    bool hit = false;
+
+    for (const auto& kv : registry.colliders()) {
+      if (kv.first == self) {
+        continue;
+      }
+      const auto& collider = kv.second;
+      Vec3 normal = v3();
+      float depth = 0.0f;
+      if (collider.type == rkg::ecs::ColliderType::Plane) {
+        Vec3 plane_n = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
+        const float nlen = length(plane_n);
+        if (nlen < kEps) {
+          continue;
+        }
+        plane_n = mul(plane_n, 1.0f / nlen);
+        float plane_d = collider.distance;
+        if (const auto* t = registry.get_transform(kv.first)) {
+          plane_d += dot(plane_n, from_array(t->position));
+        }
+        if (!capsule_overlap_plane(center, controller.half_height, controller.radius,
+                                   plane_n, plane_d, normal, depth)) {
+          continue;
+        }
+      } else if (collider.type == rkg::ecs::ColliderType::AABB) {
+        Vec3 box_center = v3(collider.center[0], collider.center[1], collider.center[2]);
+        if (const auto* t = registry.get_transform(kv.first)) {
+          box_center = add(box_center, from_array(t->position));
+        }
+        Vec3 half_extents = v3(collider.half_extents[0], collider.half_extents[1], collider.half_extents[2]);
+        if (!capsule_overlap_aabb(center, controller.half_height, controller.radius,
+                                  box_center, half_extents, normal, depth)) {
+          continue;
+        }
+      } else {
+        continue;
+      }
+
+      if (depth > best_depth) {
+        best_depth = depth;
+        best_normal = normal;
+        hit = true;
+      }
+    }
+
+    if (!hit || best_depth <= 0.0f) {
+      break;
+    }
+    float push = best_depth + controller.skin_width;
+    if (push > max_push) {
+      push = max_push;
+    }
+    center = add(center, mul(best_normal, push));
+    const float vn = dot(velocity, best_normal);
+    if (vn < 0.0f) {
+      velocity = sub(velocity, mul(best_normal, vn));
+    }
+  }
+}
+
+static bool capsule_overlaps_world(const rkg::ecs::Registry& registry,
+                                   rkg::ecs::Entity self,
+                                   const rkg::ecs::CharacterController& controller,
+                                   const Vec3& center) {
+  for (const auto& kv : registry.colliders()) {
+    if (kv.first == self) {
+      continue;
+    }
+    const auto& collider = kv.second;
+    Vec3 normal = v3();
+    float depth = 0.0f;
+    if (collider.type == rkg::ecs::ColliderType::Plane) {
+      Vec3 plane_n = v3(collider.normal[0], collider.normal[1], collider.normal[2]);
+      const float nlen = length(plane_n);
+      if (nlen < kEps) {
+        continue;
+      }
+      plane_n = mul(plane_n, 1.0f / nlen);
+      float plane_d = collider.distance;
+      if (const auto* t = registry.get_transform(kv.first)) {
+        plane_d += dot(plane_n, from_array(t->position));
+      }
+      if (capsule_overlap_plane(center, controller.half_height, controller.radius,
+                                plane_n, plane_d, normal, depth)) {
+        return true;
+      }
+    } else if (collider.type == rkg::ecs::ColliderType::AABB) {
+      Vec3 box_center = v3(collider.center[0], collider.center[1], collider.center[2]);
+      if (const auto* t = registry.get_transform(kv.first)) {
+        box_center = add(box_center, from_array(t->position));
+      }
+      Vec3 half_extents = v3(collider.half_extents[0], collider.half_extents[1], collider.half_extents[2]);
+      if (capsule_overlap_aabb(center, controller.half_height, controller.radius,
+                               box_center, half_extents, normal, depth)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 static bool try_step_up(const rkg::ecs::Registry& registry,
@@ -499,10 +906,8 @@ static bool try_step_up(const rkg::ecs::Registry& registry,
     return false;
   }
 
-  SweepHit hit{};
   Vec3 center_up = add(center, mul(up, controller.step_height + controller.skin_width));
-  if (sweep_capsule_world(registry, self, center_up, controller.half_height, controller.radius,
-                          v3(), hit)) {
+  if (capsule_overlaps_world(registry, self, controller, center_up)) {
     return false;
   }
 
@@ -681,9 +1086,12 @@ static void move_with_collisions(rkg::ecs::Registry& registry,
     center = add(center, mul(hit.normal, controller.skin_width));
     last_hit_normal = hit.normal;
 
-    const float into = dot(remaining, hit.normal);
-    const float remaining_t = 1.0f - hit.t;
-    remaining = mul(sub(remaining, mul(hit.normal, into)), remaining_t);
+    Vec3 delta_rem = mul(remaining, 1.0f - hit.t);
+    const float into = dot(delta_rem, hit.normal);
+    if (into < 0.0f) {
+      delta_rem = sub(delta_rem, mul(hit.normal, into));
+    }
+    remaining = delta_rem;
     const float vel_into = dot(velocity, hit.normal);
     if (vel_into < 0.0f) {
       velocity = sub(velocity, mul(hit.normal, vel_into));
@@ -697,6 +1105,7 @@ static void move_with_collisions(rkg::ecs::Registry& registry,
                  std::to_string(last_hit_normal.z) + ")");
 #endif
 
+  depenetrate_capsule_world(registry, entity, controller, center, velocity, dt);
   position = sub(center, mul(up, controller.center_offset));
   to_array(position, transform.position);
 }
@@ -735,14 +1144,16 @@ static void update_character(rkg::ecs::Registry& registry,
   GroundHit ground = find_ground(registry, entity, *transform, controller);
   const float pre_ground_dist = ground.distance;
   const bool pre_ground_hit = ground.hit && ground.walkable;
-  const bool on_ground = ground.hit && ground.walkable &&
-                         (ground.distance <= controller.skin_width + controller.ground_snap_max);
+  const float ground_probe = controller.skin_width + controller.ground_snap_max;
+  const bool ground_near = ground.hit && (ground.distance <= ground_probe);
+  const bool on_ground = ground_near && ground.walkable;
+  const bool on_steep = ground_near && !ground.walkable;
 
   if (on_ground) {
     controller.time_since_grounded = 0.0f;
     controller.grounded = true;
     controller.mode = rkg::ecs::MovementMode::Grounded;
-  } else if (ground.hit && !ground.walkable) {
+  } else if (on_steep) {
     controller.time_since_grounded += dt;
     controller.grounded = false;
     controller.mode = rkg::ecs::MovementMode::Sliding;
@@ -778,6 +1189,10 @@ static void update_character(rkg::ecs::Registry& registry,
       // Keep vertical velocity zeroed when grounded (snap handles contact).
       velocity.y = 0.0f;
     }
+    const float vn = dot(velocity, ground.normal);
+    if (vn > 0.0f) {
+      velocity = sub(velocity, mul(ground.normal, vn));
+    }
   } else if (controller.mode == rkg::ecs::MovementMode::Sliding) {
     velocity = update_air_velocity(controller, velocity, desired_dir, desired_speed, dt);
     const Vec3 up = up_axis();
@@ -812,12 +1227,13 @@ static void update_character(rkg::ecs::Registry& registry,
 
   // Post-move ground snap.
   GroundHit after_ground = find_ground(registry, entity, *transform, controller);
+  bool snapped = false;
   if (after_ground.hit && after_ground.walkable) {
     const bool can_snap = (velocity.y <= 0.0f) && (controller.just_jumped_time <= 0.0f);
-    if (can_snap && after_ground.distance <= controller.ground_snap_max + controller.skin_width) {
+    if (can_snap && after_ground.distance <= ground_probe) {
       Vec3 pos = from_array(transform->position);
       if (pre_ground_hit && pre_ground_dist > controller.skin_width &&
-          after_ground.distance <= controller.skin_width + controller.ground_snap_max) {
+          after_ground.distance <= ground_probe) {
         const float denom = pre_ground_dist - after_ground.distance;
         if (std::abs(denom) > kEps) {
           float t = (pre_ground_dist - controller.skin_width) / denom;
@@ -831,11 +1247,26 @@ static void update_character(rkg::ecs::Registry& registry,
       to_array(pos, transform->position);
       controller.grounded = true;
       controller.mode = rkg::ecs::MovementMode::Grounded;
+      controller.time_since_grounded = 0.0f;
       controller.ground_height = transform->position[1];
       if (velocity.y < 0.0f) {
         velocity.y = 0.0f;
       }
+      const float vn = dot(velocity, after_ground.normal);
+      if (vn > 0.0f) {
+        velocity = sub(velocity, mul(after_ground.normal, vn));
+      }
+      snapped = true;
     }
+  }
+  if (!snapped) {
+    const bool after_near = after_ground.hit && (after_ground.distance <= ground_probe);
+    if (after_near && !after_ground.walkable) {
+      controller.mode = rkg::ecs::MovementMode::Sliding;
+    } else {
+      controller.mode = rkg::ecs::MovementMode::Falling;
+    }
+    controller.grounded = false;
   }
 
   to_array(velocity, velocity_comp->linear);
