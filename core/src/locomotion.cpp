@@ -1307,7 +1307,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   pelvis_sway_amp *= (0.6f + 0.4f * speed_norm);
   pelvis_sway_amp *= 0.20f;
   const float lateral = std::abs(dot(planar, right)) / std::max(max_speed, 0.1f);
-  const float sway_gate = clampf(lateral, 0.0f, 1.0f);
+  const float sway_gate = clampf((lateral - 0.20f) * (1.0f / 0.35f), 0.0f, 1.0f);
   const float sway_scale = sway_gate * sway_gate;
   pelvis_sway_amp *= sway_scale;
   const float pelvis_roll = gait->pelvis_roll_scale * speed_norm * sway_scale;
@@ -1326,12 +1326,14 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
   const float torso_roll = 0.35f * rock_amp * rock;
   const float chest_roll = 0.7f * rock_amp * rock;
-  const float torso_pitch_rock = 0.10f * rock_amp * twist;
+  const float fwd_rock_amp = (0.04f + 0.12f * speed_norm) * speed_norm;
+  const float torso_pitch_rock = fwd_rock_amp * twist;
 
   if (gait->enable_pelvis_motion) {
     add_pos(*skeleton, gait->bone_hips, pelvis_x, pelvis_y + landing_drop, 0.0f);
     const float pelvis_roll_term = -pelvis_roll * rock * 0.10f;
-    add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f, pelvis_yaw, pelvis_roll_term);
+    add_rot(*skeleton, gait->bone_hips, -gait->lean_fwd * 0.25f + torso_pitch_rock * 0.15f, pelvis_yaw,
+            pelvis_roll_term);
   }
 
   const float lean_side_spine = 0.0f;
@@ -1341,13 +1343,13 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float breathe = std::sin(gait->idle_time * 2.0f * kPi * 0.22f);
   const float breathe_amp = 0.03f * gait->idle_blend;
   const float breathe_term = breathe_amp * breathe;
-  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f + torso_pitch_rock * 0.6f,
+  add_rot(*skeleton, gait->bone_spine, gait->lean_fwd * 0.2f + breathe_term * 0.4f + torso_pitch_rock * 0.35f,
           torso_yaw * 0.35f, lean_side_spine + torso_roll * 0.45f);
-  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term + torso_pitch_rock * 0.9f,
+  add_rot(*skeleton, gait->bone_chest, gait->lean_fwd * 0.15f + breathe_term + torso_pitch_rock * 0.55f,
           torso_yaw * 0.75f, lean_side_chest + chest_roll);
-  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f + torso_pitch_rock * 0.4f,
+  add_rot(*skeleton, gait->bone_neck, gait->lean_fwd * 0.06f + breathe_term * 0.25f + torso_pitch_rock * 0.25f,
           torso_yaw * 0.2f, lean_side_neck + torso_roll * 0.25f);
-  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f + torso_pitch_rock * 0.25f,
+  add_rot(*skeleton, gait->bone_head, gait->lean_fwd * 0.04f + breathe_term * 0.15f + torso_pitch_rock * 0.18f,
           torso_yaw * 0.1f, lean_side_head + torso_roll * 0.18f);
 
   if (gait->enable_arm_swing) {
@@ -1910,6 +1912,9 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       if (off_len > debug_lock_max && off_len > kEps) {
         lock_offset_e = mul(lock_offset_e, debug_lock_max / off_len);
       }
+      const float lock_side = dot(lock_offset_e, side_e);
+      const float lock_fwd = dot(lock_offset_e, frame_fwd_e);
+      lock_offset_e = add(mul(side_e, lock_side * sway_scale), mul(frame_fwd_e, lock_fwd));
     } else {
       lock_offset_e = v3();
     }
