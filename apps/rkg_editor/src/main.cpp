@@ -53,7 +53,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kDockLayoutVersion = 4;
+constexpr int kDockLayoutVersion = 5;
 using rkg::Mat4;
 using rkg::Vec3;
 using rkg::mat4_identity;
@@ -329,6 +329,29 @@ struct UiWindowLogState {
   bool valid = false;
 };
 
+struct PoseKeyframe {
+  float time = 0.0f;
+  std::vector<rkg::ecs::Transform> local_poses;
+};
+
+struct PoseSequencerState {
+  bool enabled = false;
+  bool playing = false;
+  bool loop = true;
+  float time = 0.0f;
+  float duration = 1.0f;
+  float playback_rate = 1.0f;
+  float last_applied_time = 0.0f;
+  bool last_applied_valid = false;
+  int selected_key = -1;
+  rkg::ecs::Entity target = rkg::ecs::kInvalidEntity;
+  rkg::ecs::Entity gait_restore_entity = rkg::ecs::kInvalidEntity;
+  bool gait_restore_valid = false;
+  bool gait_restore_enabled = true;
+  size_t bone_count = 0;
+  std::vector<PoseKeyframe> keys;
+};
+
 struct EditorState {
   rkg::runtime::RuntimeHost* runtime = nullptr;
   PlayState play_state = PlayState::Edit;
@@ -402,6 +425,7 @@ struct EditorState {
   char new_bone_name[64] = "bone";
   std::vector<std::string> skeleton_asset_names;
   std::unordered_map<std::string, rkg::ecs::Skeleton> skeleton_assets;
+  PoseSequencerState sequencer;
 
   AgentPanelState agent;
   ContentPanelState content;
@@ -462,6 +486,216 @@ std::vector<std::string> split_lines(const std::string& text) {
     lines.push_back("");
   }
   return lines;
+}
+
+constexpr float kPoseSequencerPi = 3.14159265358979323846f;
+
+float lerp_scalar(float a, float b, float t) {
+  return a + (b - a) * t;
+}
+
+float lerp_angle(float a, float b, float t) {
+  float delta = b - a;
+  if (delta > kPoseSequencerPi) {
+    delta -= 2.0f * kPoseSequencerPi;
+  } else if (delta < -kPoseSequencerPi) {
+    delta += 2.0f * kPoseSequencerPi;
+  }
+  return a + delta * t;
+}
+
+std::string entity_name_for(const EditorState& state, rkg::ecs::Entity entity) {
+  if (!state.runtime || entity == rkg::ecs::kInvalidEntity) return {};
+  for (const auto& [name, ent] : state.runtime->entities_by_name()) {
+    if (ent == entity) return name;
+  }
+  return {};
+}
+
+void sequencer_refresh_duration(PoseSequencerState& seq) {
+  float max_time = 0.0f;
+  for (const auto& key : seq.keys) {
+    max_time = std::max(max_time, key.time);
+  }
+  if (seq.duration < max_time) {
+    seq.duration = max_time;
+  }
+  if (seq.duration < 0.1f) {
+    seq.duration = 0.1f;
+  }
+}
+
+void sequencer_restore_gait(EditorState& state) {
+  auto& seq = state.sequencer;
+  if (!seq.gait_restore_valid || !state.runtime) return;
+  auto& registry = registry_mutable(state);
+  if (auto* gait = registry.get_procedural_gait(seq.gait_restore_entity)) {
+    gait->enabled = seq.gait_restore_enabled;
+  }
+  seq.gait_restore_valid = false;
+  seq.gait_restore_entity = rkg::ecs::kInvalidEntity;
+}
+
+void sequencer_disable_gait(EditorState& state, rkg::ecs::Entity entity) {
+  if (!state.runtime || entity == rkg::ecs::kInvalidEntity) return;
+  auto& seq = state.sequencer;
+  if (seq.gait_restore_valid && seq.gait_restore_entity == entity) {
+    return;
+  }
+  if (seq.gait_restore_valid && seq.gait_restore_entity != entity) {
+    sequencer_restore_gait(state);
+  }
+  auto& registry = registry_mutable(state);
+  auto* gait = registry.get_procedural_gait(entity);
+  if (!gait) return;
+  seq.gait_restore_entity = entity;
+  seq.gait_restore_enabled = gait->enabled;
+  seq.gait_restore_valid = true;
+  gait->enabled = false;
+}
+
+void sequencer_set_target(EditorState& state, rkg::ecs::Entity entity) {
+  auto& seq = state.sequencer;
+  if (seq.target == entity) return;
+  sequencer_restore_gait(state);
+  seq.target = entity;
+  seq.keys.clear();
+  seq.selected_key = -1;
+  seq.bone_count = 0;
+  seq.last_applied_valid = false;
+  seq.time = 0.0f;
+  if (seq.enabled && entity != rkg::ecs::kInvalidEntity) {
+    sequencer_disable_gait(state, entity);
+  }
+}
+
+void sequencer_apply_pose(const PoseSequencerState& seq, rkg::ecs::Skeleton& skeleton, float time) {
+  if (seq.keys.empty()) return;
+  if (skeleton.bones.empty()) return;
+
+  const PoseKeyframe* a = &seq.keys.front();
+  const PoseKeyframe* b = a;
+  float t = 0.0f;
+
+  if (seq.keys.size() > 1) {
+    size_t idx = 0;
+    while (idx < seq.keys.size() && seq.keys[idx].time < time) {
+      idx += 1;
+    }
+    if (idx == 0) {
+      a = &seq.keys.front();
+      b = a;
+      t = 0.0f;
+    } else if (idx >= seq.keys.size()) {
+      a = &seq.keys.back();
+      b = a;
+      t = 0.0f;
+    } else {
+      a = &seq.keys[idx - 1];
+      b = &seq.keys[idx];
+      const float span = std::max(0.0001f, b->time - a->time);
+      t = (time - a->time) / span;
+    }
+  }
+
+  if (a->local_poses.size() != skeleton.bones.size() ||
+      b->local_poses.size() != skeleton.bones.size()) {
+    return;
+  }
+
+  const size_t count = skeleton.bones.size();
+  for (size_t i = 0; i < count; ++i) {
+    auto& dst = skeleton.bones[i].local_pose;
+    const auto& pa = a->local_poses[i];
+    const auto& pb = b->local_poses[i];
+    dst.position[0] = lerp_scalar(pa.position[0], pb.position[0], t);
+    dst.position[1] = lerp_scalar(pa.position[1], pb.position[1], t);
+    dst.position[2] = lerp_scalar(pa.position[2], pb.position[2], t);
+    dst.rotation[0] = lerp_angle(pa.rotation[0], pb.rotation[0], t);
+    dst.rotation[1] = lerp_angle(pa.rotation[1], pb.rotation[1], t);
+    dst.rotation[2] = lerp_angle(pa.rotation[2], pb.rotation[2], t);
+    dst.scale[0] = lerp_scalar(pa.scale[0], pb.scale[0], t);
+    dst.scale[1] = lerp_scalar(pa.scale[1], pb.scale[1], t);
+    dst.scale[2] = lerp_scalar(pa.scale[2], pb.scale[2], t);
+  }
+}
+
+void update_pose_sequencer(EditorState& state, float dt) {
+  auto& seq = state.sequencer;
+  if (!seq.enabled || !state.runtime) return;
+  if (seq.playing && seq.keys.empty()) {
+    seq.playing = false;
+  }
+
+  if (seq.target == rkg::ecs::kInvalidEntity) {
+    rkg::ecs::Entity candidate = state.runtime->player_entity();
+    if (candidate == rkg::ecs::kInvalidEntity) {
+      candidate = state.selected_entity;
+    }
+    if (candidate != rkg::ecs::kInvalidEntity) {
+      sequencer_set_target(state, candidate);
+    }
+  }
+
+  if (seq.target == rkg::ecs::kInvalidEntity) return;
+
+  auto& registry = registry_mutable(state);
+  auto* skeleton = registry.get_skeleton(seq.target);
+  auto* transform = registry.get_transform(seq.target);
+  if (!skeleton || !transform) return;
+
+  sequencer_disable_gait(state, seq.target);
+
+  if (seq.playing && seq.duration > 0.0f) {
+    seq.time += dt * seq.playback_rate;
+    if (seq.time > seq.duration) {
+      if (seq.loop) {
+        seq.time = std::fmod(seq.time, seq.duration);
+      } else {
+        seq.time = seq.duration;
+        seq.playing = false;
+      }
+    }
+  }
+
+  bool should_apply = seq.playing;
+  if (!seq.playing) {
+    if (!seq.last_applied_valid || std::abs(seq.time - seq.last_applied_time) > 1e-6f) {
+      should_apply = true;
+    }
+  }
+
+  if (should_apply && !seq.keys.empty()) {
+    sequencer_apply_pose(seq, *skeleton, seq.time);
+    rkg::ecs::compute_skeleton_world_pose(*transform, *skeleton);
+    seq.last_applied_time = seq.time;
+    seq.last_applied_valid = true;
+  }
+}
+
+void set_sequencer_enabled(EditorState& state, bool enabled) {
+  auto& seq = state.sequencer;
+  if (seq.enabled == enabled) return;
+  seq.enabled = enabled;
+  if (enabled) {
+    seq.playing = false;
+    seq.last_applied_valid = false;
+    state.show_skeleton_debug = true;
+    if (seq.target == rkg::ecs::kInvalidEntity) {
+      rkg::ecs::Entity candidate = state.runtime ? state.runtime->player_entity() : rkg::ecs::kInvalidEntity;
+      if (candidate == rkg::ecs::kInvalidEntity) {
+        candidate = state.selected_entity;
+      }
+      if (candidate != rkg::ecs::kInvalidEntity) {
+        sequencer_set_target(state, candidate);
+      }
+    } else {
+      sequencer_disable_gait(state, seq.target);
+    }
+  } else {
+    seq.playing = false;
+    sequencer_restore_gait(state);
+  }
 }
 
 fs::path skeleton_assets_root(const EditorState& state) {
@@ -2593,16 +2827,18 @@ void build_dock_layout(EditorState& state) {
   ImGuiID dock_main = dockspace_id;
   ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.22f, nullptr, &dock_main);
   ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.28f, nullptr, &dock_main);
-  ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
+  ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.28f, nullptr, &dock_main);
 
   ImGuiID dock_left_bottom = ImGui::DockBuilderSplitNode(dock_left, ImGuiDir_Down, 0.5f, nullptr, &dock_left);
   ImGuiID dock_right_bottom = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.4f, nullptr, &dock_right);
+  ImGuiID dock_timeline = ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Down, 0.45f, nullptr, &dock_bottom);
   ImGuiID dock_bottom_right = ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Right, 0.45f, nullptr, &dock_bottom);
 
   ImGui::DockBuilderDockWindow("Viewport", dock_main);
   ImGui::DockBuilderDockWindow("Scene", dock_left);
   ImGui::DockBuilderDockWindow("Inspector", dock_left_bottom);
   ImGui::DockBuilderDockWindow("Content", dock_bottom);
+  ImGui::DockBuilderDockWindow("Timeline", dock_timeline);
   ImGui::DockBuilderDockWindow("Diff Preview", dock_bottom_right);
   ImGui::DockBuilderDockWindow("Chat", dock_right);
   ImGui::DockBuilderDockWindow("Runs", dock_right_bottom);
@@ -2692,6 +2928,12 @@ void draw_toolbar(EditorState& state) {
       state.editor_pivot_world[2] = state.saved_editor_cam.pivot[2];
       state.lock_editor_pivot = true;
     }
+  }
+
+  ImGui::SameLine();
+  bool seq_enabled = state.sequencer.enabled;
+  if (ImGui::Checkbox("Pose Sequencer", &seq_enabled)) {
+    set_sequencer_enabled(state, seq_enabled);
   }
 
   ImGui::SameLine();
@@ -3142,21 +3384,27 @@ void draw_inspector_panel(EditorState& state) {
         bone.local_pose.position[0] = pos[0];
         bone.local_pose.position[1] = pos[1];
         bone.local_pose.position[2] = pos[2];
-        std::memcpy(bone.bind_local.position, bone.local_pose.position, sizeof(bone.local_pose.position));
+        if (!state.sequencer.enabled) {
+          std::memcpy(bone.bind_local.position, bone.local_pose.position, sizeof(bone.local_pose.position));
+        }
       }
       if (ImGui::InputFloat3("Local Rotation", rot, "%.3f",
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
         bone.local_pose.rotation[0] = rot[0];
         bone.local_pose.rotation[1] = rot[1];
         bone.local_pose.rotation[2] = rot[2];
-        std::memcpy(bone.bind_local.rotation, bone.local_pose.rotation, sizeof(bone.local_pose.rotation));
+        if (!state.sequencer.enabled) {
+          std::memcpy(bone.bind_local.rotation, bone.local_pose.rotation, sizeof(bone.local_pose.rotation));
+        }
       }
       if (ImGui::InputFloat3("Local Scale", scl, "%.3f",
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
         bone.local_pose.scale[0] = scl[0];
         bone.local_pose.scale[1] = scl[1];
         bone.local_pose.scale[2] = scl[2];
-        std::memcpy(bone.bind_local.scale, bone.local_pose.scale, sizeof(bone.local_pose.scale));
+        if (!state.sequencer.enabled) {
+          std::memcpy(bone.bind_local.scale, bone.local_pose.scale, sizeof(bone.local_pose.scale));
+        }
       }
       ImGui::PopID();
     }
@@ -3476,6 +3724,166 @@ void draw_content_panel(EditorState& state) {
     ImGui::EndChild();
   }
 
+  ImGui::End();
+}
+
+void draw_timeline_panel(EditorState& state) {
+  ImGui::Begin("Timeline");
+  log_ui_window(state, "Timeline");
+
+  bool enabled = state.sequencer.enabled;
+  if (ImGui::Checkbox("Enable Pose Sequencer", &enabled)) {
+    set_sequencer_enabled(state, enabled);
+  }
+
+  if (!state.sequencer.enabled) {
+    ImGui::TextDisabled("Enable to pose bones and capture keyframes.");
+    ImGui::End();
+    return;
+  }
+
+  if (state.play_state == PlayState::Play) {
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Stop simulation for posing.");
+  }
+
+  auto& seq = state.sequencer;
+  const rkg::ecs::Entity player = state.runtime ? state.runtime->player_entity() : rkg::ecs::kInvalidEntity;
+  if (ImGui::Button("Use Player")) {
+    if (player != rkg::ecs::kInvalidEntity) {
+      sequencer_set_target(state, player);
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Use Selected")) {
+    if (state.selected_entity != rkg::ecs::kInvalidEntity) {
+      sequencer_set_target(state, state.selected_entity);
+    }
+  }
+
+  std::string target_name = entity_name_for(state, seq.target);
+  if (seq.target != rkg::ecs::kInvalidEntity) {
+    ImGui::Text("Target: %u %s", seq.target, target_name.empty() ? "" : target_name.c_str());
+  } else {
+    ImGui::TextDisabled("Target: none");
+  }
+
+  auto& registry = registry_mutable(state);
+  auto* skeleton = (seq.target != rkg::ecs::kInvalidEntity) ? registry.get_skeleton(seq.target) : nullptr;
+  if (skeleton) {
+    ImGui::Text("Bones: %zu", skeleton->bones.size());
+    if (seq.bone_count != 0 && seq.bone_count != skeleton->bones.size()) {
+      ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                         "Pose bones (%zu) != current skeleton (%zu). Capture will reset keys.",
+                         seq.bone_count, skeleton->bones.size());
+    }
+  } else if (seq.target != rkg::ecs::kInvalidEntity) {
+    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Target has no skeleton.");
+  }
+
+  ImGui::Separator();
+
+  const bool can_play = !seq.keys.empty();
+  if (ImGui::Button(seq.playing ? "Stop" : "Play")) {
+    if (can_play) {
+      seq.playing = !seq.playing;
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Rewind")) {
+    seq.time = 0.0f;
+    seq.playing = false;
+    seq.last_applied_valid = false;
+  }
+  ImGui::SameLine();
+  ImGui::Checkbox("Loop", &seq.loop);
+
+  if (!can_play) {
+    ImGui::TextDisabled("Add at least 1 keyframe to play.");
+  }
+
+  ImGui::DragFloat("Rate", &seq.playback_rate, 0.05f, 0.05f, 4.0f, "%.2fx");
+  if (seq.playback_rate < 0.01f) seq.playback_rate = 0.01f;
+  ImGui::DragFloat("Duration (s)", &seq.duration, 0.05f, 0.1f, 60.0f, "%.2f");
+  if (seq.duration < 0.1f) seq.duration = 0.1f;
+
+  float prev_time = seq.time;
+  if (seq.duration > 0.0f) {
+    ImGui::SliderFloat("Time (s)", &seq.time, 0.0f, seq.duration, "%.3f");
+  } else {
+    ImGui::DragFloat("Time (s)", &seq.time, 0.01f, 0.0f, 10.0f, "%.3f");
+  }
+  if (seq.time < 0.0f) seq.time = 0.0f;
+  if (seq.time > seq.duration && seq.duration > 0.0f) seq.time = seq.duration;
+  if (seq.time != prev_time) {
+    seq.playing = false;
+    seq.last_applied_valid = false;
+  }
+
+  ImGui::Separator();
+
+  const bool can_capture = skeleton && !skeleton->bones.empty();
+  if (ImGui::Button("Capture Key") && can_capture) {
+    if (seq.bone_count != 0 && seq.bone_count != skeleton->bones.size()) {
+      seq.keys.clear();
+      seq.selected_key = -1;
+      seq.last_applied_valid = false;
+    }
+    seq.bone_count = skeleton->bones.size();
+    PoseKeyframe key;
+    key.time = seq.time;
+    key.local_poses.reserve(skeleton->bones.size());
+    for (const auto& bone : skeleton->bones) {
+      key.local_poses.push_back(bone.local_pose);
+    }
+
+    const float epsilon = 1e-4f;
+    auto it = std::lower_bound(seq.keys.begin(), seq.keys.end(), key.time,
+                               [](const PoseKeyframe& k, float t) { return k.time < t; });
+    if (it != seq.keys.end() && std::abs(it->time - key.time) <= epsilon) {
+      *it = std::move(key);
+      seq.selected_key = static_cast<int>(it - seq.keys.begin());
+    } else {
+      const int index = static_cast<int>(it - seq.keys.begin());
+      seq.keys.insert(it, std::move(key));
+      seq.selected_key = index;
+    }
+    sequencer_refresh_duration(seq);
+    seq.last_applied_valid = false;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Delete Key") && seq.selected_key >= 0 &&
+      static_cast<size_t>(seq.selected_key) < seq.keys.size()) {
+    seq.keys.erase(seq.keys.begin() + seq.selected_key);
+    if (seq.selected_key >= static_cast<int>(seq.keys.size())) {
+      seq.selected_key = static_cast<int>(seq.keys.size()) - 1;
+    }
+    sequencer_refresh_duration(seq);
+    seq.last_applied_valid = false;
+  }
+
+  if (!can_capture) {
+    ImGui::TextDisabled("Select a rigged entity to capture keyframes.");
+  }
+
+  ImGui::Separator();
+
+  ImGui::Text("Keys: %zu", seq.keys.size());
+  ImGui::BeginChild("TimelineKeys", ImVec2(0, 140), true);
+  for (size_t i = 0; i < seq.keys.size(); ++i) {
+    const auto& key = seq.keys[i];
+    char label[64];
+    std::snprintf(label, sizeof(label), "Key %zu @ %.3f s", i, key.time);
+    const bool selected = (seq.selected_key == static_cast<int>(i));
+    if (ImGui::Selectable(label, selected)) {
+      seq.selected_key = static_cast<int>(i);
+      seq.time = key.time;
+      seq.playing = false;
+      seq.last_applied_valid = false;
+    }
+  }
+  ImGui::EndChild();
+
+  ImGui::TextDisabled("Tip: pose bones in the viewport, then Capture Key.");
   ImGui::End();
 }
 
@@ -4679,22 +5087,28 @@ void update_camera_and_draw_list(EditorState& state) {
             editable.local_pose.position[0] = state.bone_gizmo_start_local[0] + local_move.x;
             editable.local_pose.position[1] = state.bone_gizmo_start_local[1] + local_move.y;
             editable.local_pose.position[2] = state.bone_gizmo_start_local[2] + local_move.z;
-            std::memcpy(editable.bind_local.position, editable.local_pose.position,
-                        sizeof(editable.local_pose.position));
+            if (!state.sequencer.enabled) {
+              std::memcpy(editable.bind_local.position, editable.local_pose.position,
+                          sizeof(editable.local_pose.position));
+            }
           } else if (state.bone_gizmo_mode == 1) {
             const float rotate_scale = 0.01f;
             const float delta = (dx - dy) * rotate_scale;
             editable.local_pose.rotation[axis] = state.bone_gizmo_start_rot[axis] + delta;
-            std::memcpy(editable.bind_local.rotation, editable.local_pose.rotation,
-                        sizeof(editable.local_pose.rotation));
+            if (!state.sequencer.enabled) {
+              std::memcpy(editable.bind_local.rotation, editable.local_pose.rotation,
+                          sizeof(editable.local_pose.rotation));
+            }
           } else {
             const float scale_scale = 0.01f;
             const float delta = (dx - dy) * scale_scale;
             float next = state.bone_gizmo_start_scale[axis] * (1.0f + delta);
             if (next < 0.01f) next = 0.01f;
             editable.local_pose.scale[axis] = next;
-            std::memcpy(editable.bind_local.scale, editable.local_pose.scale,
-                        sizeof(editable.local_pose.scale));
+            if (!state.sequencer.enabled) {
+              std::memcpy(editable.bind_local.scale, editable.local_pose.scale,
+                          sizeof(editable.local_pose.scale));
+            }
           }
         }
       }
@@ -4853,11 +5267,14 @@ void draw_editor_ui(void* user_data) {
   }
   ImGui::End();
 
+  update_pose_sequencer(*state, ImGui::GetIO().DeltaTime);
+
   draw_toolbar(*state);
   draw_viewport(*state);
   draw_scene_panel(*state);
   draw_inspector_panel(*state);
   draw_content_panel(*state);
+  draw_timeline_panel(*state);
   draw_diff_preview_panel(*state);
   draw_chat_panel(*state);
   draw_runs_browser_panel(*state);
