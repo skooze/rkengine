@@ -53,7 +53,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kDockLayoutVersion = 3;
+constexpr int kDockLayoutVersion = 4;
 using rkg::Mat4;
 using rkg::Vec3;
 using rkg::mat4_identity;
@@ -338,6 +338,7 @@ struct EditorState {
   bool dock_built = false;
   int dock_layout_version = 0;
   float toolbar_height_hint = 0.0f;
+  bool toolbar_height_applied = false;
   std::unordered_map<std::string, UiWindowLogState> ui_window_log;
   bool viewport_focused = false;
   bool viewport_hovered = false;
@@ -2537,6 +2538,9 @@ static void log_ui_window(EditorState& state, const char* name) {
     entry.pos[1] = pos.y;
     entry.size[0] = size.x;
     entry.size[1] = size.y;
+    if (std::strcmp(name, "Toolbar") == 0) {
+      state.toolbar_height_hint = size.y;
+    }
     std::ostringstream line;
     line.setf(std::ios::fixed);
     line.precision(1);
@@ -2590,23 +2594,12 @@ void build_dock_layout(EditorState& state) {
   ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.22f, nullptr, &dock_main);
   ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.28f, nullptr, &dock_main);
   ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
-  const float toolbar_extra_px = 20.0f;
-  const ImGuiStyle& style = ImGui::GetStyle();
-  float toolbar_height_px = ImGui::GetFrameHeightWithSpacing() + style.WindowPadding.y * 2.0f + toolbar_extra_px;
-  if (state.toolbar_height_hint > 1.0f) {
-    toolbar_height_px = state.toolbar_height_hint;
-  }
-  const float viewport_h = std::max(1.0f, ImGui::GetMainViewport()->Size.y);
-  float top_ratio = toolbar_height_px / viewport_h;
-  top_ratio = std::clamp(top_ratio, 0.06f, 0.18f);
-  ImGuiID dock_top = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Up, top_ratio, nullptr, &dock_main);
 
   ImGuiID dock_left_bottom = ImGui::DockBuilderSplitNode(dock_left, ImGuiDir_Down, 0.5f, nullptr, &dock_left);
   ImGuiID dock_right_bottom = ImGui::DockBuilderSplitNode(dock_right, ImGuiDir_Down, 0.4f, nullptr, &dock_right);
   ImGuiID dock_bottom_right = ImGui::DockBuilderSplitNode(dock_bottom, ImGuiDir_Right, 0.45f, nullptr, &dock_bottom);
 
   ImGui::DockBuilderDockWindow("Viewport", dock_main);
-  ImGui::DockBuilderDockWindow("Toolbar", dock_top);
   ImGui::DockBuilderDockWindow("Scene", dock_left);
   ImGui::DockBuilderDockWindow("Inspector", dock_left_bottom);
   ImGui::DockBuilderDockWindow("Content", dock_bottom);
@@ -2619,9 +2612,26 @@ void build_dock_layout(EditorState& state) {
 }
 
 void draw_toolbar(EditorState& state) {
-  ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
-                                 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse);
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  const ImGuiStyle& style = ImGui::GetStyle();
+  const float toolbar_extra_px = 20.0f;
+  float toolbar_height_px = ImGui::GetFrameHeightWithSpacing() + style.WindowPadding.y * 2.0f + toolbar_extra_px;
+  if (state.toolbar_height_hint > 1.0f) {
+    toolbar_height_px = state.toolbar_height_hint;
+  }
+  ImGui::SetNextWindowPos(viewport->WorkPos);
+  ImGui::SetNextWindowViewport(viewport->ID);
+  if (!state.toolbar_height_applied) {
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, toolbar_height_px), ImGuiCond_Always);
+  }
+  ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                                 ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus);
   log_ui_window(state, "Toolbar");
+  if (!state.toolbar_height_applied) {
+    state.toolbar_height_applied = true;
+  }
 
   const bool playing = state.play_state == PlayState::Play;
   const bool paused = state.play_state == PlayState::Pause;
@@ -4809,8 +4819,17 @@ void draw_editor_ui(void* user_data) {
   if (!state || !state->runtime) return;
 
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
-  ImGui::SetNextWindowPos(viewport->WorkPos);
-  ImGui::SetNextWindowSize(viewport->WorkSize);
+  const ImGuiStyle& style = ImGui::GetStyle();
+  const float toolbar_extra_px = 20.0f;
+  float toolbar_height_px = ImGui::GetFrameHeightWithSpacing() + style.WindowPadding.y * 2.0f + toolbar_extra_px;
+  if (state->toolbar_height_hint > 1.0f) {
+    toolbar_height_px = state->toolbar_height_hint;
+  }
+  const ImVec2 dock_pos(viewport->WorkPos.x, viewport->WorkPos.y + toolbar_height_px);
+  const ImVec2 dock_size(viewport->WorkSize.x,
+                         std::max(1.0f, viewport->WorkSize.y - toolbar_height_px));
+  ImGui::SetNextWindowPos(dock_pos);
+  ImGui::SetNextWindowSize(dock_size);
   ImGui::SetNextWindowViewport(viewport->ID);
 
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
