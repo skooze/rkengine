@@ -1,4 +1,11 @@
-Updating 90ad3e8..8f7f898
+From github.com:skooze/rkengine
+   b3ff0c5..5977519  main       -> origin/main
+Updating b3ff0c5..5977519
 Fast-forward
- core/src/locomotion.cpp | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ apps/rkg_editor/src/main.cpp | 52 ++++++++++++++++++++++++++++++++++++++++++++
+ core/CMakeLists.txt          |  1 +
+ core/include/rkg/ui_log.h    | 17 +++++++++++++++
+ core/src/ui_log.cpp          | 42 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 112 insertions(+)
+ create mode 100644 core/include/rkg/ui_log.h
+ create mode 100644 core/src/ui_log.cpp
