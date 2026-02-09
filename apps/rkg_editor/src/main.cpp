@@ -51,6 +51,8 @@
 namespace fs = std::filesystem;
 
 namespace {
+
+constexpr int kDockLayoutVersion = 2;
 using rkg::Mat4;
 using rkg::Vec3;
 using rkg::mat4_identity;
@@ -327,6 +329,7 @@ struct EditorState {
   bool stop_requested = false;
   float fixed_step = 1.0f / 60.0f;
   bool dock_built = false;
+  int dock_layout_version = 0;
   bool viewport_focused = false;
   bool viewport_hovered = false;
   bool ui_capturing = false;
@@ -2513,6 +2516,7 @@ bool draw_diff_entries_viewer(std::vector<DiffPreviewEntry>& entries,
 }
 
 void build_dock_layout(EditorState& state) {
+  state.dock_layout_version = kDockLayoutVersion;
   ImGuiID dockspace_id = ImGui::GetID("EditorDockspace");
   ImGui::DockBuilderRemoveNode(dockspace_id);
   ImGuiDockNodeFlags dock_flags =
@@ -4749,6 +4753,10 @@ void draw_editor_ui(void* user_data) {
   ImGuiID dockspace_id = ImGui::GetID("EditorDockspace");
   ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
   ImGui::DockSpace(dockspace_id, ImVec2(0, 0), dockspace_flags);
+  if (state->dock_layout_version != kDockLayoutVersion) {
+    state->dock_built = false;
+    state->dock_layout_version = kDockLayoutVersion;
+  }
   if (!state->dock_built) {
     build_dock_layout(*state);
   }
