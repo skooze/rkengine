@@ -1413,8 +1413,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float arm_lift = 0.03f * arm_amp;
     const float elbow_amp = 0.12f * arm_amp;
     const float elbow_phase = 0.20f;
-    const float shoulder_pitch_amp = 0.32f * arm_amp;
-    const float shoulder_yaw_amp = 0.05f * arm_amp;
+    const float shoulder_pitch_amp = 0.0f;
+    const float shoulder_yaw_amp = 0.0f;
     const float shoulder_roll_amp = 0.0f;
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
@@ -1943,6 +1943,10 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     add_rot(*skeleton, gait->bone_spine, 0.0f, yaw_twist * 0.35f, 0.0f);
     add_rot(*skeleton, gait->bone_chest, 0.0f, yaw_twist * 0.75f, 0.0f);
     add_rot(*skeleton, gait->bone_neck, 0.0f, yaw_twist * 0.20f, 0.0f);
+    const float shoulder_lead_amp = 0.20f + 0.20f * speed_norm;
+    const float shoulder_lead = twist_norm * shoulder_lead_amp;
+    add_rot(*skeleton, gait->bone_l_shoulder, -shoulder_lead, 0.0f, 0.0f);
+    add_rot(*skeleton, gait->bone_r_shoulder, shoulder_lead, 0.0f, 0.0f);
   }
 
   to_array(l_target_e, gait->debug_left_target);
