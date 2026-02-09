@@ -53,7 +53,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kDockLayoutVersion = 2;
+constexpr int kDockLayoutVersion = 3;
 using rkg::Mat4;
 using rkg::Vec3;
 using rkg::mat4_identity;
@@ -337,6 +337,7 @@ struct EditorState {
   float fixed_step = 1.0f / 60.0f;
   bool dock_built = false;
   int dock_layout_version = 0;
+  float toolbar_height_hint = 0.0f;
   std::unordered_map<std::string, UiWindowLogState> ui_window_log;
   bool viewport_focused = false;
   bool viewport_hovered = false;
@@ -2496,6 +2497,29 @@ void draw_copy_button(const char* id, const std::string& value) {
   }
 }
 
+static float load_last_toolbar_height(const fs::path& log_path) {
+  std::ifstream in(log_path);
+  if (!in.is_open()) {
+    return 0.0f;
+  }
+  std::string line;
+  float last_h = 0.0f;
+  while (std::getline(in, line)) {
+    if (line.rfind("window=Toolbar", 0) != 0) {
+      continue;
+    }
+    const char* cstr = line.c_str();
+    float w = 0.0f;
+    float h = 0.0f;
+    if (std::sscanf(cstr, "window=Toolbar pos=(%*f,%*f) size=(%f,%f)", &w, &h) == 2) {
+      if (h > 1.0f && h < 300.0f) {
+        last_h = h;
+      }
+    }
+  }
+  return last_h;
+}
+
 static void log_ui_window(EditorState& state, const char* name) {
   if (!rkg::ui_log::enabled()) {
     return;
@@ -2568,7 +2592,10 @@ void build_dock_layout(EditorState& state) {
   ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.25f, nullptr, &dock_main);
   const float toolbar_extra_px = 20.0f;
   const ImGuiStyle& style = ImGui::GetStyle();
-  const float toolbar_height_px = ImGui::GetFrameHeightWithSpacing() + style.WindowPadding.y * 2.0f + toolbar_extra_px;
+  float toolbar_height_px = ImGui::GetFrameHeightWithSpacing() + style.WindowPadding.y * 2.0f + toolbar_extra_px;
+  if (state.toolbar_height_hint > 1.0f) {
+    toolbar_height_px = state.toolbar_height_hint;
+  }
   const float viewport_h = std::max(1.0f, ImGui::GetMainViewport()->Size.y);
   float top_ratio = toolbar_height_px / viewport_h;
   top_ratio = std::clamp(top_ratio, 0.06f, 0.18f);
@@ -4895,8 +4922,18 @@ int main(int argc, char** argv) {
     const auto log_dir = runtime.paths().root / "build_logs";
     std::error_code log_ec;
     std::filesystem::create_directories(log_dir, log_ec);
-    rkg::ui_log::open(log_dir / "ui.log");
-    rkg::ui_log::write("ui_log: opened");
+    const fs::path ui_log_path = log_dir / "ui.log";
+    state.toolbar_height_hint = load_last_toolbar_height(ui_log_path);
+    rkg::ui_log::open(ui_log_path);
+    if (state.toolbar_height_hint > 1.0f) {
+      std::ostringstream line;
+      line.setf(std::ios::fixed);
+      line.precision(1);
+      line << "ui_log: toolbar_height_hint=" << state.toolbar_height_hint;
+      rkg::ui_log::write(line.str());
+    } else {
+      rkg::ui_log::write("ui_log: toolbar_height_hint=none");
+    }
 
     rkg::debug_ui::set_draw_callback(&draw_editor_ui, &state);
   } else {
