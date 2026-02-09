@@ -1934,6 +1934,17 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     r_target_w = r_lock_w;
   }
 
+  if (gait->enable_arm_swing && speed_norm > 0.02f) {
+    const float foot_fwd = dot(sub(l_target_e, r_target_e), frame_fwd_e);
+    float twist_norm = (stride_len_e > kEps) ? (foot_fwd / stride_len_e) : 0.0f;
+    twist_norm = clampf(twist_norm, -1.0f, 1.0f);
+    const float twist_amp = 0.10f + 0.12f * speed_norm;
+    const float yaw_twist = -twist_norm * twist_amp;
+    add_rot(*skeleton, gait->bone_spine, 0.0f, yaw_twist * 0.35f, 0.0f);
+    add_rot(*skeleton, gait->bone_chest, 0.0f, yaw_twist * 0.75f, 0.0f);
+    add_rot(*skeleton, gait->bone_neck, 0.0f, yaw_twist * 0.20f, 0.0f);
+  }
+
   to_array(l_target_e, gait->debug_left_target);
   to_array(r_target_e, gait->debug_right_target);
   to_array(frame_fwd_w, gait->debug_forward);
