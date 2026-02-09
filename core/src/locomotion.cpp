@@ -1354,7 +1354,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float sway_gate = clampf((lateral - 0.20f) * (1.0f / 0.35f), 0.0f, 1.0f);
   const float sway_scale = sway_gate * sway_gate;
   pelvis_sway_amp *= sway_scale;
-  const float pelvis_roll = gait->pelvis_roll_scale * speed_norm * sway_scale;
+  const float pelvis_roll = 0.0f;
   const float sway_phase = 2.0f * kPi * cycle;
   const float sway = std::sin(sway_phase);
   const float rock = sway;
@@ -1378,8 +1378,8 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float pelvis_yaw = 0.08f * arm_amp * shoulder_twist;
   const float torso_yaw = -0.14f * arm_amp * shoulder_twist;
   const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
-  const float torso_roll = 0.35f * rock_amp * rock;
-  const float chest_roll = 0.7f * rock_amp * rock;
+  const float torso_roll = 0.0f;
+  const float chest_roll = 0.0f;
   const float fwd_rock_amp = (0.02f + 0.08f * speed_norm) * speed_norm;
   const float torso_pitch_rock = fwd_rock_amp * twist;
 
@@ -1415,7 +1415,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     const float elbow_phase = 0.20f;
     const float shoulder_pitch_amp = 0.32f * arm_amp;
     const float shoulder_yaw_amp = 0.05f * arm_amp;
-    const float shoulder_roll_amp = 0.003f * arm_amp;
+    const float shoulder_roll_amp = 0.0f;
     const float relax = gait->idle_blend;
     const float relax_pitch = 0.18f * relax;
     const float relax_yaw = 0.02f * relax;
