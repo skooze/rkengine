@@ -1939,7 +1939,7 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
     float twist_norm = (stride_len_e > kEps) ? (foot_fwd / stride_len_e) : 0.0f;
     twist_norm = clampf(twist_norm, -1.0f, 1.0f);
     const float twist_amp = 0.18f + 0.22f * speed_norm;
-    const float yaw_twist = -twist_norm * twist_amp;
+    const float yaw_twist = twist_norm * twist_amp;
     add_rot(*skeleton, gait->bone_spine, 0.0f, yaw_twist * 0.35f, 0.0f);
     add_rot(*skeleton, gait->bone_chest, 0.0f, yaw_twist * 0.75f, 0.0f);
     add_rot(*skeleton, gait->bone_neck, 0.0f, yaw_twist * 0.20f, 0.0f);
