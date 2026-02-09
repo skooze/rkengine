@@ -11,6 +11,7 @@
 #include "rkg/json_write.h"
 #include "rkg/renderer_hooks.h"
 #include "rkg/movement_log.h"
+#include "rkg/ui_log.h"
 
 #include <algorithm>
 #include <cctype>
@@ -322,6 +323,12 @@ struct UndoState {
   std::vector<UndoEntry> redo;
 };
 
+struct UiWindowLogState {
+  float pos[2]{0.0f, 0.0f};
+  float size[2]{0.0f, 0.0f};
+  bool valid = false;
+};
+
 struct EditorState {
   rkg::runtime::RuntimeHost* runtime = nullptr;
   PlayState play_state = PlayState::Edit;
@@ -330,6 +337,7 @@ struct EditorState {
   float fixed_step = 1.0f / 60.0f;
   bool dock_built = false;
   int dock_layout_version = 0;
+  std::unordered_map<std::string, UiWindowLogState> ui_window_log;
   bool viewport_focused = false;
   bool viewport_hovered = false;
   bool ui_capturing = false;
@@ -2488,6 +2496,35 @@ void draw_copy_button(const char* id, const std::string& value) {
   }
 }
 
+static void log_ui_window(EditorState& state, const char* name) {
+  if (!rkg::ui_log::enabled()) {
+    return;
+  }
+  const ImVec2 pos = ImGui::GetWindowPos();
+  const ImVec2 size = ImGui::GetWindowSize();
+  auto& entry = state.ui_window_log[name];
+  const float dx = std::abs(pos.x - entry.pos[0]);
+  const float dy = std::abs(pos.y - entry.pos[1]);
+  const float dw = std::abs(size.x - entry.size[0]);
+  const float dh = std::abs(size.y - entry.size[1]);
+  if (!entry.valid || dx > 0.5f || dy > 0.5f || dw > 0.5f || dh > 0.5f) {
+    entry.valid = true;
+    entry.pos[0] = pos.x;
+    entry.pos[1] = pos.y;
+    entry.size[0] = size.x;
+    entry.size[1] = size.y;
+    std::ostringstream line;
+    line.setf(std::ios::fixed);
+    line.precision(1);
+    line << "window=" << name
+         << " pos=(" << pos.x << "," << pos.y << ")"
+         << " size=(" << size.x << "," << size.y << ")"
+         << " docked=" << (ImGui::IsWindowDocked() ? 1 : 0)
+         << " collapsed=" << (ImGui::IsWindowCollapsed() ? 1 : 0);
+    rkg::ui_log::write(line.str());
+  }
+}
+
 bool draw_diff_entries_viewer(std::vector<DiffPreviewEntry>& entries,
                               int& selected,
                               const char* list_id,
@@ -2557,6 +2594,7 @@ void build_dock_layout(EditorState& state) {
 void draw_toolbar(EditorState& state) {
   ImGui::Begin("Toolbar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
                                  ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse);
+  log_ui_window(state, "Toolbar");
 
   const bool playing = state.play_state == PlayState::Play;
   const bool paused = state.play_state == PlayState::Pause;
@@ -2629,6 +2667,7 @@ void draw_viewport(EditorState& state) {
   ImGui::Begin("Viewport", nullptr,
                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                    ImGuiWindowFlags_NoCollapse);
+  log_ui_window(state, "Viewport");
   if (ImGui::CollapsingHeader("Grid/Debug", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::Checkbox("World Grid", &state.show_world_grid);
     ImGui::SameLine();
@@ -2752,6 +2791,7 @@ void draw_viewport(EditorState& state) {
 
 void draw_scene_panel(EditorState& state) {
   ImGui::Begin("Scene");
+  log_ui_window(state, "Scene");
   const auto& project = state.runtime->project();
   ImGui::Text("Level: %s", project.initial_level.empty() ? "(none)" : project.initial_level.c_str());
   ImGui::Text("Entities: %zu", state.runtime->registry().entity_count());
@@ -2808,6 +2848,7 @@ void draw_scene_panel(EditorState& state) {
 
 void draw_inspector_panel(EditorState& state) {
   ImGui::Begin("Inspector");
+  log_ui_window(state, "Inspector");
   const auto entity = state.selected_entity;
   if (entity == rkg::ecs::kInvalidEntity) {
     ImGui::TextUnformatted("Select an entity.");
@@ -3184,6 +3225,7 @@ void draw_inspector_panel(EditorState& state) {
 
 void draw_content_panel(EditorState& state) {
   ImGui::Begin("Content");
+  log_ui_window(state, "Content");
   ImGui::TextWrapped("Project: %s", state.runtime->project_root().generic_string().c_str());
   ImGui::TextWrapped("Cooked root: %s", state.runtime->cooked_root().generic_string().c_str());
   ImGui::TextWrapped("Pack: %s", state.runtime->pack_path().generic_string().c_str());
@@ -3402,6 +3444,7 @@ void draw_content_panel(EditorState& state) {
 
 void draw_diff_preview_panel(EditorState& state) {
   ImGui::Begin("Diff Preview");
+  log_ui_window(state, "Diff Preview");
 #if RKG_ENABLE_DATA_JSON
   if (!state.diff_preview.error.empty()) {
     ImGui::TextWrapped("Error: %s", state.diff_preview.error.c_str());
@@ -3487,6 +3530,7 @@ void draw_diff_preview_panel(EditorState& state) {
 void draw_chat_panel(EditorState& state) {
   auto& agent = state.agent;
   ImGui::Begin("Chat");
+  log_ui_window(state, "Chat");
   state.chat_active = false;
 
   if (!agent.openai_available) {
@@ -3678,6 +3722,7 @@ void draw_chat_panel(EditorState& state) {
 
 void draw_runs_browser_panel(EditorState& state) {
   ImGui::Begin("Runs");
+  log_ui_window(state, "Runs");
 #if RKG_ENABLE_DATA_JSON
   auto& runs = state.runs;
   if (!runs.runs_error.empty()) {
@@ -4847,6 +4892,12 @@ int main(int argc, char** argv) {
     refresh_skeleton_assets(state);
     resolve_skeleton_asset_refs(state);
 
+    const auto log_dir = runtime.paths().root / "build_logs";
+    std::error_code log_ec;
+    std::filesystem::create_directories(log_dir, log_ec);
+    rkg::ui_log::open(log_dir / "ui.log");
+    rkg::ui_log::write("ui_log: opened");
+
     rkg::debug_ui::set_draw_callback(&draw_editor_ui, &state);
   } else {
     rkg::log::warn("debug_ui disabled via --no-ui");
@@ -4917,6 +4968,7 @@ int main(int argc, char** argv) {
 #endif
   }
 
+  rkg::ui_log::close();
   runtime.shutdown();
   return 0;
 }

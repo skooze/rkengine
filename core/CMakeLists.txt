@@ -1,6 +1,7 @@
 rkg_add_library(rkg_core
   src/log.cpp
   src/movement_log.cpp
+  src/ui_log.cpp
   src/ecs.cpp
   src/plugin_host.cpp
   src/config.cpp
