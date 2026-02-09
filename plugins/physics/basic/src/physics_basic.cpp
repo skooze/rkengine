@@ -1097,8 +1097,13 @@ static void update_character(rkg::ecs::Registry& registry,
   const bool ground_near = ground.hit && (ground.distance <= ground_probe);
   const bool on_ground = ground_near && ground.walkable;
   const bool on_steep = ground_near && !ground.walkable;
+  const bool suppress_ground = controller.just_jumped_time > 0.0f;
 
-  if (on_ground) {
+  if (suppress_ground) {
+    controller.time_since_grounded += dt;
+    controller.grounded = false;
+    controller.mode = rkg::ecs::MovementMode::Falling;
+  } else if (on_ground) {
     controller.time_since_grounded = 0.0f;
     controller.grounded = true;
     controller.mode = rkg::ecs::MovementMode::Grounded;

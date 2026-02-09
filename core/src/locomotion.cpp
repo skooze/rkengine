@@ -1367,8 +1367,16 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
       1.0f - 0.4f * std::min(1.0f, std::abs(dot(planar, right)) / std::max(max_speed, 0.1f));
   const float swing_scale = 0.25f + 0.75f * speed_norm;
   const float arm_amp = (gait->arm_swing_scale * speed_norm + 0.02f) * strafe_factor * swing_scale;
-  const float pelvis_yaw = 0.06f * arm_amp * twist;
-  const float torso_yaw = -0.08f * arm_amp * twist;
+  const float phase_offset = 0.25f;
+  const float arm_phase_l = 2.0f * kPi * u_l + phase_offset;
+  const float arm_phase_r = 2.0f * kPi * u_r + phase_offset;
+  const float swing_l = std::sin(arm_phase_l);
+  const float swing_r = std::sin(arm_phase_r);
+  const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
+  const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
+  const float shoulder_twist = gait->enable_arm_swing ? (0.5f * (swing_r - swing_l)) : twist;
+  const float pelvis_yaw = 0.08f * arm_amp * shoulder_twist;
+  const float torso_yaw = -0.14f * arm_amp * shoulder_twist;
   const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
   const float torso_roll = 0.35f * rock_amp * rock;
   const float chest_roll = 0.7f * rock_amp * rock;
@@ -1399,13 +1407,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
           torso_yaw * 0.1f, lean_side_head + torso_roll * 0.18f);
 
   if (gait->enable_arm_swing) {
-    const float phase_offset = 0.25f;
-    const float arm_phase_l = 2.0f * kPi * u_l + phase_offset;
-    const float arm_phase_r = 2.0f * kPi * u_r + phase_offset;
-    const float swing_l = std::sin(arm_phase_l);
-    const float swing_r = std::sin(arm_phase_r);
-    const float swing_l_90 = std::sin(arm_phase_l + 0.5f * kPi);
-    const float swing_r_90 = std::sin(arm_phase_r + 0.5f * kPi);
     const float arm_pitch_amp = 0.70f * arm_amp;
     const float arm_yaw = 0.01f * arm_amp;
     const float arm_roll = 0.01f * arm_amp;
