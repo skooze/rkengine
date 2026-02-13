@@ -564,6 +564,19 @@ void sequencer_set_target(EditorState& state, rkg::ecs::Entity entity) {
   seq.bone_count = 0;
   seq.last_applied_valid = false;
   seq.time = 0.0f;
+  state.selected_entity = entity;
+  state.selected_name = entity_name_for(state, entity);
+  state.selected_bone_name_index = -1;
+  if (entity != rkg::ecs::kInvalidEntity) {
+    auto& registry = registry_mutable(state);
+    if (auto* skeleton = registry.get_skeleton(entity)) {
+      state.selected_bone = skeleton->bones.empty() ? -1 : 0;
+    } else {
+      state.selected_bone = -1;
+    }
+  } else {
+    state.selected_bone = -1;
+  }
   if (seq.enabled && entity != rkg::ecs::kInvalidEntity) {
     sequencer_disable_gait(state, entity);
   }
@@ -2999,6 +3012,11 @@ void draw_viewport(EditorState& state) {
   const ImGuiIO& io = ImGui::GetIO();
   const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
   state.viewport_hovered = hovered;
+  const bool mouse_in_render =
+      io.MousePos.x >= state.viewport_pos[0] &&
+      io.MousePos.x <= (state.viewport_pos[0] + state.viewport_size[0]) &&
+      io.MousePos.y >= state.viewport_pos[1] &&
+      io.MousePos.y <= (state.viewport_pos[1] + state.viewport_size[1]);
   const bool clicked_any =
       ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
       ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
@@ -3017,13 +3035,13 @@ void draw_viewport(EditorState& state) {
     if (state.camera_distance < 1.5f) state.camera_distance = 1.5f;
     if (state.camera_distance > 12.0f) state.camera_distance = 12.0f;
   }
-  if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse &&
+  if (hovered && mouse_in_render && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
       (state.play_state != PlayState::Play || io.KeyCtrl)) {
     state.pick_requested = true;
     state.pick_mouse_pos[0] = io.MousePos.x;
     state.pick_mouse_pos[1] = io.MousePos.y;
   }
-  if (!hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse) {
+  if (!hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     state.viewport_focused = false;
   }
   if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
@@ -4933,8 +4951,13 @@ void update_camera_and_draw_list(EditorState& state) {
   if (state.show_skeleton_debug) {
     const Vec3 cam_right{state.camera_right[0], state.camera_right[1], state.camera_right[2]};
     const Vec3 cam_up{state.camera_up[0], state.camera_up[1], state.camera_up[2]};
+    const bool mouse_in_render =
+        io.MousePos.x >= state.viewport_pos[0] &&
+        io.MousePos.x <= (state.viewport_pos[0] + state.viewport_size[0]) &&
+        io.MousePos.y >= state.viewport_pos[1] &&
+        io.MousePos.y <= (state.viewport_pos[1] + state.viewport_size[1]);
     const bool can_gizmo =
-        (state.play_state != PlayState::Play) && state.viewport_hovered && !io.WantCaptureMouse;
+        (state.play_state != PlayState::Play) && state.viewport_hovered && mouse_in_render;
     for (auto& kv : registry.skeletons()) {
       const auto entity = kv.first;
       auto& skeleton = kv.second;
