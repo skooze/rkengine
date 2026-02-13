@@ -3397,8 +3397,7 @@ void draw_inspector_panel(EditorState& state) {
       float pos[3] = {bone.local_pose.position[0], bone.local_pose.position[1], bone.local_pose.position[2]};
       float rot[3] = {bone.local_pose.rotation[0], bone.local_pose.rotation[1], bone.local_pose.rotation[2]};
       float scl[3] = {bone.local_pose.scale[0], bone.local_pose.scale[1], bone.local_pose.scale[2]};
-      if (ImGui::InputFloat3("Local Position", pos, "%.3f",
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+      if (ImGui::InputFloat3("Local Position", pos, "%.3f")) {
         bone.local_pose.position[0] = pos[0];
         bone.local_pose.position[1] = pos[1];
         bone.local_pose.position[2] = pos[2];
@@ -3406,8 +3405,7 @@ void draw_inspector_panel(EditorState& state) {
           std::memcpy(bone.bind_local.position, bone.local_pose.position, sizeof(bone.local_pose.position));
         }
       }
-      if (ImGui::InputFloat3("Local Rotation", rot, "%.3f",
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+      if (ImGui::InputFloat3("Local Rotation", rot, "%.3f")) {
         bone.local_pose.rotation[0] = rot[0];
         bone.local_pose.rotation[1] = rot[1];
         bone.local_pose.rotation[2] = rot[2];
@@ -3415,8 +3413,7 @@ void draw_inspector_panel(EditorState& state) {
           std::memcpy(bone.bind_local.rotation, bone.local_pose.rotation, sizeof(bone.local_pose.rotation));
         }
       }
-      if (ImGui::InputFloat3("Local Scale", scl, "%.3f",
-                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+      if (ImGui::InputFloat3("Local Scale", scl, "%.3f")) {
         bone.local_pose.scale[0] = scl[0];
         bone.local_pose.scale[1] = scl[1];
         bone.local_pose.scale[2] = scl[2];
