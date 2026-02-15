@@ -4882,6 +4882,7 @@ void update_camera_and_draw_list(EditorState& state) {
   const float axis_y_color[4] = {0.2f, 0.85f, 0.2f, 1.0f};
   const float axis_z_color[4] = {0.2f, 0.35f, 0.9f, 1.0f};
   const float skeleton_color[4] = {0.9f, 0.85f, 0.2f, 1.0f};
+  bool suppress_entity_pick = false;
 
   const bool show_world_grid = state.show_world_grid || state.play_state == PlayState::Play;
   const bool show_character_grid = state.show_character_grid || state.play_state == PlayState::Play;
@@ -5056,6 +5057,7 @@ void update_camera_and_draw_list(EditorState& state) {
           }
         }
         if (best_axis >= 0) {
+          suppress_entity_pick = true;
           state.bone_gizmo_active = true;
           state.bone_gizmo_axis = best_axis;
           state.bone_gizmo_start_mouse[0] = io.MousePos.x;
@@ -5074,6 +5076,7 @@ void update_camera_and_draw_list(EditorState& state) {
       }
 
       if (state.bone_gizmo_active && state.bone_gizmo_axis >= 0) {
+        suppress_entity_pick = true;
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
           state.bone_gizmo_active = false;
         } else {
@@ -5152,6 +5155,11 @@ void update_camera_and_draw_list(EditorState& state) {
     rkg::set_vulkan_viewport_line_list(line_positions, line_colors, line_count);
   } else {
     rkg::set_vulkan_viewport_line_list(nullptr, nullptr, 0);
+  }
+
+  if (state.pick_requested &&
+      (suppress_entity_pick || state.bone_gizmo_active || state.sequencer.enabled)) {
+    state.pick_requested = false;
   }
 
   if (state.pick_requested) {
