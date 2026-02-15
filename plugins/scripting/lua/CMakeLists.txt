@@ -30,6 +30,42 @@ macro(_rkg_append_unique list_name value)
   list(REMOVE_DUPLICATES ${list_name})
 endmacro()
 
+macro(_rkg_append_lua_include_dir list_name root_dir)
+  set(_rkg_include_dir "")
+  foreach(_rkg_suffix
+    ""
+    lua
+    lua5.4
+    lua-5.4
+    lua.5.4
+    lua5.3
+    lua-5.3
+    lua.5.3
+    lua5.2
+    lua-5.2
+    lua.5.2
+    lua5.1
+    lua-5.1
+    lua.5.1
+    luajit-2.1
+    luajit-2.0
+  )
+    set(_rkg_candidate "${root_dir}")
+    if(NOT "${_rkg_suffix}" STREQUAL "")
+      set(_rkg_candidate "${_rkg_candidate}/${_rkg_suffix}")
+    endif()
+    if(EXISTS "${_rkg_candidate}/lua.h")
+      set(_rkg_include_dir "${_rkg_candidate}")
+      break()
+    endif()
+  endforeach()
+  if(_rkg_include_dir)
+    _rkg_append_unique(${list_name} "${_rkg_include_dir}")
+  else()
+    message(STATUS "Lua detection: dropping include dir without header: ${root_dir}")
+  endif()
+endmacro()
+
 if(Lua_FOUND OR LUA_FOUND)
   message(STATUS "Lua detection: CMake package found (FindLua).")
   if(Lua_VERSION)
@@ -141,24 +177,30 @@ if(NOT RKG_LUA_INCLUDE_DIRS)
   message(STATUS "Lua detection: searching for headers.")
   find_path(RKG_LUA_INCLUDE_HINT
     NAMES lua.h
-    HINTS ENV LUA_DIR
+    PATHS
+      $ENV{LUA_DIR}
+      $ENV{VCPKG_ROOT}
+      /opt/homebrew
+      /usr/local
+      /usr
     PATH_SUFFIXES
       include
       include/lua
-      include/lua5.4
-      include/lua5.3
-      include/lua5.2
-      include/lua5.1
-      include/lua-5.4
-      include/lua-5.3
-      include/lua-5.2
-      include/lua-5.1
-      include/lua54
-      include/lua53
-      include/lua52
-      include/lua51
-      include/luajit-2.1
-      include/luajit-2.0
+      lua
+      lua5.4
+      lua-5.4
+      lua.5.4
+      lua5.3
+      lua-5.3
+      lua.5.3
+      lua5.2
+      lua-5.2
+      lua.5.2
+      lua5.1
+      lua-5.1
+      lua.5.1
+      luajit-2.1
+      luajit-2.0
   )
   if(RKG_LUA_INCLUDE_HINT)
     _rkg_append_unique(RKG_LUA_INCLUDE_DIRS "${RKG_LUA_INCLUDE_HINT}")
@@ -166,6 +208,14 @@ if(NOT RKG_LUA_INCLUDE_DIRS)
   else()
     message(STATUS "Lua detection: header search missed standard locations.")
   endif()
+endif()
+
+set(_RKG_LUA_VALID_INCLUDE_DIRS "")
+foreach(_rkg_dir IN LISTS RKG_LUA_INCLUDE_DIRS)
+  _rkg_append_lua_include_dir(_RKG_LUA_VALID_INCLUDE_DIRS "${_rkg_dir}")
+endforeach()
+if(_RKG_LUA_VALID_INCLUDE_DIRS)
+  set(RKG_LUA_INCLUDE_DIRS "${_RKG_LUA_VALID_INCLUDE_DIRS}")
 endif()
 
 if(RKG_LUA_INCLUDE_DIRS)
