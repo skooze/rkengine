@@ -1,0 +1,7 @@
+[2026-02-15 11:43:40][INFO] log init
+[2026-02-15 11:43:40][INFO] log file: /home/rkoasis/rkg/build_logs/rkg_tests_20260215_114340.log
+[2026-02-15 11:43:40][INFO] platform: linux
+[2026-02-15 11:43:40][INFO] build: debug
+[2026-02-15 11:43:40][INFO] git: 4ae820e
+[2026-02-15 11:43:40][INFO] asset_cache: manny source -> /home/rkoasis/rkg/NecTr/AI_GUARD_1/AI_GUARD_1_Character_output.glb
+[2026-02-15 11:43:40][INFO] asset_cache: auto-importing manny into build/content_cache/generated_assets/manny
