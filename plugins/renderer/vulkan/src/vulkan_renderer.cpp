@@ -1149,8 +1149,6 @@ static rkg::Mat4 mat4_rotation_from_to(const rkg::Vec3& from, const rkg::Vec3& t
 
 static rkg::Vec3 mat4_to_euler_xyz(const rkg::Mat4& m) {
   const float r00 = m.m[0];
-  const float r01 = m.m[4];
-  const float r02 = m.m[8];
   const float r10 = m.m[1];
   const float r11 = m.m[5];
   const float r12 = m.m[9];

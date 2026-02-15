@@ -421,17 +421,6 @@ static bool sweep_sphere_aabb(const Vec3& center,
   return true;
 }
 
-static Vec3 closest_point_aabb(const Vec3& p, const Vec3& center, const Vec3& half_extents) {
-  Vec3 min_b = sub(center, half_extents);
-  Vec3 max_b = add(center, half_extents);
-  Vec3 out = p;
-  out.x = std::min(max_b.x, std::max(min_b.x, out.x));
-  out.y = std::min(max_b.y, std::max(min_b.y, out.y));
-  out.z = std::min(max_b.z, std::max(min_b.z, out.z));
-  return out;
-}
-
-
 static bool sweep_sphere_plane(const Vec3& center,
                                float radius,
                                const Vec3& delta,

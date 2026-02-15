@@ -1384,7 +1384,6 @@ void update_procedural_gait(ecs::Registry& registry, ecs::Entity entity, float d
   const float shoulder_twist = gait->enable_arm_swing ? (0.5f * (swing_r - swing_l)) : twist;
   const float pelvis_yaw = 0.08f * arm_amp * shoulder_twist;
   const float torso_yaw = -0.14f * arm_amp * shoulder_twist;
-  const float rock_amp = (0.06f + 0.18f * speed_norm) * sway_scale;
   const float torso_roll = 0.0f;
   const float chest_roll = 0.0f;
   const float fwd_rock_amp = (0.02f + 0.08f * speed_norm) * speed_norm;
