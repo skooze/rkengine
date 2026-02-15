@@ -189,12 +189,8 @@ if(NOT RKG_LUA_LINK_LIBS)
   endif()
 endif()
 
-if(RKG_LUA_INCLUDE_DIRS)
-  set(_RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_DIRS}")
-else()
-  set(_RKG_LUA_INCLUDE_INPUT)
-endif()
-
+set(_RKG_LUA_INCLUDE_RAW "${RKG_LUA_INCLUDE_DIRS}")
+set(_RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_DIRS}")
 set(_RKG_LUA_SEARCH_HINTS
   $ENV{LUA_DIR}
   $ENV{VCPKG_ROOT}
@@ -202,147 +198,64 @@ set(_RKG_LUA_SEARCH_HINTS
   /usr/local
   /usr
 )
+set(_RKG_LUA_SEARCH_HINTS_INCLUDE)
+foreach(_rkg_hint IN LISTS _RKG_LUA_SEARCH_HINTS)
+  list(APPEND _RKG_LUA_SEARCH_HINTS_INCLUDE "${_rkg_hint}/include")
+  list(APPEND _RKG_LUA_SEARCH_HINTS_INCLUDE "${_rkg_hint}")
+endforeach()
+list(APPEND _RKG_LUA_SEARCH_HINTS_INCLUDE
+  /opt/homebrew/include
+  /usr/local/include
+  /usr/include
+  /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
+)
+list(REMOVE_DUPLICATES _RKG_LUA_SEARCH_HINTS_INCLUDE)
 
-if(NOT _RKG_LUA_INCLUDE_INPUT)
-  message(STATUS "Lua detection: searching for headers.")
-  find_path(RKG_LUA_INCLUDE_HINT
-    NAMES lua.h
-    PATHS ${_RKG_LUA_SEARCH_HINTS}
-    PATH_SUFFIXES
-      include
-      include/lua
-      lua
-      lua5.4
-      lua-5.4
-      lua.5.4
-      lua5.3
-      lua-5.3
-      lua.5.3
-      lua5.2
-      lua-5.2
-      lua.5.2
-      lua5.1
-      lua-5.1
-      lua.5.1
-      luajit-2.1
-      luajit-2.0
-  )
-  if(RKG_LUA_INCLUDE_HINT)
-    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
-    message(STATUS "Lua detection: header search hit: ${RKG_LUA_INCLUDE_HINT}")
-  else()
-    message(STATUS "Lua detection: header search missed standard locations.")
-  endif()
-endif()
-
-if(NOT _RKG_LUA_INCLUDE_INPUT)
-  set(_RKG_LUA_SEARCH_HINTS_EXTRA
-    /opt/homebrew/include
-    /usr/local/include
-    /usr/include
-    /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
-  )
-  message(STATUS "Lua detection: package include paths invalid or absent; fallback scan.")
-  find_path(RKG_LUA_INCLUDE_HINT
-    NAMES lua.h
-    PATHS ${_RKG_LUA_SEARCH_HINTS_EXTRA}
-    PATH_SUFFIXES
-      include
-      include/${CMAKE_LIBRARY_ARCHITECTURE}
-      lua
-      ${CMAKE_LIBRARY_ARCHITECTURE}/lua
-      include/lua5.4
-      include/lua-5.4
-      include/lua.5.4
-      include/lua5.3
-      include/lua-5.3
-      include/lua.5.3
-      include/lua5.2
-      include/lua-5.2
-      include/lua.5.2
-      lua5.4
-      lua-5.4
-      lua.5.4
-      lua5.3
-      lua-5.3
-      lua.5.3
-      lua5.2
-      lua-5.2
-      lua.5.2
-      lua5.1
-      lua-5.1
-      lua.5.1
-      luajit-2.1
-      luajit-2.0
-  )
-  if(RKG_LUA_INCLUDE_HINT)
-    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
-    message(STATUS "Lua detection: fallback header search hit: ${RKG_LUA_INCLUDE_HINT}")
-  else()
-    message(STATUS "Lua detection: fallback header search missed.")
-  endif()
+message(STATUS "Lua detection: searching for headers (package + fallback scan).")
+find_path(RKG_LUA_INCLUDE_HINT
+  NAMES lua.h
+  PATHS ${_RKG_LUA_SEARCH_HINTS_INCLUDE}
+  PATH_SUFFIXES
+    lua
+    lua5.4
+    lua-5.4
+    lua.5.4
+    lua5.3
+    lua-5.3
+    lua.5.3
+    lua5.2
+    lua-5.2
+    lua.5.2
+    lua5.1
+    lua-5.1
+    lua.5.1
+    luajit-2.1
+    luajit-2.0
+)
+if(RKG_LUA_INCLUDE_HINT)
+  list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
+  message(STATUS "Lua detection: header search hit: ${RKG_LUA_INCLUDE_HINT}")
+else()
+  message(STATUS "Lua detection: header search did not find a candidate.")
 endif()
 
 set(_RKG_LUA_VALID_INCLUDE_DIRS "")
 foreach(_rkg_dir IN LISTS _RKG_LUA_INCLUDE_INPUT)
   _rkg_append_lua_include_dir(_RKG_LUA_VALID_INCLUDE_DIRS "${_rkg_dir}")
 endforeach()
+set(_RKG_LUA_INCLUDE_DIRS_FALLBACK "")
+foreach(_rkg_link_dir IN LISTS CMAKE_SYSTEM_PREFIX_PATH)
+  _rkg_append_lua_include_dir(_RKG_LUA_INCLUDE_DIRS_FALLBACK "${_rkg_link_dir}/include")
+  _rkg_append_lua_include_dir(_RKG_LUA_INCLUDE_DIRS_FALLBACK "${_rkg_link_dir}")
+endforeach()
+if(_RKG_LUA_INCLUDE_DIRS_FALLBACK)
+  list(APPEND _RKG_LUA_VALID_INCLUDE_DIRS ${_RKG_LUA_INCLUDE_DIRS_FALLBACK})
+  list(REMOVE_DUPLICATES _RKG_LUA_VALID_INCLUDE_DIRS)
+endif()
 if(_RKG_LUA_VALID_INCLUDE_DIRS)
   set(RKG_LUA_INCLUDE_DIRS "${_RKG_LUA_VALID_INCLUDE_DIRS}")
-endif()
-
-if(NOT _RKG_LUA_VALID_INCLUDE_DIRS)
-  set(_RKG_LUA_INCLUDE_INPUT)
-  set(_RKG_LUA_SEARCH_HINTS_EXTRA
-    /opt/homebrew/include
-    /usr/local/include
-    /usr/include
-    /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
-  )
-  message(STATUS "Lua detection: normalizing package include dirs failed; fallback scanning.")
-  find_path(RKG_LUA_INCLUDE_HINT
-    NAMES lua.h
-    PATHS ${_RKG_LUA_SEARCH_HINTS_EXTRA}
-    PATH_SUFFIXES
-      include
-      include/${CMAKE_LIBRARY_ARCHITECTURE}
-      lua
-      ${CMAKE_LIBRARY_ARCHITECTURE}/lua
-      include/lua5.4
-      include/lua-5.4
-      include/lua.5.4
-      include/lua5.3
-      include/lua-5.3
-      include/lua.5.3
-      include/lua5.2
-      include/lua-5.2
-      include/lua.5.2
-      lua5.4
-      lua-5.4
-      lua.5.4
-      lua5.3
-      lua-5.3
-      lua.5.3
-      lua5.2
-      lua-5.2
-      lua.5.2
-      lua5.1
-      lua-5.1
-      lua.5.1
-      luajit-2.1
-      luajit-2.0
-  )
-  if(RKG_LUA_INCLUDE_HINT)
-    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
-    message(STATUS "Lua detection: fallback scan hit ${RKG_LUA_INCLUDE_HINT}")
-  endif()
-  set(_RKG_LUA_VALID_INCLUDE_DIRS "")
-  foreach(_rkg_dir IN LISTS _RKG_LUA_INCLUDE_INPUT)
-    _rkg_append_lua_include_dir(_RKG_LUA_VALID_INCLUDE_DIRS "${_rkg_dir}")
-  endforeach()
-  if(_RKG_LUA_VALID_INCLUDE_DIRS)
-    set(RKG_LUA_INCLUDE_DIRS "${_RKG_LUA_VALID_INCLUDE_DIRS}")
-  endif()
+else()
+  set(RKG_LUA_INCLUDE_DIRS "")
 endif()
 
 if(RKG_LUA_INCLUDE_DIRS)
@@ -363,25 +276,34 @@ foreach(_rkg_dir IN LISTS RKG_LUA_INCLUDE_DIRS)
 endforeach()
 
 message(STATUS "Lua detection summary (pre-validation):")
-message(STATUS "  includes: ${RKG_LUA_INCLUDE_DIRS}")
+message(STATUS "  includes (package): ${_RKG_LUA_INCLUDE_RAW}")
+message(STATUS "  includes (resolved): ${RKG_LUA_INCLUDE_DIRS}")
 message(STATUS "  libraries: ${RKG_LUA_LINK_LIBS}")
 message(STATUS "  header version: ${RKG_LUA_VERSION}")
 message(STATUS "  Lua_FOUND: ${Lua_FOUND}; LUA_FOUND: ${LUA_FOUND}")
 
 set(RKG_LUA_HAS_NEWSTATE OFF)
 set(RKG_LUA_HAS_OPENLIBS OFF)
-set(RKG_LUA_HAS_LOADFILEX OFF)
+set(RKG_LUA_HAS_DODOFILE OFF)
 set(RKG_LUA_HAS_DOSTRING OFF)
-set(RKG_LUA_HAS_PCALLK OFF)
+set(RKG_LUA_HAS_PCALL OFF)
 set(RKG_LUA_HAS_CHECKINTEGER OFF)
+set(RKG_LUA_HAS_CHECKNUMBER OFF)
+set(RKG_LUA_HAS_GETGLOBAL OFF)
+set(RKG_LUA_HAS_ISFUNCTION OFF)
+set(RKG_LUA_HAS_POP OFF)
 set(RKG_LUA_LINK_TEST_OK OFF)
 if(RKG_LUA_INCLUDE_DIRS)
   check_symbol_exists(luaL_newstate "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_NEWSTATE)
   check_symbol_exists(luaL_openlibs "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_OPENLIBS)
-  check_symbol_exists(luaL_loadfilex "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_LOADFILEX)
+  check_symbol_exists(luaL_dofile "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_DODOFILE)
   check_symbol_exists(luaL_dostring "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_DOSTRING)
-  check_symbol_exists(lua_pcallk "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_PCALLK)
+  check_symbol_exists(lua_pcall "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_PCALL)
   check_symbol_exists(luaL_checkinteger "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_CHECKINTEGER)
+  check_symbol_exists(luaL_checknumber "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_CHECKNUMBER)
+  check_symbol_exists(lua_getglobal "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_GETGLOBAL)
+  check_symbol_exists(lua_isfunction "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_ISFUNCTION)
+  check_symbol_exists(lua_pop "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_POP)
 endif()
 
 set(_RKG_LUA_PROBE_LIBS "")
@@ -413,10 +335,12 @@ if(RKG_LUA_INCLUDE_DIRS AND _RKG_LUA_PROBE_LIBS)
     int main(void) {
       lua_State* (*_rkg_new_state)(void) = luaL_newstate;
       void (*_rkg_open_libs)(lua_State*) = luaL_openlibs;
-      int (*_rkg_load_filex)(lua_State*, const char*, const char*) = luaL_loadfilex;
+      int (*_rkg_dofile)(lua_State*, const char*) = luaL_dofile;
       int (*_rkg_load_string)(lua_State*, const char*) = luaL_loadstring;
-      int (*_rkg_pcallk)(lua_State*, int, int, int, int, lua_CFunction) = lua_pcallk;
+      int (*_rkg_pcall)(lua_State*, int, int, int) = lua_pcall;
       int (*_rkg_type)(lua_State*, int) = lua_type;
+      int (*_rkg_is_function)(lua_State*, int) = lua_isfunction;
+      void (*_rkg_pop)(lua_State*, int) = lua_pop;
       void (*_rkg_settop)(lua_State*, int) = lua_settop;
       int (*_rkg_get_global)(lua_State*, const char*) = lua_getglobal;
       void (*_rkg_push_number)(lua_State*, lua_Number) = lua_pushnumber;
@@ -445,10 +369,14 @@ if(
   RKG_LUA_LINK_TEST_OK
   AND RKG_LUA_HAS_NEWSTATE
   AND RKG_LUA_HAS_OPENLIBS
-  AND RKG_LUA_HAS_LOADFILEX
+  AND RKG_LUA_HAS_DODOFILE
   AND RKG_LUA_HAS_DOSTRING
-  AND RKG_LUA_HAS_PCALLK
+  AND RKG_LUA_HAS_PCALL
   AND RKG_LUA_HAS_CHECKINTEGER
+  AND RKG_LUA_HAS_CHECKNUMBER
+  AND RKG_LUA_HAS_GETGLOBAL
+  AND RKG_LUA_HAS_ISFUNCTION
+  AND RKG_LUA_HAS_POP
   AND NOT RKG_LUA_VERSION STREQUAL "unknown"
   AND RKG_LUA_VERSION GREATER_EQUAL 502
   AND RKG_LUA_LINK_LIBS
@@ -465,6 +393,6 @@ else()
   message(WARNING "Lua detection failed: plugin disabled to avoid unresolved symbols.")
   message(STATUS "  include dirs found: ${RKG_LUA_INCLUDE_DIRS}")
   message(STATUS "  link libs found: ${RKG_LUA_LINK_LIBS}")
-  message(STATUS "  symbol checks: luaL_newstate=${RKG_LUA_HAS_NEWSTATE}, luaL_openlibs=${RKG_LUA_HAS_OPENLIBS}, luaL_loadfilex=${RKG_LUA_HAS_LOADFILEX}, luaL_dostring=${RKG_LUA_HAS_DOSTRING}, lua_pcallk=${RKG_LUA_HAS_PCALLK}, luaL_checkinteger=${RKG_LUA_HAS_CHECKINTEGER}, link-probe=${RKG_LUA_LINK_TEST_OK}, version=${RKG_LUA_VERSION}")
+  message(STATUS "  symbol checks: luaL_newstate=${RKG_LUA_HAS_NEWSTATE}, luaL_openlibs=${RKG_LUA_HAS_OPENLIBS}, luaL_dofile=${RKG_LUA_HAS_DODOFILE}, luaL_dostring=${RKG_LUA_HAS_DOSTRING}, lua_pcall=${RKG_LUA_HAS_PCALL}, luaL_checkinteger=${RKG_LUA_HAS_CHECKINTEGER}, luaL_checknumber=${RKG_LUA_HAS_CHECKNUMBER}, lua_getglobal=${RKG_LUA_HAS_GETGLOBAL}, lua_isfunction=${RKG_LUA_HAS_ISFUNCTION}, lua_pop=${RKG_LUA_HAS_POP}, link-probe=${RKG_LUA_LINK_TEST_OK}, version=${RKG_LUA_VERSION}")
   target_compile_definitions(rkg_plugins_script_lua PRIVATE RKG_HAVE_LUA=0)
 endif()
