@@ -5330,27 +5330,7 @@ int main(int argc, char** argv) {
 
   if (!project_override.has_value()) {
     const auto paths = rkg::resolve_paths(argc > 0 ? argv[0] : nullptr, std::nullopt, "demo_game");
-    const fs::path blank_root = paths.root / "build" / "blank_project";
-    std::error_code ec;
-    fs::create_directories(blank_root / "content" / "levels", ec);
-    const fs::path project_path = blank_root / "project.yaml";
-    if (!fs::exists(project_path)) {
-      std::ofstream out(project_path);
-      out << "project:\n";
-      out << "  name: blank_project\n";
-      out << "  renderer: vulkan\n";
-      out << "  plugins:\n";
-      out << "    - debug_ui_imgui\n";
-      out << "  initial_level: content/levels/blank.yaml\n";
-      out << "  dev_mode: true\n";
-    }
-    const fs::path level_path = blank_root / "content" / "levels" / "blank.yaml";
-    if (!fs::exists(level_path)) {
-      std::ofstream level_out(level_path);
-      level_out << "name: blank\n";
-      level_out << "entities: []\n";
-    }
-    project_override = blank_root;
+    project_override = paths.root / "projects" / "demo_game";
   }
 
   rkg::runtime::RuntimeHost runtime;
