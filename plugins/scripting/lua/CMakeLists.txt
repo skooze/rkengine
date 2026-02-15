@@ -32,6 +32,7 @@ endmacro()
 
 macro(_rkg_append_lua_include_dir list_name root_dir)
   set(_rkg_include_dir "")
+  set(_rkg_found_headers FALSE)
   foreach(_rkg_suffix
     ""
     lua
@@ -54,13 +55,28 @@ macro(_rkg_append_lua_include_dir list_name root_dir)
     if(NOT "${_rkg_suffix}" STREQUAL "")
       set(_rkg_candidate "${_rkg_candidate}/${_rkg_suffix}")
     endif()
-    if(EXISTS "${_rkg_candidate}/lua.h")
+    if(
+      EXISTS "${_rkg_candidate}/lua.h"
+      AND EXISTS "${_rkg_candidate}/lauxlib.h"
+      AND EXISTS "${_rkg_candidate}/lualib.h"
+    )
       set(_rkg_include_dir "${_rkg_candidate}")
+      set(_rkg_found_headers TRUE)
+      break()
+    elseif(
+      EXISTS "${_rkg_candidate}/lua/lua.h"
+      AND EXISTS "${_rkg_candidate}/lua/lauxlib.h"
+      AND EXISTS "${_rkg_candidate}/lua/lualib.h"
+    )
+      set(_rkg_include_dir "${_rkg_candidate}/lua")
+      set(_rkg_found_headers TRUE)
       break()
     endif()
   endforeach()
   if(_rkg_include_dir)
     _rkg_append_unique(${list_name} "${_rkg_include_dir}")
+  elseif(_rkg_found_headers STREQUAL "FALSE")
+    message(STATUS "Lua detection: include dir candidate '${root_dir}' rejected (missing lua.h/lauxlib.h/lualib.h)")
   else()
     message(STATUS "Lua detection: dropping include dir without header: ${root_dir}")
   endif()
@@ -173,16 +189,25 @@ if(NOT RKG_LUA_LINK_LIBS)
   endif()
 endif()
 
-if(NOT RKG_LUA_INCLUDE_DIRS)
+if(RKG_LUA_INCLUDE_DIRS)
+  set(_RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_DIRS}")
+else()
+  set(_RKG_LUA_INCLUDE_INPUT)
+endif()
+
+set(_RKG_LUA_SEARCH_HINTS
+  $ENV{LUA_DIR}
+  $ENV{VCPKG_ROOT}
+  /opt/homebrew
+  /usr/local
+  /usr
+)
+
+if(NOT _RKG_LUA_INCLUDE_INPUT)
   message(STATUS "Lua detection: searching for headers.")
   find_path(RKG_LUA_INCLUDE_HINT
     NAMES lua.h
-    PATHS
-      $ENV{LUA_DIR}
-      $ENV{VCPKG_ROOT}
-      /opt/homebrew
-      /usr/local
-      /usr
+    PATHS ${_RKG_LUA_SEARCH_HINTS}
     PATH_SUFFIXES
       include
       include/lua
@@ -203,19 +228,121 @@ if(NOT RKG_LUA_INCLUDE_DIRS)
       luajit-2.0
   )
   if(RKG_LUA_INCLUDE_HINT)
-    _rkg_append_unique(RKG_LUA_INCLUDE_DIRS "${RKG_LUA_INCLUDE_HINT}")
+    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
     message(STATUS "Lua detection: header search hit: ${RKG_LUA_INCLUDE_HINT}")
   else()
     message(STATUS "Lua detection: header search missed standard locations.")
   endif()
 endif()
 
+if(NOT _RKG_LUA_INCLUDE_INPUT)
+  set(_RKG_LUA_SEARCH_HINTS_EXTRA
+    /opt/homebrew/include
+    /usr/local/include
+    /usr/include
+    /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
+  )
+  message(STATUS "Lua detection: package include paths invalid or absent; fallback scan.")
+  find_path(RKG_LUA_INCLUDE_HINT
+    NAMES lua.h
+    PATHS ${_RKG_LUA_SEARCH_HINTS_EXTRA}
+    PATH_SUFFIXES
+      include
+      include/${CMAKE_LIBRARY_ARCHITECTURE}
+      lua
+      ${CMAKE_LIBRARY_ARCHITECTURE}/lua
+      include/lua5.4
+      include/lua-5.4
+      include/lua.5.4
+      include/lua5.3
+      include/lua-5.3
+      include/lua.5.3
+      include/lua5.2
+      include/lua-5.2
+      include/lua.5.2
+      lua5.4
+      lua-5.4
+      lua.5.4
+      lua5.3
+      lua-5.3
+      lua.5.3
+      lua5.2
+      lua-5.2
+      lua.5.2
+      lua5.1
+      lua-5.1
+      lua.5.1
+      luajit-2.1
+      luajit-2.0
+  )
+  if(RKG_LUA_INCLUDE_HINT)
+    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
+    message(STATUS "Lua detection: fallback header search hit: ${RKG_LUA_INCLUDE_HINT}")
+  else()
+    message(STATUS "Lua detection: fallback header search missed.")
+  endif()
+endif()
+
 set(_RKG_LUA_VALID_INCLUDE_DIRS "")
-foreach(_rkg_dir IN LISTS RKG_LUA_INCLUDE_DIRS)
+foreach(_rkg_dir IN LISTS _RKG_LUA_INCLUDE_INPUT)
   _rkg_append_lua_include_dir(_RKG_LUA_VALID_INCLUDE_DIRS "${_rkg_dir}")
 endforeach()
 if(_RKG_LUA_VALID_INCLUDE_DIRS)
   set(RKG_LUA_INCLUDE_DIRS "${_RKG_LUA_VALID_INCLUDE_DIRS}")
+endif()
+
+if(NOT _RKG_LUA_VALID_INCLUDE_DIRS)
+  set(_RKG_LUA_INCLUDE_INPUT)
+  set(_RKG_LUA_SEARCH_HINTS_EXTRA
+    /opt/homebrew/include
+    /usr/local/include
+    /usr/include
+    /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
+  )
+  message(STATUS "Lua detection: normalizing package include dirs failed; fallback scanning.")
+  find_path(RKG_LUA_INCLUDE_HINT
+    NAMES lua.h
+    PATHS ${_RKG_LUA_SEARCH_HINTS_EXTRA}
+    PATH_SUFFIXES
+      include
+      include/${CMAKE_LIBRARY_ARCHITECTURE}
+      lua
+      ${CMAKE_LIBRARY_ARCHITECTURE}/lua
+      include/lua5.4
+      include/lua-5.4
+      include/lua.5.4
+      include/lua5.3
+      include/lua-5.3
+      include/lua.5.3
+      include/lua5.2
+      include/lua-5.2
+      include/lua.5.2
+      lua5.4
+      lua-5.4
+      lua.5.4
+      lua5.3
+      lua-5.3
+      lua.5.3
+      lua5.2
+      lua-5.2
+      lua.5.2
+      lua5.1
+      lua-5.1
+      lua.5.1
+      luajit-2.1
+      luajit-2.0
+  )
+  if(RKG_LUA_INCLUDE_HINT)
+    list(APPEND _RKG_LUA_INCLUDE_INPUT "${RKG_LUA_INCLUDE_HINT}")
+    message(STATUS "Lua detection: fallback scan hit ${RKG_LUA_INCLUDE_HINT}")
+  endif()
+  set(_RKG_LUA_VALID_INCLUDE_DIRS "")
+  foreach(_rkg_dir IN LISTS _RKG_LUA_INCLUDE_INPUT)
+    _rkg_append_lua_include_dir(_RKG_LUA_VALID_INCLUDE_DIRS "${_rkg_dir}")
+  endforeach()
+  if(_RKG_LUA_VALID_INCLUDE_DIRS)
+    set(RKG_LUA_INCLUDE_DIRS "${_RKG_LUA_VALID_INCLUDE_DIRS}")
+  endif()
 endif()
 
 if(RKG_LUA_INCLUDE_DIRS)
@@ -247,6 +374,7 @@ set(RKG_LUA_HAS_LOADFILEX OFF)
 set(RKG_LUA_HAS_DOSTRING OFF)
 set(RKG_LUA_HAS_PCALLK OFF)
 set(RKG_LUA_HAS_CHECKINTEGER OFF)
+set(RKG_LUA_LINK_TEST_OK OFF)
 if(RKG_LUA_INCLUDE_DIRS)
   check_symbol_exists(luaL_newstate "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_NEWSTATE)
   check_symbol_exists(luaL_openlibs "lua.h;lauxlib.h;lualib.h" RKG_LUA_HAS_OPENLIBS)
