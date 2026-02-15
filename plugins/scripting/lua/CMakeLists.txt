@@ -18,15 +18,25 @@ target_link_libraries(rkg_plugins_script_lua
 
 set(RKG_LUA_AVAILABLE OFF)
 set(RKG_LUA_LINK_LIBS "")
+set(RKG_LUA_INCLUDE_DIRS "")
 
 if(Lua_FOUND)
+  if(LUA_INCLUDE_DIRS)
+    list(APPEND RKG_LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIRS})
+  endif()
+  if(LUA_INCLUDE_DIR)
+    list(APPEND RKG_LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR})
+  endif()
+
   find_library(LUA_AUXLIB NAMES lauxlib5.4 lauxlib)
   find_library(LUA_LUALIB NAMES lualib5.4 lualib)
 
   if(TARGET Lua::Lua)
     list(APPEND RKG_LUA_LINK_LIBS Lua::Lua)
   else()
-    target_include_directories(rkg_plugins_script_lua PUBLIC ${LUA_INCLUDE_DIR})
+    if(RKG_LUA_INCLUDE_DIRS)
+      target_include_directories(rkg_plugins_script_lua PUBLIC ${RKG_LUA_INCLUDE_DIRS})
+    endif()
     list(APPEND RKG_LUA_LINK_LIBS ${LUA_LIBRARIES})
   endif()
 
@@ -38,8 +48,8 @@ if(Lua_FOUND)
   endif()
 
   # Verify we can link a basic lauxlib symbol; if not, disable Lua to avoid link failures.
-  set(CMAKE_REQUIRED_INCLUDES ${LUA_INCLUDE_DIR})
-  set(CMAKE_REQUIRED_LIBRARIES ${LUA_LIBRARIES} ${LUA_AUXLIB} ${LUA_LUALIB})
+  set(CMAKE_REQUIRED_INCLUDES ${RKG_LUA_INCLUDE_DIRS})
+  set(CMAKE_REQUIRED_LIBRARIES ${RKG_LUA_LINK_LIBS})
   check_symbol_exists(luaL_newstate "lua.h;lauxlib.h" RKG_LUA_HAS_LAUXLIB)
   set(CMAKE_REQUIRED_INCLUDES "")
   set(CMAKE_REQUIRED_LIBRARIES "")
